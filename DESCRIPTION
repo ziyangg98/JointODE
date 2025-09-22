@@ -39,7 +39,8 @@ Suggests:
     tidyr,
     patchwork,
     purrr,
-    gridExtra
+    gridExtra,
+    latex2exp
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 Depends:
