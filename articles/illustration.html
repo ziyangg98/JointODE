@@ -77,109 +77,63 @@
     
     
 <div class="section level2">
-<h2 id="biomarker-trajectories">Biomarker Trajectories<a class="anchor" aria-label="anchor" href="#biomarker-trajectories"></a>
+<h2 id="mathematical-framework">Mathematical Framework<a class="anchor" aria-label="anchor" href="#mathematical-framework"></a>
 </h2>
-<blockquote>
-<p><strong>Note</strong>: This part draws inspiration from the <a href="https://CRAN.R-project.org/package=doremi" class="external-link">doremi</a> package for
-modeling dynamical systems.</p>
-</blockquote>
-<p>Ordinary differential equations (ODEs) provide a rigorous
-mathematical framework for characterizing biomarker dynamics in complex
-biological systems. This vignette analyzes second-order ODE models,
-emphasizing damping’s role in system behavior.</p>
-<p>The temporal evolution of biomarkers is governed by the following
-second-order linear ordinary differential equation with initial
-conditions:</p>
-<p><span class="math display">\frac{d^2m}{dt^2} +
-2\xi\omega_n\frac{dm}{dt} + \omega_n^2 m = k\omega_n^2 u(t), \quad m(0)
-= m_0, \quad \frac{dm}{dt}(0) = v_0</span></p>
-<p>where:</p>
+<p><span class="math display">\ddot{m}(t) + 2\xi\omega\dot{m}(t) +
+\omega^2 m(t) = k\omega^2 u(t), \quad m(0) = m_0, \quad \dot{m}(0) =
+v_0</span></p>
+<p><strong>Parameters:</strong></p>
 <ul>
 <li>
-<span class="math inline">m(t)</span>: biomarker value at time <span class="math inline">t</span>
-</li>
+<span class="math inline">m(t)</span>: biomarker value</li>
 <li>
-<span class="math inline">\xi</span>: damping ratio
-(dimensionless)</li>
+<span class="math inline">\xi</span>: damping ratio (stability
+control)</li>
 <li>
-<span class="math inline">\omega_n</span>: natural frequency
-(rad/s)</li>
+<span class="math inline">\omega = 2\pi/T</span>: natural
+frequency</li>
 <li>
 <span class="math inline">k</span>: steady-state gain</li>
 <li>
-<span class="math inline">u(t)</span>: excitation function</li>
+<span class="math inline">u(t)</span>: external excitation</li>
 </ul>
-<p>Three key characteristics govern system dynamics:</p>
-<ol style="list-style-type: decimal">
-<li>
-<strong>Damping Ratio</strong> (<span class="math inline">\xi</span>): Controls oscillatory behavior and
-stability</li>
-<li>
-<strong>Oscillation Period</strong> (<span class="math inline">T=2\pi/\omega_n</span>): Time between successive
-peaks</li>
-<li>
-<strong>Steady-State Equilibrium</strong> (<span class="math inline">m_{eq}</span>): Asymptotic value when derivatives
-vanish</li>
-</ol>
+<div class="section level3">
+<h3 id="systematic-classification">Systematic Classification<a class="anchor" aria-label="anchor" href="#systematic-classification"></a>
+</h3>
+<p>Complete 2<em>3 matrix: <span class="math inline">\omega^2</span>
+(motion type) </em> <span class="math inline">\omega\xi</span> (energy
+behavior)</p>
+<p><img src="illustration_files/figure-html/dynamic-cases-1.png" width="1152" style="display: block; margin: auto;"><img src="illustration_files/figure-html/dynamic-cases-2.png" width="1152" style="display: block; margin: auto;"></p>
+</div>
 <div class="section level3">
 <h3 id="autonomous-systems">Autonomous Systems<a class="anchor" aria-label="anchor" href="#autonomous-systems"></a>
 </h3>
-<p>For autonomous systems with constant excitation (<span class="math inline">u(t) = c</span>), we simulate various damping ratios
-with zero excitation (<span class="math inline">c = 0</span>):</p>
+<p><strong>Constant excitation</strong> (<span class="math inline">u(t)
+= 0</span>):</p>
 <p><img src="illustration_files/figure-html/dynamics-plots-1.png" width="1152" style="display: block; margin: auto;"></p>
-<table class="table">
-<colgroup>
-<col width="44%">
-<col width="25%">
-<col width="30%">
-</colgroup>
-<thead><tr class="header">
-<th>Damping Range</th>
-<th>Dynamic Regime</th>
-<th>Qualitative Behavior</th>
-</tr></thead>
-<tbody>
-<tr class="odd">
-<td><span class="math inline">\xi \leq 0</span></td>
-<td>Unstable/Marginally Stable</td>
-<td>Exponential divergence or sustained oscillations</td>
-</tr>
-<tr class="even">
-<td><span class="math inline">0 &lt; \xi \leq 0.7</span></td>
-<td>Underdamped</td>
-<td>Decaying oscillations with convergence to equilibrium</td>
-</tr>
-<tr class="odd">
-<td><span class="math inline">0.7 &lt; \xi &lt; 1</span></td>
-<td>Near-Critical Damping</td>
-<td>Rapid convergence with minimal overshoot</td>
-</tr>
-<tr class="even">
-<td><span class="math inline">\xi \geq 1</span></td>
-<td>Overdamped</td>
-<td>Monotonic exponential approach to equilibrium</td>
-</tr>
-</tbody>
-</table>
+<ul>
+<li>
+<strong>Stable:</strong> <span class="math inline">\omega^2 \geq
+0</span> AND <span class="math inline">\omega\xi &gt; 0</span>
+</li>
+<li>
+<strong>Marginally stable:</strong> <span class="math inline">\omega^2 \geq 0</span> AND <span class="math inline">\omega\xi = 0</span>
+</li>
+<li>
+<strong>Unstable:</strong> <span class="math inline">\omega^2 &lt;
+0</span> OR <span class="math inline">\omega\xi &lt; 0</span>
+</li>
+</ul>
 </div>
 <div class="section level3">
-<h3 id="non-autonomous-system">Non-Autonomous System<a class="anchor" aria-label="anchor" href="#non-autonomous-system"></a>
+<h3 id="non-autonomous-systems">Non-Autonomous Systems<a class="anchor" aria-label="anchor" href="#non-autonomous-systems"></a>
 </h3>
-<p>Non-autonomous systems with time-varying excitation <span class="math inline">u(t)</span> occur in pharmacological and
-environmental contexts. The response depends on both damping ratio <span class="math inline">\xi</span> and input characteristics.</p>
-<p>Consider a step input at <span class="math inline">t = 50</span>:</p>
-<p><span class="math display">
-u(t) = \begin{cases}
-0 &amp; t &lt; 50 \\
-0.5 &amp; t \geq 50
-\end{cases}
-</span></p>
-<p>This induces a transition from <span class="math inline">m_{\text{eq}} = 0</span> to <span class="math inline">m_{\text{eq}} = 0.5k</span>, with transient behavior
-determined by <span class="math inline">\xi</span>:</p>
+<p><strong>Step excitation:</strong> <span class="math inline">u(t) =
+0.5 \cdot \mathbb{1}_{t \geq 50}</span></p>
 <p><img src="illustration_files/figure-html/non-autonomous-1.png" width="1152" style="display: block; margin: auto;"></p>
 </div>
 <div class="section level3">
-<h3 id="real-data-examples">Real-Data Examples<a class="anchor" aria-label="anchor" href="#real-data-examples"></a>
+<h3 id="real-data-examples">Real Data Examples<a class="anchor" aria-label="anchor" href="#real-data-examples"></a>
 </h3>
 <p>Four biological datasets illustrate distinct damping behaviors:</p>
 <ul>
@@ -199,38 +153,123 @@ intravenous injection of the anti-inflammatory drug in 6 subjects</li>
 measurements over time from a forestry growth study</li>
 </ul>
 <p><img src="illustration_files/figure-html/real-data-1.png" width="1152" style="display: block; margin: auto;"></p>
-<p>This analysis requires <span class="math inline">\omega_n^2 \geq
+<p>This analysis requires <span class="math inline">\omega^2 \geq
 0</span> for real natural frequencies, focusing on stable or oscillatory
-systems that better represent biological reality. Systems with <span class="math inline">\omega_n^2 &lt; 0</span> exhibit purely exponential
+systems that better represent biological reality. Systems with <span class="math inline">\omega^2 &lt; 0</span> exhibit purely exponential
 divergence without oscillations and lack practical relevance for
 modeling physiological processes.</p>
 </div>
+<div class="section level3">
+<h3 id="theoretical-analysis">Theoretical Analysis<a class="anchor" aria-label="anchor" href="#theoretical-analysis"></a>
+</h3>
+<table style="width:100%;" class="table">
+<colgroup>
+<col width="20%">
+<col width="24%">
+<col width="33%">
+<col width="22%">
+</colgroup>
+<thead><tr class="header">
+<th>Damping</th>
+<th>Condition</th>
+<th>Solution Form</th>
+<th>Behavior</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>Underdamped</td>
+<td>
+<span class="math inline">0 &lt; \xi &lt; 1</span>, <span class="math inline">\omega^2 &gt; 0</span>
+</td>
+<td><span class="math inline">e^{-\xi\omega t}[A\cos(\omega_d t) +
+B\sin(\omega_d t)]</span></td>
+<td>Decaying oscillations</td>
+</tr>
+<tr class="even">
+<td>Critically damped</td>
+<td>
+<span class="math inline">\xi = 1</span>, <span class="math inline">\omega^2 &gt; 0</span>
+</td>
+<td><span class="math inline">(A + Bt)e^{-\omega t}</span></td>
+<td>Fastest decay without oscillation</td>
+</tr>
+<tr class="odd">
+<td>Overdamped</td>
+<td>
+<span class="math inline">\xi &gt; 1</span>, <span class="math inline">\omega^2 &gt; 0</span>
+</td>
+<td><span class="math inline">Ae^{\lambda_1 t} + Be^{\lambda_2
+t}</span></td>
+<td>Slow exponential decay</td>
+</tr>
+<tr class="even">
+<td>Undamped</td>
+<td>
+<span class="math inline">\xi = 0</span>, <span class="math inline">\omega^2 &gt; 0</span>
+</td>
+<td><span class="math inline">A\cos(\omega t) + B\sin(\omega
+t)</span></td>
+<td>Sustained oscillations</td>
+</tr>
+<tr class="odd">
+<td>Unstable</td>
+<td>
+<span class="math inline">\omega^2 &lt; 0</span> or <span class="math inline">\omega\xi &lt; 0</span>
+</td>
+<td>Exponential growth</td>
+<td>System diverges</td>
+</tr>
+</tbody>
+</table>
+<p>where:</p>
+<ul>
+<li>
+<span class="math inline">\omega_d = \omega\sqrt{1 - \xi^2}</span>:
+damped natural frequency</li>
+<li>
+<span class="math inline">\lambda_{1,2} = -\xi\omega \pm
+\omega\sqrt{\xi^2 - 1}</span>: overdamped eigenvalues</li>
+<li>
+<span class="math inline">A, B</span>: constants determined by
+initial conditions <span class="math inline">m_0, v_0</span>
+</li>
+</ul>
+</div>
 </div>
 <div class="section level2">
-<h2 id="survival-outcomes">Survival Outcomes<a class="anchor" aria-label="anchor" href="#survival-outcomes"></a>
+<h2 id="joint-model-with-survival-outcomes">Joint Model with Survival Outcomes<a class="anchor" aria-label="anchor" href="#joint-model-with-survival-outcomes"></a>
 </h2>
 <p>The hazard function incorporates both the biomarker level and its
 rate of change:</p>
-<p><span class="math display">h(t) = h_0(t) \exp(\alpha_1 m(t) +
-\alpha_2 |\dot{m}(t)|)</span></p>
+<p><span class="math display">\lambda(t) = \lambda_0(t) \exp(\alpha_1
+m(t) + \alpha_2 \dot{m}^{\gamma}(t))</span></p>
+<p>where:</p>
+<ul>
+<li>
+<span class="math inline">\lambda_0(t)</span>: baseline hazard
+function</li>
+<li>
+<span class="math inline">\alpha_1, \alpha_2</span>: regression
+coefficients for biomarker level and velocity</li>
+<li>
+<span class="math inline">\gamma=0,1,2</span>: power transformation
+for velocity (e.g., <span class="math inline">\gamma=2</span> squared to
+capture magnitude)</li>
+</ul>
 <p>This formulation captures two distinct aspects of risk:</p>
 <ul>
 <li>
 <span class="math inline">m(t)</span>: The biomarker level itself
 (e.g., elevated glucose indicating immediate risk)</li>
 <li>
-<span class="math inline">|\dot{m}(t)|</span>: The biomarker
+<span class="math inline">\dot{m}(t)</span>: The biomarker
 volatility (e.g., rapid fluctuations indicating instability)</li>
 </ul>
-<p>By incorporating <span class="math inline">|\dot{m}(t)|</span>, we
-effectively model both the biomarker’s central tendency and its temporal
+<p>By incorporating <span class="math inline">\dot{m}^{\gamma}(t)</span>, we effectively model
+both the biomarker’s central tendency and its temporal
 variability—analogous to simultaneously capturing mean and variance
 effects on survival risk. This dual characterization provides richer
 prognostic information than static measurements alone.</p>
-<p>In diabetes management, stable glucose levels suggest controlled
-disease, while rapid fluctuations (large <span class="math inline">|\dot{m}(t)|</span>) indicate poor glycemic control
-and elevated complication risk, independent of the average glucose
-level.</p>
 <p><strong>Remark:</strong> For oscillatory biomarker dynamics (<span class="math inline">\xi &lt; 1</span>), using absolute values prevents
 positive and negative velocity contributions from canceling in
 cumulative hazard calculations, ensuring that all variability

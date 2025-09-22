@@ -108,13 +108,12 @@ Measurement error</li>
 <p>The biomarker trajectory evolution is characterized by the following
 second-order differential equation:</p>
 <p><span class="math display">
-\ddot{m}_i(t) + 2 \xi \omega_n \dot{m}_i(t) + \omega_n^2 m_i(t) = k
-\omega_n^2 \boldsymbol{X}_i(t)^{\top} \boldsymbol{\beta},
+\ddot{m}_i(t) + 2 \xi \omega \dot{m}_i(t) + \omega^2 m_i(t) = k \omega^2
+\boldsymbol{X}_i(t)^{\top} \boldsymbol{\beta},
 </span></p>
 <p>where <span class="math inline">\dot{m}_i(t)</span> and <span class="math inline">\ddot{m}_i(t)</span> denote the biomarker’s velocity
 and acceleration, respectively, and <span class="math inline">\boldsymbol{X}_i(t)</span> denotes time-varying
-covariates. The parameters have the usual interpretations: <span class="math inline">\omega_n &gt; 0</span> is the natural frequency,
-<span class="math inline">\xi</span> is the damping ratio, and <span class="math inline">k</span> is the steady-state gain.</p>
+covariates. The parameters have the usual interpretations: <span class="math inline">\omega &gt; 0</span> is the natural frequency, <span class="math inline">\xi</span> is the damping ratio, and <span class="math inline">k</span> is the steady-state gain.</p>
 </div>
 <div class="section level3">
 <h3 id="survival-sub-model">Survival Sub-Model<a class="anchor" aria-label="anchor" href="#survival-sub-model"></a>
@@ -516,19 +515,18 @@ the <span class="math inline">k</span>-th position and 0 elsewhere).</p>
 </h2>
 <p>For the longitudinal sub-model, there are several statistcs that are
 useful for inference, including <span class="math inline">T =
-\frac{2\pi}{\omega_n}</span> and the damping ratio <span class="math inline">\xi</span>.</p>
+\frac{2\pi}{\omega}</span> and the damping ratio <span class="math inline">\xi</span>.</p>
 <p>However, these are not directly estimated parameters. We can use the
 delta method to obtain their standard errors.</p>
 <p>Since <span class="math display">
-\omega_n = \sqrt{-\beta_1}, \quad \xi =
--\frac{\beta_2}{2\sqrt{-\beta_1}},
+\omega = \sqrt{-\beta_1}, \quad \xi = -\frac{\beta_2}{2\sqrt{-\beta_1}},
 </span> we have <span class="math display">
 \frac{\partial T}{\partial \beta_1} = -\frac{\pi}{(-\beta_1)^{3/2}},
 \quad \frac{\partial T}{\partial \beta_2} = 0, \quad
 \frac{\partial \xi}{\partial \beta_1} =
 -\frac{\beta_2}{4(-\beta_1)^{3/2}}, \quad \frac{\partial \xi}{\partial
 \beta_2} = -\frac{1}{2\sqrt{-\beta_1}}.
-</span> Thus, the variance-covariance matrix of <span class="math inline">(\omega_n, \xi)</span> can be approximated as <span class="math display">
+</span> Thus, the variance-covariance matrix of <span class="math inline">(\omega, \xi)</span> can be approximated as <span class="math display">
 \mathbf{J} \begin{pmatrix}
 \text{Var}(\beta_1) &amp; \text{Cov}(\beta_1, \beta_2) \\
 \text{Cov}(\beta_1, \beta_2) &amp; \text{Var}(\beta_2)
