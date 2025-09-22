@@ -34,10 +34,10 @@ where:
 The biomarker trajectory evolution is characterized by the following second-order differential equation:
 
 $$
-\ddot{m}_i(t) + 2 \xi \omega_n \dot{m}_i(t) + \omega_n^2 m_i(t) = k \omega_n^2 \boldsymbol{X}_i(t)^{\top} \boldsymbol{\beta},
+\ddot{m}_i(t) + 2 \xi \omega \dot{m}_i(t) + \omega^2 m_i(t) = k \omega^2 \boldsymbol{X}_i(t)^{\top} \boldsymbol{\beta},
 $$
 
-where $\dot{m}_i(t)$ and $\ddot{m}_i(t)$ denote the biomarker’s velocity and acceleration, respectively, and $\boldsymbol{X}_i(t)$ denotes time-varying covariates. The parameters have the usual interpretations: $\omega_n > 0$ is the natural frequency, $\xi$ is the damping ratio, and $k$ is the steady-state gain.
+where $\dot{m}_i(t)$ and $\ddot{m}_i(t)$ denote the biomarker’s velocity and acceleration, respectively, and $\boldsymbol{X}_i(t)$ denotes time-varying covariates. The parameters have the usual interpretations: $\omega > 0$ is the natural frequency, $\xi$ is the damping ratio, and $k$ is the steady-state gain.
 
 ### Survival Sub-Model
 
@@ -304,20 +304,20 @@ where $\mathbf{e}_k$ is the $k$-th unit vector (i.e., a vector with 1 in the $k$
 
 ## Inference
 
-For the longitudinal sub-model, there are several statistcs that are useful for inference, including $T = \frac{2\pi}{\omega_n}$ and the damping ratio $\xi$.
+For the longitudinal sub-model, there are several statistcs that are useful for inference, including $T = \frac{2\pi}{\omega}$ and the damping ratio $\xi$.
 
 However, these are not directly estimated parameters. We can use the delta method to obtain their standard errors.
 
 Since
 $$
-\omega_n = \sqrt{-\beta_1}, \quad \xi = -\frac{\beta_2}{2\sqrt{-\beta_1}},
+\omega = \sqrt{-\beta_1}, \quad \xi = -\frac{\beta_2}{2\sqrt{-\beta_1}},
 $$
 we have
 $$
 \frac{\partial T}{\partial \beta_1} = -\frac{\pi}{(-\beta_1)^{3/2}}, \quad \frac{\partial T}{\partial \beta_2} = 0, \quad
 \frac{\partial \xi}{\partial \beta_1} = -\frac{\beta_2}{4(-\beta_1)^{3/2}}, \quad \frac{\partial \xi}{\partial \beta_2} = -\frac{1}{2\sqrt{-\beta_1}}.
 $$
-Thus, the variance-covariance matrix of $(\omega_n, \xi)$ can be approximated as
+Thus, the variance-covariance matrix of $(\omega, \xi)$ can be approximated as
 $$
 \mathbf{J} \begin{pmatrix}
 \text{Var}(\beta_1) & \text{Cov}(\beta_1, \beta_2) \\

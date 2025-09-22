@@ -54,7 +54,8 @@
 #' Initial conditions:
 #' \deqn{m_i(0) = -3.0 + \mathbf{X}_i^T\boldsymbol{\beta}_{init} + 0.2 b_i,
 #'       \quad \dot{m}_i(0) = 0}
-#' where \eqn{\boldsymbol{\beta}_{init} = (0.1, -0.1)^T} and \eqn{b_i} is the random effect.
+#' where \eqn{\boldsymbol{\beta}_{init} = (0.1, -0.1)^T} and \eqn{b_i} is the
+#' random effect.
 #'
 #' Observed measurements:
 #' \deqn{y_{ij} = m_i(t_{ij}) + b_i + \epsilon_{ij},

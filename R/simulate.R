@@ -589,60 +589,6 @@ simulate <- function(
   data.frame(id = x$id, biomarker = value, velocity = slope)
 }
 
-.solve_simple_biomarker_ode <- function(
-  times = seq(0, 100, by = 0.1),
-  init = c(1, 0),
-  configurations = list()
-) {
-  .calculate_acceleration <- function(t, biomarker, velocity, parms) {
-    omega <- 2 * pi / parms$period
-    -2 *
-      parms$xi *
-      omega *
-      velocity -
-      (omega^2) * biomarker +
-      parms$k * (omega^2) * parms$excitation(t)
-  }
-  .ode_deriv <- function(t, state, parms) {
-    biomarker <- state[1]
-    velocity <- state[2]
-    acceleration <- .calculate_acceleration(
-      t,
-      biomarker,
-      velocity,
-      parms
-    )
-    list(c(velocity, acceleration))
-  }
-  default_config <- list(
-    xi = -0.2,
-    period = 20,
-    k = 1.0,
-    excitation = function(t) 0
-  )
-  ode_parms <- modifyList(default_config, configurations)
-  ode_solution <- deSolve::ode(
-    y = init,
-    times = sort(c(0, times)),
-    func = .ode_deriv,
-    parms = ode_parms
-  )
-  acceleration <- .calculate_acceleration(
-    ode_solution[, 1],
-    ode_solution[, 2],
-    ode_solution[, 3],
-    ode_parms
-  )
-  idx <- match(times, ode_solution[, 1])
-  data.frame(
-    time = times,
-    biomarker = ode_solution[idx, 2],
-    velocity = ode_solution[idx, 3],
-    acceleration = acceleration[idx]
-  )
-}
-
-
 .solve_biomarker_ode <- function(times, x, init, longitudinal) {
   .ode_deriv <- function(t, state, parms) {
     biomarker <- state[1]

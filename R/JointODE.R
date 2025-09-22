@@ -779,7 +779,8 @@ summary.JointODE <- function(object, ...) {
       grad_xi_slope <- -1 / (2 * sqrt(-value_coef))
 
       # Variance of xi using Delta method with covariance
-      var_xi <- grad_xi_value^2 * var_value +
+      var_xi <- grad_xi_value^2 *
+        var_value +
         grad_xi_slope^2 * var_slope +
         2 * grad_xi_value * grad_xi_slope * cov_value_slope
       se_xi <- sqrt(var_xi)

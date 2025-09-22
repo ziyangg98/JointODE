@@ -28,35 +28,222 @@ library(nlme)
 library(ggplot2)
 library(gridExtra)
 library(grid)
+library(latex2exp)
 ```
 
-## Biomarker Trajectories
+## Mathematical Framework
 
-> **Note**: This part draws inspiration from the [doremi](https://CRAN.R-project.org/package=doremi) package for modeling dynamical systems.
+```{r function, echo=FALSE}
+.solve_simple_biomarker_ode <- function(
+  times = seq(0, 100, by = 0.1),
+  init = c(1, 0),
+  configurations = list()
+) {
+  .calculate_acceleration <- function(t, biomarker, velocity, parms) {
+    omega <- 2 * pi / parms$period
+    -2 *
+      as.numeric(parms$xi * omega) *
+      velocity -
+      as.numeric(omega^2) * biomarker +
+      parms$k * as.numeric(omega^2) * parms$excitation(t)
+  }
+  .ode_deriv <- function(t, state, parms) {
+    biomarker <- state[1]
+    velocity <- state[2]
+    acceleration <- .calculate_acceleration(
+      t,
+      biomarker,
+      velocity,
+      parms
+    )
+    list(c(velocity, acceleration))
+  }
+  default_config <- list(
+    xi = -0.2,
+    period = 20,
+    k = 1.0,
+    excitation = function(t) 0
+  )
+  ode_parms <- modifyList(default_config, configurations)
+  ode_solution <- deSolve::ode(
+    y = init,
+    times = sort(c(0, times)),
+    func = .ode_deriv,
+    parms = ode_parms
+  )
+  acceleration <- .calculate_acceleration(
+    ode_solution[, 1],
+    ode_solution[, 2],
+    ode_solution[, 3],
+    ode_parms
+  )
+  idx <- match(times, ode_solution[, 1])
+  data.frame(
+    time = times,
+    biomarker = ode_solution[idx, 2],
+    velocity = ode_solution[idx, 3],
+    acceleration = acceleration[idx]
+  )
+}
+```
 
-Ordinary differential equations (ODEs) provide a rigorous mathematical framework for characterizing biomarker dynamics in complex biological systems. This vignette analyzes second-order ODE models, emphasizing damping's role in system behavior.
 
-The temporal evolution of biomarkers is governed by the following second-order linear ordinary differential equation with initial conditions:
+$$\ddot{m}(t) + 2\xi\omega\dot{m}(t) + \omega^2 m(t) = k\omega^2 u(t), \quad m(0) = m_0, \quad \dot{m}(0) = v_0$$
 
-$$\frac{d^2m}{dt^2} + 2\xi\omega_n\frac{dm}{dt} + \omega_n^2 m = k\omega_n^2 u(t), \quad m(0) = m_0, \quad \frac{dm}{dt}(0) = v_0$$
+**Parameters:**
 
-where:
-
-- $m(t)$: biomarker value at time $t$
-- $\xi$: damping ratio (dimensionless)
-- $\omega_n$: natural frequency (rad/s)
+- $m(t)$: biomarker value
+- $\xi$: damping ratio (stability control)
+- $\omega = 2\pi/T$: natural frequency
 - $k$: steady-state gain
-- $u(t)$: excitation function
+- $u(t)$: external excitation
 
-Three key characteristics govern system dynamics:
+### Systematic Classification
 
-1. **Damping Ratio** ($\xi$): Controls oscillatory behavior and stability
-2. **Oscillation Period** ($T=2\pi/\omega_n$): Time between successive peaks
-3. **Steady-State Equilibrium** ($m_{eq}$): Asymptotic value when derivatives vanish
+Complete 2*3 matrix: $\omega^2$ (motion type) * $\omega\xi$ (energy behavior)
+
+```{r dynamic-cases, fig.width=12, fig.height=6, echo=FALSE, message=FALSE, warning=FALSE}
+cases <- list(
+  # omega^2 < 0 (all unstable)
+  list(
+    name = "omega^2 < 0, omega*xi < 0",
+    xi = 0.5i, period = 20i, k = 1.0,
+    excitation = function(t) 0, init = c(1, 0)
+  ),
+  list(
+    name = "omega^2 < 0, omega*xi = 0",
+    xi = 0, period = 20i, k = 1.0,
+    excitation = function(t) 0, init = c(1, 0)
+  ),
+  list(
+    name = "omega^2 < 0, omega*xi > 0",
+    xi = -0.5i, period = 20i, k = 1.0,
+    excitation = function(t) 0, init = c(1, 0)
+  ),
+
+  # omega^2 > 0
+  list(
+    name = "omega^2 > 0, omega*xi < 0",
+    xi = -0.3, period = 20, k = 1.0,
+    excitation = function(t) 0, init = c(1, 0)
+  ),
+  list(
+    name = "omega^2 > 0, omega*xi = 0",
+    xi = 0, period = 20, k = 1.0,
+    excitation = function(t) 0, init = c(1, 0)
+  ),
+  list(
+    name = "omega^2 > 0, omega*xi > 0",
+    xi = 0.3, period = 20, k = 1.0,
+    excitation = function(t) 0, init = c(1, 0)
+  )
+)
+
+# Simulate each case
+case_data <- map_df(cases, function(case) {
+  # Shorter time for unstable cases
+  max_time <- 100
+  times <- seq(0, max_time, by = 0.1)
+
+  result <- .solve_simple_biomarker_ode(
+    times = times,
+    init = case$init,
+    configurations = list(
+      xi = case$xi,
+      period = case$period,
+      k = case$k,
+      excitation = case$excitation
+    )
+  )
+
+  # Calculate ω and display values
+  omega <- 2 * pi / case$period
+  omega_squared <- omega^2 * case$k  # Effective omega^2
+  omega_xi <- omega * case$xi
+
+  data.frame(
+    time = result$time,
+    biomarker = result$biomarker,
+    velocity = result$velocity,
+    case_name = case$name,
+    omega_squared = as.numeric(omega_squared),
+    omega_xi = as.numeric(omega_xi),
+    xi = as.numeric(case$xi)
+  )
+})
+
+# Time series plot
+p_cases_time <- ggplot(
+  case_data,
+  aes(x = time, y = biomarker)
+) +
+  geom_line(linewidth = 1, alpha = 0.9, aes(color = omega_squared)) +
+  geom_hline(yintercept = 0, linetype = "dotted", alpha = 0.4) +
+  facet_wrap(~case_name, scales = "free", ncol = 3,
+             labeller = labeller(case_name = function(x) {
+               gsub("omega\\^2", "\u03C9\u00B2", gsub("omega\\*xi", "\u03C9\u03BE", x))
+             })) +
+  scale_color_gradient2(
+    name = expression(omega^2),
+    low = "red",
+    mid = "gray",
+    high = "blue",
+    midpoint = 0
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(face = "bold", size = 14),
+    strip.text = element_text(face = "bold", size = 9),
+    strip.background = element_rect(fill = "gray95", color = NA),
+    panel.grid.minor = element_blank()
+  ) +
+  labs(
+    x = "Time",
+    y = "Biomarker Value"
+  )
+
+# Display biomarker dynamics
+print(p_cases_time)
+
+# Phase portrait
+p_cases_phase <- ggplot(
+  case_data,
+  aes(x = biomarker, y = velocity)
+) +
+  geom_path(size = 0.8, alpha = 0.7, aes(color = time)) +
+  geom_point(
+    data = case_data %>%
+      group_by(case_name) %>%
+      slice_min(time),
+    size = 3, shape = 21, fill = "green", color = "darkgreen"
+  ) +
+  facet_wrap(~case_name, scales = "free", ncol = 3,
+             labeller = labeller(case_name = function(x) {
+               gsub("omega\\^2", "\u03C9\u00B2", gsub("omega\\*xi", "\u03C9\u03BE", x))
+             })) +
+  scale_color_viridis_c(name = "Time", option = "magma") +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(face = "bold", size = 14),
+    strip.text = element_text(face = "bold", size = 9),
+    strip.background = element_rect(fill = "gray95", color = NA),
+    panel.grid.minor = element_blank()
+  ) +
+  labs(
+    title = "Phase Portraits",
+    x = "Biomarker",
+    y = "Velocity (dm/dt)"
+  )
+
+# Display phase portraits
+print(p_cases_phase)
+```
 
 ### Autonomous Systems
 
-For autonomous systems with constant excitation ($u(t) = c$), we simulate various damping ratios with zero excitation ($c = 0$):
+**Constant excitation** ($u(t) = 0$):
 
 ```{r simulation, echo=FALSE, message=FALSE, warning=FALSE}
 # Define damping ratios including key values
@@ -67,10 +254,10 @@ xi_group <- cut(
   xi,
   breaks = c(-Inf, 0, 0.7, 1, Inf),
   labels = c(
-    "Divergent (ξ ≤ 0)",
-    "Underdamped (0 < ξ ≤ 0.7)",
-    "Critical (0.7 < ξ < 1)",
-    "Overdamped (ξ ≥ 1)"
+    "Divergent (xi <= 0)",
+    "Underdamped (0 < xi <= 0.7)",
+    "Critical (0.7 < xi < 1)",
+    "Overdamped (xi >= 1)"
   ),
   include.lowest = TRUE,
   right = TRUE
@@ -79,7 +266,7 @@ xi_group <- cut(
 # Run simulations
 simulations <- map(
   xi,
-  ~ JointODE:::.solve_simple_biomarker_ode(configurations = list(xi = .x))
+  ~ .solve_simple_biomarker_ode(configurations = list(xi = .x))
 )
 
 # Combine results
@@ -107,7 +294,7 @@ p_time <- ggplot(
   geom_line(size = 1, alpha = 0.85) +
   geom_hline(yintercept = 0, linetype = "dotted", alpha = 0.4) +
   facet_wrap(~group, scales = "free_y", ncol = 2) +
-  scale_color_viridis_d(name = "ξ", option = "plasma") +
+  scale_color_viridis_d(name = expression(xi), option = "plasma") +
   theme_minimal() +
   theme(
     legend.position = "bottom",
@@ -138,7 +325,8 @@ p_phase <- ggplot(phase_data, aes(x = biomarker, y = velocity)) +
       slice_max(time),
     size = 2, shape = 21, fill = "red", color = "darkred"
   ) +
-  facet_wrap(~ sprintf("ξ = %.3f", damping_ratio), scales = "free", ncol = 2) +
+  facet_wrap(~ damping_ratio, scales = "free", ncol = 2,
+             labeller = labeller(damping_ratio = function(x) paste0("\u03BE = ", x))) +
   scale_color_viridis_c(name = "Time", option = "magma") +
   theme_minimal() +
   theme(
@@ -158,63 +346,32 @@ p_phase <- ggplot(phase_data, aes(x = biomarker, y = velocity)) +
 grid.arrange(p_time, p_phase, ncol = 2, widths = c(1, 1))
 ```
 
+- **Stable:** $\omega^2 \geq 0$ AND $\omega\xi > 0$
+- **Marginally stable:** $\omega^2 \geq 0$ AND $\omega\xi = 0$
+- **Unstable:** $\omega^2 < 0$ OR $\omega\xi < 0$
 
-| Damping Range | Dynamic Regime | Qualitative Behavior |
-|--------------------------------|------------------|----------------------|
-| $\xi \leq 0$ | Unstable/Marginally Stable | Exponential divergence or sustained oscillations |
-| $0 < \xi \leq 0.7$ | Underdamped | Decaying oscillations with convergence to equilibrium |
-| $0.7 < \xi < 1$ | Near-Critical Damping | Rapid convergence with minimal overshoot |
-| $\xi \geq 1$ | Overdamped | Monotonic exponential approach to equilibrium |
+### Non-Autonomous Systems
 
-
-### Non-Autonomous System
-
-Non-autonomous systems with time-varying excitation $u(t)$ occur in pharmacological and environmental contexts. The response depends on both damping ratio $\xi$ and input characteristics.
-
-Consider a step input at $t = 50$:
-
-$$
-u(t) = \begin{cases}
-0 & t < 50 \\
-0.5 & t \geq 50
-\end{cases}
-$$
-
-This induces a transition from $m_{\text{eq}} = 0$ to $m_{\text{eq}} = 0.5k$, with transient behavior determined by $\xi$:
+**Step excitation:** $u(t) = 0.5 \cdot \mathbb{1}_{t \geq 50}$
 
 ```{r non-autonomous, fig.width=12, fig.height=6, echo=FALSE}
-xi_values <- c(-0.1, 0, 0.1, 0.3, 0.5, 0.707, 0.9, 1.0, 1.2, 1.5, 2.0)
-
-# Categorize damping ratios
-xi_group <- cut(
-  xi_values,
-  breaks = c(-Inf, 0, 0.7, 1, Inf),
-  labels = c(
-    "Divergent (ξ ≤ 0)",
-    "Underdamped (0 < ξ ≤ 0.7)",
-    "Critical (0.7 < ξ < 1)",
-    "Overdamped (ξ ≥ 1)"
-  ),
-  include.lowest = TRUE,
-  right = TRUE
-)
-
+# Use same xi values as autonomous case
 # Define step input function
 step_input <- function(t) {
   ifelse(t < 50, 0, 1) * 0.5
 }
 
 # Simulate responses using JointODE function
-na_data <- map2_df(xi_values, xi_group, function(xi, group) {
-  result <- JointODE:::.solve_simple_biomarker_ode(
-    configurations = list(xi = xi, excitation = step_input)
+na_data <- map2_df(xi, xi_group, function(xi_val, group) {
+  result <- .solve_simple_biomarker_ode(
+    configurations = list(xi = xi_val, excitation = step_input)
   )
 
   data.frame(
     time = result$time,
     biomarker = result$biomarker,
     velocity = result$velocity,
-    damping_ratio = xi,
+    damping_ratio = xi_val,
     group = group
   )
 })
@@ -232,7 +389,7 @@ p_time_na <- ggplot(
   geom_hline(yintercept = 0, linetype = "dotted", alpha = 0.4) +
   geom_hline(yintercept = 1, linetype = "dotted", alpha = 0.4) +
   facet_wrap(~group, scales = "free_y", ncol = 2) +
-  scale_color_viridis_d(name = "ξ", option = "plasma") +
+  scale_color_viridis_d(name = expression(xi), option = "plasma") +
   theme_minimal() +
   theme(
     legend.position = "bottom",
@@ -244,9 +401,8 @@ p_time_na <- ggplot(
   ) +
   labs(x = "Time", y = "Biomarker")
 
-selected_xi_na <- c(-0.1, 0.707, 1.0, 1.5)
 phase_data_na <- na_data %>%
-  filter(damping_ratio %in% selected_xi_na)
+  filter(damping_ratio %in% c(-0.1, 0.707, 1.0, 1.5))
 
 p_phase_na <- ggplot(phase_data_na, aes(x = biomarker, y = velocity)) +
   geom_path(aes(color = time), size = 1, alpha = 0.8) +
@@ -262,8 +418,9 @@ p_phase_na <- ggplot(phase_data_na, aes(x = biomarker, y = velocity)) +
       slice_max(time),
     size = 2, shape = 21, fill = "red", color = "darkred"
   ) +
-  facet_wrap(~ sprintf("ξ = %.3f", damping_ratio),
-    scales = "free", ncol = 2
+  facet_wrap(~ damping_ratio,
+    scales = "free", ncol = 2,
+    labeller = labeller(damping_ratio = function(x) paste0("\u03BE = ", x))
   ) +
   scale_color_viridis_c(name = "Time", option = "magma") +
   theme_minimal() +
@@ -284,7 +441,7 @@ p_phase_na <- ggplot(phase_data_na, aes(x = biomarker, y = velocity)) +
 grid.arrange(p_time_na, p_phase_na, ncol = 2, widths = c(1, 1))
 ```
 
-### Real-Data Examples
+### Real Data Examples
 
 Four biological datasets illustrate distinct damping behaviors:
 
@@ -375,21 +532,41 @@ p_orange <- ggplot(orange_df, aes(x = time, y = value)) +
 grid.arrange(p_lynx, p_theoph, p_indo, p_orange, ncol = 2, nrow = 2)
 ```
 
-This analysis requires $\omega_n^2 \geq 0$ for real natural frequencies, focusing on stable or oscillatory systems that better represent biological reality. Systems with $\omega_n^2 < 0$ exhibit purely exponential divergence without oscillations and lack practical relevance for modeling physiological processes.
+This analysis requires $\omega^2 \geq 0$ for real natural frequencies, focusing on stable or oscillatory systems that better represent biological reality. Systems with $\omega^2 < 0$ exhibit purely exponential divergence without oscillations and lack practical relevance for modeling physiological processes.
 
-## Survival Outcomes
+### Theoretical Analysis
+
+| Damping | Condition | Solution Form | Behavior |
+|---------|-----------|---------------|----------|
+| Underdamped | $0 < \xi < 1$, $\omega^2 > 0$ | $e^{-\xi\omega t}[A\cos(\omega_d t) + B\sin(\omega_d t)]$ | Decaying oscillations |
+| Critically damped | $\xi = 1$, $\omega^2 > 0$ | $(A + Bt)e^{-\omega t}$ | Fastest decay without oscillation |
+| Overdamped | $\xi > 1$, $\omega^2 > 0$ | $Ae^{\lambda_1 t} + Be^{\lambda_2 t}$ | Slow exponential decay |
+| Undamped | $\xi = 0$, $\omega^2 > 0$ | $A\cos(\omega t) + B\sin(\omega t)$ | Sustained oscillations |
+| Unstable | $\omega^2 < 0$ or $\omega\xi < 0$ | Exponential growth | System diverges |
+
+where:
+
+- $\omega_d = \omega\sqrt{1 - \xi^2}$: damped natural frequency
+- $\lambda_{1,2} = -\xi\omega \pm \omega\sqrt{\xi^2 - 1}$: overdamped eigenvalues
+- $A, B$: constants determined by initial conditions $m_0, v_0$
+
+## Joint Model with Survival Outcomes
 
 The hazard function incorporates both the biomarker level and its rate of change:
 
-$$h(t) = h_0(t) \exp(\alpha_1 m(t) + \alpha_2 |\dot{m}(t)|)$$
+$$\lambda(t) = \lambda_0(t) \exp(\alpha_1 m(t) + \alpha_2 \dot{m}^{\gamma}(t))$$
+
+where:
+
+- $\lambda_0(t)$: baseline hazard function
+- $\alpha_1, \alpha_2$: regression coefficients for biomarker level and velocity
+- $\gamma=0,1,2$: power transformation for velocity (e.g., $\gamma=2$ squared to capture magnitude)
 
 This formulation captures two distinct aspects of risk:
 
 - $m(t)$: The biomarker level itself (e.g., elevated glucose indicating immediate risk)
-- $|\dot{m}(t)|$: The biomarker volatility (e.g., rapid fluctuations indicating instability)
+- $\dot{m}(t)$: The biomarker volatility (e.g., rapid fluctuations indicating instability)
 
-By incorporating $|\dot{m}(t)|$, we effectively model both the biomarker's central tendency and its temporal variability—analogous to simultaneously capturing mean and variance effects on survival risk. This dual characterization provides richer prognostic information than static measurements alone.
-
-In diabetes management, stable glucose levels suggest controlled disease, while rapid fluctuations (large $|\dot{m}(t)|$) indicate poor glycemic control and elevated complication risk, independent of the average glucose level.
+By incorporating $\dot{m}^{\gamma}(t)$, we effectively model both the biomarker's central tendency and its temporal variability—analogous to simultaneously capturing mean and variance effects on survival risk. This dual characterization provides richer prognostic information than static measurements alone.
 
 **Remark:** For oscillatory biomarker dynamics ($\xi < 1$), using absolute values prevents positive and negative velocity contributions from canceling in cumulative hazard calculations, ensuring that all variability contributes to risk assessment.
