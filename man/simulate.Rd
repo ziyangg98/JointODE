@@ -7,9 +7,10 @@
 simulate(
   n_subjects = 200,
   shared_sd = 0.1,
-  longitudinal = list(xi = 0.707, period = 5, k = 1, excitation = list(offset = 0,
-    covariates = c(x1 = 0.8, x2 = -0.5)), initial = list(offset = -3, covariates = c(x1 =
-    0.1, x2 = -0.1), random_coef = 0.2), error_sd = 0.1, n_measurements = 10),
+  longitudinal = list(xi = c(0.3, 0.707, 1, 2), period = c(5, 5, 3, 3), prob = c(0.25,
+    0.25, 0.25, 0.25), excitation = list(offset = 0, covariates = c(x1 = 0.8, x2 =
+    -0.5)), initial = list(offset = -3, covariates = c(x1 = 0.1, x2 = -0.1), random_coef
+    = 0.2), error_sd = 0.1, n_measurements = 10),
   survival = list(baseline = list(type = "weibull", shape = 1, scale = 8), value = 0.3,
     slope = 1, covariates = c(w1 = 0.4, w2 = -0.6)),
   covariates = list(x1 = list(type = "normal", mean = 0, sd = 1), x2 = list(type =
@@ -29,12 +30,16 @@ shared random effects, \eqn{\sigma_b} (default: 0.1)}
 \item{longitudinal}{List specifying the longitudinal sub-model parameters:
 \describe{
 \item{xi}{Damping ratio \eqn{\xi} controlling the oscillation decay.
+Can be a scalar or vector of values for different patient groups.
 Values: \eqn{\xi < 1} (underdamped), \eqn{\xi = 1} (critically damped),
-\eqn{\xi > 1} (overdamped) (default: 0.707, slightly underdamped)}
+\eqn{\xi > 1} (overdamped). Default: c(0.3, 0.707, 1.0, 2.0)}
 \item{period}{Natural period \eqn{T} of oscillation in time units,
-related to natural frequency as \eqn{\omega = 2\pi/T} (default: 5)}
-\item{k}{Excitation amplitude scaling factor \eqn{k} that modulates
-the strength of external forcing (default: 1.0)}
+related to natural frequency as \eqn{\omega = 2\pi/T}.
+Must have same length as xi. Default: c(5, 5, 3, 3)}
+\item{prob}{Optional probability weights for sampling from
+xi/period groups. Must sum to 1 and have same length as xi/period.
+If NULL, uniform probabilities are used.
+Default: c(0.25, 0.25, 0.25, 0.25)}
 \item{excitation}{List specifying external forcing parameters:
 \describe{
 \item{offset}{Constant excitation term \eqn{f_0} (default: 0.0)}
@@ -207,46 +212,128 @@ between the longitudinal and survival processes through:
 }
 }
 \examples{
-# Generate a small dataset with default parameters
-sim_data <- simulate(n_subjects = 50, seed = 123)
-
-# Examine the structure of generated data
-str(sim_data)
-
-\dontrun{
-# Customized simulation with underdamped oscillator
+# Example 1: Generate data with heterogeneous patient dynamics
 sim_data <- simulate(
-  n_subjects = 200,
-  longitudinal = list(
-    xi = 0.3,          # Low damping (more oscillatory)
-    period = 3,        # Faster oscillations
-    k = 1.5,           # Stronger excitation
-    excitation = list(
-      offset = 0.5,
-      covariates = c(x1 = 1.0, x2 = -0.3)
-    ),
-    initial = list(
-      offset = 0.0,    # Start at equilibrium
-      covariates = c(x1 = 0.5, x2 = -0.2),
-      random_coef = 0.5
-    ),
-    error_sd = 0.2     # Moderate measurement error
-  )
-)
-
-# Overdamped system (no oscillations)
-sim_data_overdamped <- simulate(
   n_subjects = 100,
   longitudinal = list(
-    xi = 2.0,          # Overdamped (exponential decay)
-    period = 10,       # Slow dynamics
-    k = 0.5,           # Weak excitation
+    xi = c(0.3, 1.0, 2.0),       # Underdamped, critical, overdamped
+    period = c(3, 5, 8),         # Different natural periods
+    prob = c(0.4, 0.4, 0.2),     # Group probabilities
     excitation = list(
-      offset = -1.0,
-      covariates = c(x1 = 0.2, x2 = 0.1)
-    )
-  )
+      offset = 0,
+      covariates = c(x1 = 0.5)
+    ),
+    initial = list(
+      offset = -1,
+      covariates = c(x1 = 0.2),
+      random_coef = 0.5
+    ),
+    n_measurements = 10,
+    error_sd = 0.1
+  ),
+  seed = 123
 )
+
+# Examine patient dynamics distribution
+dynamics_table <- table(
+  sim_data$longitudinal_data[!duplicated(sim_data$longitudinal_data$id),
+                             c("xi", "period")]
+)
+print(dynamics_table)
+
+# Example 2: Backward compatible - single dynamics for all patients
+sim_uniform <- simulate(
+  n_subjects = 50,
+  longitudinal = list(
+    xi = 0.707,                  # Single value
+    period = 5,                  # Single value
+    excitation = list(
+      offset = 0,
+      covariates = numeric(0)
+    ),
+    initial = list(
+      offset = -2,
+      covariates = numeric(0),
+      random_coef = 0.5
+    ),
+    n_measurements = 10,
+    error_sd = 0.15
+  ),
+  seed = 456
+)
+
+\dontrun{
+# Example 3: Comprehensive simulation with all features
+sim_full <- simulate(
+  n_subjects = 200,
+  shared_sd = 0.1,
+  longitudinal = list(
+    # Different dynamics groups:
+    # - Underdamped oscillatory (xi=0.3)
+    # - Critically damped (xi=1.0)
+    # - Overdamped fast decay (xi=1.5)
+    # - Overdamped slow decay (xi=2.5)
+    xi = c(0.3, 1.0, 1.5, 2.5),
+    period = c(3, 5, 4, 8),
+    prob = c(0.35, 0.30, 0.20, 0.15),
+    excitation = list(
+      offset = 0.0,
+      covariates = c(x1 = 0.8, x2 = -0.5)
+    ),
+    initial = list(
+      offset = -2.0,
+      covariates = c(x1 = 0.5, x2 = -0.3),
+      random_coef = 0.5
+    ),
+    n_measurements = 15,
+    error_sd = 0.15
+  ),
+  survival = list(
+    baseline = list(
+      type = "weibull",
+      shape = 1.5,
+      scale = 10
+    ),
+    value = 0.15,
+    slope = 0.10,
+    covariates = c(w1 = -0.7, w2 = 0.8)
+  ),
+  covariates = list(
+    x1 = list(type = "normal", mean = 0, sd = 1),
+    x2 = list(type = "normal", mean = 0, sd = 0.5),
+    w1 = list(type = "normal", mean = 0, sd = 1),
+    w2 = list(type = "binary", prob = 0.4)
+  ),
+  maxt = 20,
+  seed = 12345
+)
+
+# Analyze the dynamics distribution
+dynamics_df <- sim_full$longitudinal_data[
+  !duplicated(sim_full$longitudinal_data$id),
+  c("id", "xi", "period")
+]
+
+# Visualize different dynamics behaviors
+library(ggplot2)
+# Select one patient from each dynamics group
+example_ids <- sapply(unique(dynamics_df$xi), function(xi_val) {
+  dynamics_df$id[dynamics_df$xi == xi_val][1]
+})
+
+plot_data <- sim_full$longitudinal_data[
+  sim_full$longitudinal_data$id \%in\% example_ids,
+]
+
+ggplot(plot_data, aes(x = time, y = biomarker,
+                      group = id, color = factor(xi))) +
+  geom_line() +
+  facet_wrap(~ xi, scales = "free_y",
+            labeller = labeller(xi = function(x) paste("xi =", x))) +
+  labs(title = "Different Dynamics Behaviors",
+       x = "Time", y = "Biomarker",
+       color = "Damping Ratio") +
+  theme_minimal()
 }
 }
 \concept{data-simulation}
