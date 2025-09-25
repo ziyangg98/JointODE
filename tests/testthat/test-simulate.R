@@ -46,7 +46,6 @@ test_that("simulate handles custom parameters correctly", {
     longitudinal = list(
       xi = 0.5,
       period = 3,
-      k = 1.5,
       excitation = list(
         offset = 0.2,
         covariates = c(x1 = -0.2, x2 = 0.1)
@@ -75,7 +74,7 @@ test_that("simulate handles custom parameters correctly", {
     seed = 111
   )
 
-  expect_equal(ncol(sim$longitudinal_data), 8)
+  expect_equal(ncol(sim$longitudinal_data), 10)  # Now includes xi and period
   expect_true(all(sim$survival_data$time <= 50))
   expect_true(
     mean(sim$survival_data$w2) > 0.4 && mean(sim$survival_data$w2) < 0.8
@@ -104,8 +103,7 @@ test_that("simulate validates input parameters", {
       longitudinal = list(
         xi = 0.5,
         period = 5,
-        k = 1.0,
-        excitation = list(
+          excitation = list(
           offset = 0,
           covariates = c(x1 = 1, x2 = 2) # 2 covariates
         ),
@@ -171,6 +169,144 @@ test_that("simulate generates valid survival times", {
   expect_true(any(sim_cens$survival_data$status == 0))
 })
 
+test_that("simulate handles patient-specific dynamics", {
+  # Test multiple dynamics groups
+  sim_groups <- JointODE::simulate(
+    n_subjects = 100,
+    longitudinal = list(
+      xi = c(0.3, 0.707, 1.0, 2.0),
+      period = c(2, 3, 5, 10),
+      prob = c(0.4, 0.3, 0.2, 0.1),  # Different probabilities
+      excitation = list(
+        offset = 0,
+        covariates = c(x1 = 0.5)
+      ),
+      initial = list(
+        offset = 0,
+        covariates = c(x1 = 0.2),
+        random_coef = 0.5
+      ),
+      n_measurements = 10,
+      error_sd = 0.1
+    ),
+    seed = 999
+  )
+
+  # Check that dynamics columns exist
+  expect_true("xi" %in% names(sim_groups$longitudinal_data))
+  expect_true("period" %in% names(sim_groups$longitudinal_data))
+
+  # Extract unique dynamics per patient
+  patient_dynamics <- sim_groups$longitudinal_data[
+    !duplicated(sim_groups$longitudinal_data$id),
+    c("id", "xi", "period")
+  ]
+
+  # Check that all expected xi values are present
+  unique_xi <- unique(patient_dynamics$xi)
+  expect_true(all(unique_xi %in% c(0.3, 0.707, 1.0, 2.0)))
+
+  # Check that xi and period are paired correctly
+  for(i in seq_len(nrow(patient_dynamics))) {
+    xi_val <- patient_dynamics$xi[i]
+    period_val <- patient_dynamics$period[i]
+    if(xi_val == 0.3) expect_equal(period_val, 2)
+    if(xi_val == 0.707) expect_equal(period_val, 3)
+    if(xi_val == 1.0) expect_equal(period_val, 5)
+    if(xi_val == 2.0) expect_equal(period_val, 10)
+  }
+
+  # Check probability distribution (with tolerance for sampling)
+  xi_table <- table(patient_dynamics$xi)
+  xi_props <- as.numeric(xi_table) / sum(xi_table)
+  # With 100 subjects, we expect roughly 40%, 30%, 20%, 10%
+  expect_true(abs(xi_props[names(xi_table) == "0.3"] - 0.4) < 0.15)
+})
+
+test_that("simulate handles single dynamics (backward compatibility)", {
+  # Test with single xi and period values
+  sim_single <- JointODE::simulate(
+    n_subjects = 50,
+    longitudinal = list(
+      xi = 0.5,
+      period = 4,
+      excitation = list(
+        offset = 0,
+        covariates = numeric(0)
+      ),
+      initial = list(
+        offset = -1,
+        covariates = numeric(0),
+        random_coef = 0.5
+      ),
+      n_measurements = 10,
+      error_sd = 0.1
+    ),
+    seed = 888
+  )
+
+  # All patients should have the same dynamics
+  patient_dynamics <- sim_single$longitudinal_data[
+    !duplicated(sim_single$longitudinal_data$id),
+    c("xi", "period")
+  ]
+
+  expect_true(all(patient_dynamics$xi == 0.5))
+  expect_true(all(patient_dynamics$period == 4))
+})
+
+test_that("simulate validates dynamics parameters correctly", {
+  # xi and period must have same length
+  expect_error(
+    JointODE::simulate(
+      n_subjects = 10,
+      longitudinal = list(
+        xi = c(0.3, 0.7),
+        period = c(2, 3, 4),  # Different length!
+        excitation = list(offset = 0, covariates = numeric(0)),
+        initial = list(offset = 0, covariates = numeric(0), random_coef = 0),
+        n_measurements = 10,
+        error_sd = 0.1
+      )
+    ),
+    "same length"
+  )
+
+  # prob must match xi/period length if provided
+  expect_error(
+    JointODE::simulate(
+      n_subjects = 10,
+      longitudinal = list(
+        xi = c(0.3, 0.7),
+        period = c(2, 3),
+        prob = c(0.5, 0.3, 0.2),  # Wrong length!
+        excitation = list(offset = 0, covariates = numeric(0)),
+        initial = list(offset = 0, covariates = numeric(0), random_coef = 0),
+        n_measurements = 10,
+        error_sd = 0.1
+      )
+    ),
+    "prob must match"
+  )
+
+  # prob must sum to 1
+  expect_error(
+    JointODE::simulate(
+      n_subjects = 10,
+      longitudinal = list(
+        xi = c(0.3, 0.7),
+        period = c(2, 3),
+        prob = c(0.3, 0.3),  # Doesn't sum to 1!
+        excitation = list(offset = 0, covariates = numeric(0)),
+        initial = list(offset = 0, covariates = numeric(0), random_coef = 0),
+        n_measurements = 10,
+        error_sd = 0.1
+      )
+    ),
+    "prob must match"
+  )
+})
+
 test_that("simulate handles edge cases", {
   # Small sample size
   sim_small <- JointODE::simulate(n_subjects = 1, seed = 444)
@@ -182,7 +318,6 @@ test_that("simulate handles edge cases", {
     longitudinal = list(
       xi = 0.7,
       period = 5,
-      k = 1.0,
       excitation = list(
         offset = 0,
         covariates = numeric(0)
@@ -215,7 +350,6 @@ test_that("simulate handles edge cases", {
     longitudinal = list(
       xi = 0.7,
       period = 5,
-      k = 1.0,
       excitation = list(
         offset = 0,
         covariates = numeric(0)
@@ -237,7 +371,7 @@ test_that("simulate handles edge cases", {
     covariates = list(),
     seed = 666
   )
-  expect_equal(ncol(sim_no_cov$longitudinal_data), 6) # No covariate columns
+  expect_equal(ncol(sim_no_cov$longitudinal_data), 8) # Now includes xi and period
 })
 
 test_that("simulate creates consistent longitudinal observations", {
@@ -265,7 +399,6 @@ test_that("simulate respects covariate distributions", {
     longitudinal = list(
       xi = 0.7,
       period = 5,
-      k = 1.0,
       excitation = list(
         offset = 0,
         covariates = c(x1 = -0.2, x2 = 0.1)

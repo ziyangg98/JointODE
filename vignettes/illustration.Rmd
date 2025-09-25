@@ -211,7 +211,7 @@ p_cases_phase <- ggplot(
   case_data,
   aes(x = biomarker, y = velocity)
 ) +
-  geom_path(size = 0.8, alpha = 0.7, aes(color = time)) +
+  geom_path(linewidth = 0.8, alpha = 0.7, aes(color = time)) +
   geom_point(
     data = case_data %>%
       group_by(case_name) %>%
@@ -291,7 +291,7 @@ p_time <- ggplot(
   simulation_data,
   aes(x = time, y = biomarker, color = as.factor(damping_ratio))
 ) +
-  geom_line(size = 1, alpha = 0.85) +
+  geom_line(linewidth = 1, alpha = 0.85) +
   geom_hline(yintercept = 0, linetype = "dotted", alpha = 0.4) +
   facet_wrap(~group, scales = "free_y", ncol = 2) +
   scale_color_viridis_d(name = expression(xi), option = "plasma") +
@@ -312,7 +312,7 @@ phase_data <- simulation_data %>%
   filter(damping_ratio %in% selected_xi)
 
 p_phase <- ggplot(phase_data, aes(x = biomarker, y = velocity)) +
-  geom_path(aes(color = time), size = 1, alpha = 0.8) +
+  geom_path(aes(color = time), linewidth = 1, alpha = 0.8) +
   geom_point(
     data = phase_data %>%
       group_by(damping_ratio) %>%
@@ -381,7 +381,7 @@ p_time_na <- ggplot(
   na_data,
   aes(x = time, y = biomarker, color = as.factor(damping_ratio))
 ) +
-  geom_line(size = 1, alpha = 0.85) +
+  geom_line(linewidth = 1, alpha = 0.85) +
   geom_vline(
     xintercept = 50, linetype = "dashed",
     color = "red", alpha = 0.5
@@ -405,7 +405,7 @@ phase_data_na <- na_data %>%
   filter(damping_ratio %in% c(-0.1, 0.707, 1.0, 1.5))
 
 p_phase_na <- ggplot(phase_data_na, aes(x = biomarker, y = velocity)) +
-  geom_path(aes(color = time), size = 1, alpha = 0.8) +
+  geom_path(aes(color = time), linewidth = 1, alpha = 0.8) +
   geom_point(
     data = phase_data_na %>%
       group_by(damping_ratio) %>%
@@ -469,7 +469,7 @@ orange_df <- data.frame(time = orange_df$age, value = orange_df$circumference)
 
 # Create individual plots with specific axis labels
 p_lynx <- ggplot(lynx_df, aes(x = time, y = value)) +
-  geom_line(size = 1, alpha = 0.9, color = "#C73E1D") +
+  geom_line(linewidth = 1, alpha = 0.9, color = "#C73E1D") +
   geom_point(size = 1.5, alpha = 0.7, color = "#C73E1D") +
   theme_minimal() +
   theme(
@@ -486,7 +486,7 @@ p_lynx <- ggplot(lynx_df, aes(x = time, y = value)) +
   )
 
 p_theoph <- ggplot(theoph_df, aes(x = time, y = value)) +
-  geom_line(size = 1, alpha = 0.9, color = "#2E86AB") +
+  geom_line(linewidth = 1, alpha = 0.9, color = "#2E86AB") +
   geom_point(size = 1.5, alpha = 0.7, color = "#2E86AB") +
   theme_minimal() +
   theme(
@@ -501,7 +501,7 @@ p_theoph <- ggplot(theoph_df, aes(x = time, y = value)) +
   )
 
 p_indo <- ggplot(indo_df, aes(x = time, y = value)) +
-  geom_line(size = 1, alpha = 0.9, color = "#A23B72") +
+  geom_line(linewidth = 1, alpha = 0.9, color = "#A23B72") +
   geom_point(size = 1.5, alpha = 0.7, color = "#A23B72") +
   theme_minimal() +
   theme(
@@ -516,7 +516,7 @@ p_indo <- ggplot(indo_df, aes(x = time, y = value)) +
   )
 
 p_orange <- ggplot(orange_df, aes(x = time, y = value)) +
-  geom_line(size = 1, alpha = 0.9, color = "#F18F01") +
+  geom_line(linewidth = 1, alpha = 0.9, color = "#F18F01") +
   geom_point(size = 1.5, alpha = 0.7, color = "#F18F01") +
   theme_minimal() +
   theme(

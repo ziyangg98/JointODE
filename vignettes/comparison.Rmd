@@ -75,8 +75,8 @@ cat(sprintf(
 ))
 cat(sprintf(
   "  Variance: σ_e = %.1f, σ_b = %.1f\n",
-  sim$parameters$coefficients$measurement_error_sd,
-  sim$parameters$coefficients$random_effect_sd
+  sim$init$coefficients$measurement_error_sd,
+  sim$init$coefficients$random_effect_sd
 ))
 
 cat(sprintf(
@@ -110,7 +110,7 @@ dynamics_data <- long_data %>%
   ))
 
 p1 <- ggplot(dynamics_data, aes(x = time, y = value, color = component)) +
-  geom_line(size = 0.8) +
+  geom_line(linewidth = 0.8) +
   facet_wrap(~ paste("Subject", id), scales = "free_y", ncol = 2) +
   scale_color_manual(values = c("#27AE60", "#3498DB", "#9B59B6")) +
   theme_minimal(base_size = 10) +
@@ -128,7 +128,7 @@ error_examples <- long_data %>%
   filter(id %in% example_ids)
 
 p2 <- ggplot(error_examples, aes(x = time)) +
-  geom_line(aes(y = biomarker, color = "True"), size = 1) +
+  geom_line(aes(y = biomarker, color = "True"), linewidth = 1) +
   geom_point(aes(y = observed, color = "Observed"), alpha = 0.6, size = 1.2) +
   facet_wrap(~ paste("Subject", id), scales = "free_y", ncol = 2) +
   scale_color_manual(values = c("True" = "#27AE60", "Observed" = "#E74C3C")) +

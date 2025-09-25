@@ -100,19 +100,31 @@ head(sim$data$longitudinal_data)
 summary(sim$data$survival_data$time)
 table(sim$data$survival_data$status)
 
-# Patient dynamics distribution
-dynamics <- sim$data$longitudinal_data[
-  !duplicated(sim$data$longitudinal_data$id),
-  c("id", "xi", "period")
-]
-table(dynamics$xi, dynamics$period)
-
 # Visualize different dynamics behaviors
 library(ggplot2)
 library(dplyr)
 
+# Patient dynamics distribution
+dynamics_summary <- sim$data$longitudinal_data \%>\%
+  group_by(xi, period) \%>\%
+  summarise(n_patients = n_distinct(id), .groups = "drop") \%>\%
+  mutate(
+    group = paste0("(ξ=", xi, ", T=", period, ")"),
+    dynamics_type = case_when(
+      xi < 1 ~ "Underdamped",
+      xi == 1 ~ "Critically damped",
+      xi > 1 ~ "Overdamped"
+    )
+  ) \%>\%
+  select(group, dynamics_type, n_patients)
+print(dynamics_summary)
+
 # Select example patients from each dynamics group
+# Choose patients with at least 3 observations
 dynamics_groups <- sim$data$longitudinal_data \%>\%
+  group_by(id) \%>\%
+  mutate(n_obs = n()) \%>\%
+  filter(n_obs >= 3) \%>\%
   group_by(xi, period) \%>\%
   summarise(example_id = first(id), .groups = "drop")
 
@@ -132,7 +144,7 @@ plot_data <- sim$data$longitudinal_data \%>\%
 
 # True trajectories
 p1 <- ggplot(plot_data, aes(x = time, y = biomarker)) +
-  geom_line(aes(color = dynamics_type), size = 1.2) +
+  geom_line(aes(color = dynamics_type), linewidth = 1.2) +
   geom_point(aes(y = observed), alpha = 0.4, size = 0.8) +
   facet_wrap(~ label, scales = "free_y", ncol = 2) +
   labs(
@@ -149,7 +161,7 @@ print(p1)
 
 # Phase plane plot (velocity vs biomarker)
 p2 <- ggplot(plot_data, aes(x = biomarker, y = velocity)) +
-  geom_path(aes(color = dynamics_type), size = 1) +
+  geom_path(aes(color = dynamics_type), linewidth = 1) +
   geom_point(data = filter(plot_data, time == 0),
              size = 3, shape = 21, fill = "white") +
   facet_wrap(~ label, scales = "free") +

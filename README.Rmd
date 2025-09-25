@@ -39,10 +39,10 @@ where:
 The biomarker trajectory evolution is characterized by the following second-order differential equation:
 
 $$
-\ddot{m}_i(t) + 2 \xi \omega \dot{m}_i(t) + \omega^2 m_i(t) = k \omega^2 \boldsymbol{X}_i(t)^{\top} \boldsymbol{\beta},
+\ddot{m}_i(t) + 2 \xi_{i} \omega_{i} \dot{m}_i(t) + \omega_{i}^2 m_i(t) = \omega_{i}^2 \boldsymbol{X}_i(t)^{\top} \boldsymbol{\beta},
 $$
 
-where $\dot{m}_i(t)$ and $\ddot{m}_i(t)$ denote the biomarker’s velocity and acceleration, respectively, and $\boldsymbol{X}_i(t)$ denotes time-varying covariates. The parameters have the usual interpretations: $\omega > 0$ is the natural frequency, $\xi$ is the damping ratio, and $k$ is the steady-state gain.
+where $\dot{m}_i(t)$ and $\ddot{m}_i(t)$ denote the biomarker’s velocity and acceleration, respectively, and $\boldsymbol{X}_i(t)$ denotes time-varying covariates. The parameters have the usual interpretations: $\omega_{i} > 0$ is the subject-specific natural frequency, and $\xi_{i}$ is the subject-specific damping ratio.
 
 ### Survival Sub-Model
 
