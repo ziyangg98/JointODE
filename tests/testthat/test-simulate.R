@@ -74,7 +74,7 @@ test_that("simulate handles custom parameters correctly", {
     seed = 111
   )
 
-  expect_equal(ncol(sim$longitudinal_data), 10)  # Now includes xi and period
+  expect_equal(ncol(sim$longitudinal_data), 10) # Now includes xi and period
   expect_true(all(sim$survival_data$time <= 50))
   expect_true(
     mean(sim$survival_data$w2) > 0.4 && mean(sim$survival_data$w2) < 0.8
@@ -103,7 +103,7 @@ test_that("simulate validates input parameters", {
       longitudinal = list(
         xi = 0.5,
         period = 5,
-          excitation = list(
+        excitation = list(
           offset = 0,
           covariates = c(x1 = 1, x2 = 2) # 2 covariates
         ),
@@ -176,7 +176,7 @@ test_that("simulate handles patient-specific dynamics", {
     longitudinal = list(
       xi = c(0.3, 0.707, 1.0, 2.0),
       period = c(2, 3, 5, 10),
-      prob = c(0.4, 0.3, 0.2, 0.1),  # Different probabilities
+      prob = c(0.4, 0.3, 0.2, 0.1), # Different probabilities
       excitation = list(
         offset = 0,
         covariates = c(x1 = 0.5)
@@ -207,13 +207,19 @@ test_that("simulate handles patient-specific dynamics", {
   expect_true(all(unique_xi %in% c(0.3, 0.707, 1.0, 2.0)))
 
   # Check that xi and period are paired correctly
-  for(i in seq_len(nrow(patient_dynamics))) {
+  for (i in seq_len(nrow(patient_dynamics))) {
     xi_val <- patient_dynamics$xi[i]
     period_val <- patient_dynamics$period[i]
-    if(xi_val == 0.3) expect_equal(period_val, 2)
-    if(xi_val == 0.707) expect_equal(period_val, 3)
-    if(xi_val == 1.0) expect_equal(period_val, 5)
-    if(xi_val == 2.0) expect_equal(period_val, 10)
+    if (xi_val == 0.3) {
+      expect_equal(period_val, 2)
+    }
+    if (xi_val == 0.707) {
+      expect_equal(period_val, 3)
+    }
+    if (xi_val == 1.0) {
+      expect_equal(period_val, 5)
+    }
+    if (xi_val == 2.0) expect_equal(period_val, 10)
   }
 
   # Check probability distribution (with tolerance for sampling)
@@ -262,7 +268,7 @@ test_that("simulate validates dynamics parameters correctly", {
       n_subjects = 10,
       longitudinal = list(
         xi = c(0.3, 0.7),
-        period = c(2, 3, 4),  # Different length!
+        period = c(2, 3, 4), # Different length!
         excitation = list(offset = 0, covariates = numeric(0)),
         initial = list(offset = 0, covariates = numeric(0), random_coef = 0),
         n_measurements = 10,
@@ -279,7 +285,7 @@ test_that("simulate validates dynamics parameters correctly", {
       longitudinal = list(
         xi = c(0.3, 0.7),
         period = c(2, 3),
-        prob = c(0.5, 0.3, 0.2),  # Wrong length!
+        prob = c(0.5, 0.3, 0.2), # Wrong length!
         excitation = list(offset = 0, covariates = numeric(0)),
         initial = list(offset = 0, covariates = numeric(0), random_coef = 0),
         n_measurements = 10,
@@ -296,7 +302,7 @@ test_that("simulate validates dynamics parameters correctly", {
       longitudinal = list(
         xi = c(0.3, 0.7),
         period = c(2, 3),
-        prob = c(0.3, 0.3),  # Doesn't sum to 1!
+        prob = c(0.3, 0.3), # Doesn't sum to 1!
         excitation = list(offset = 0, covariates = numeric(0)),
         initial = list(offset = 0, covariates = numeric(0), random_coef = 0),
         n_measurements = 10,

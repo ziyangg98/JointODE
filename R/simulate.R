@@ -388,9 +388,9 @@ simulate <- function(
       longitudinal$prob
     ) ||
       (is.numeric(longitudinal$prob) &&
-         length(longitudinal$prob) == length(longitudinal$xi) &&
-         all(longitudinal$prob >= 0) &&
-         abs(sum(longitudinal$prob) - 1) < 1e-10),
+        length(longitudinal$prob) == length(longitudinal$xi) &&
+        all(longitudinal$prob >= 0) &&
+        abs(sum(longitudinal$prob) - 1) < 1e-10),
     "longitudinal$error_sd must be positive" = is.numeric(
       longitudinal$error_sd
     ) &&
@@ -572,7 +572,7 @@ simulate <- function(
   )
 }
 
-.create_example_data <- function(n_subjects = 200, seed = 123) {
+.create_example_data <- function(n_subjects = 200, seed = 42) {
   data <- simulate(n_subjects = n_subjects, seed = seed)
   coef_args <- formals(simulate)
   f0 <- function(t) {
@@ -606,37 +606,53 @@ simulate <- function(
     config = spline_config
   )
 
-  # For example data, use representative values
-  # If period/xi are vectors, use the first value
-  period_val <- eval(coef_args$longitudinal$period)
-  xi_val <- eval(coef_args$longitudinal$xi)
-  if (length(period_val) > 1) period_val <- period_val[1]
-  if (length(xi_val) > 1) xi_val <- xi_val[1]
-
-  omega <- 2 * pi / period_val
-  xi <- xi_val
-  acceleration_coef <- c(
-    -omega^2,
-    -2 * xi * omega,
-    omega^2 * eval(coef_args$longitudinal$excitation$offset),
-    omega^2 * eval(coef_args$longitudinal$excitation$covariates)
-  )
+  period_values <- eval(coef_args$longitudinal$period)
+  xi_values <- eval(coef_args$longitudinal$xi)
+  omega_values <- 2 * pi / period_values
   hazard_coef <- c(
     eval(coef_args$survival$value),
     eval(coef_args$survival$slope),
     eval(coef_args$survival$covariates)
   )
+
+  # Create membership matrix
+  subject_dynamics <- aggregate(
+    cbind(xi, period) ~ id,
+    data = data$longitudinal_data,
+    FUN = function(x) x[1]
+  )
+  n_groups <- length(xi_values)
+  membership <- matrix(0, nrow = nrow(subject_dynamics), ncol = n_groups)
+  for (g in seq_len(n_groups)) {
+    membership[, g] <- as.numeric(
+      abs(subject_dynamics$xi - xi_values[g]) < 1e-10 &
+        abs(subject_dynamics$period - period_values[g]) < 1e-10
+    )
+  }
+
   parameters <- list(
     coefficients = list(
       baseline = baseline_coef,
-      acceleration = acceleration_coef,
       hazard = hazard_coef,
+      acceleration = rbind(
+        -omega_values^2,
+        -2 * xi_values * omega_values,
+        rep(0, n_groups),
+        eval(coef_args$longitudinal$excitation$covariates) %o% omega_values^2
+      ),
+      membership = membership,
+      prob = eval(coef_args$longitudinal$prob),
+      random_effect = matrix(
+        rep(data$survival_data$b, each = n_groups),
+        ncol = n_groups,
+        byrow = TRUE
+      ),
       measurement_error_sd = eval(coef_args$longitudinal$error_sd),
       random_effect_sd = eval(coef_args$shared_sd)
     ),
     configurations = list(
       baseline = spline_config,
-      autonomous = TRUE
+      n_groups = length(eval(coef_args$longitudinal$xi))
     )
   )
   list(data = data, init = parameters)
@@ -735,7 +751,7 @@ simulate <- function(
   omega <- 2 * pi / dynamic$period
   offset <- omega^2 *
     (excitation$offset +
-       sum(x * excitation$covariates))
+      sum(x * excitation$covariates))
   ode_parms <- list(
     offset = offset,
     value = -omega^2,

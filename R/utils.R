@@ -13,9 +13,9 @@ NULL
 }
 
 # Setup parallel plan for computation
-.setup_parallel_plan <- function(n_cores = NULL) {
+.setup_parallel_plan <- function(n_cores = 0) {
   # Auto-detect cores if not specified
-  if (is.null(n_cores)) {
+  if (n_cores == 0) {
     n_cores <- max(1, parallel::detectCores() - 1)
   }
   # Set up future plan based on platform
@@ -37,9 +37,8 @@ NULL
   state,
   id,
   time,
-  autonomous = TRUE,
-  spline_baseline = list(),
-  init = NULL
+  spline_baseline,
+  init
 ) {
   stopifnot(
     "longitudinal_formula must be a formula" = inherits(
@@ -56,9 +55,7 @@ NULL
       length(id) == 1,
     "time must be a single character string" = is.character(time) &&
       length(time) == 1,
-    "spline_baseline must be a list" = is.list(spline_baseline),
-    "autonomous must be logical" = is.logical(autonomous) &&
-      length(autonomous) == 1
+    "spline_baseline must be a list" = is.list(spline_baseline)
   )
 
   stopifnot(
@@ -428,17 +425,14 @@ NULL
             "must contain finite values"
           ))
         }
-        min_len <- if (isTRUE(autonomous)) 2 else 3
-        if (length(init$coefficients$acceleration) < min_len) {
+        if (length(init$coefficients$acceleration) < 2) {
           stop(paste(
             "Invalid 'init$coefficients$acceleration':",
-            "must have at least",
-            min_len,
-            "elements"
+            "must have at least 2 elements"
           ))
         }
         # Check exact length
-        expected_len <- n_longitudinal_covariates + min_len
+        expected_len <- n_longitudinal_covariates + 2
         if (length(init$coefficients$acceleration) != expected_len) {
           stop(sprintf(
             paste(
@@ -680,11 +674,7 @@ NULL
 ) {
   long_cov <- .get_longitudinal_covariates(data, time)
   # Construct z vector
-  z <- if (isTRUE(parameters$configurations$autonomous)) {
-    c(biomarker, velocity, long_cov)
-  } else {
-    c(biomarker, velocity, long_cov, time)
-  }
+  z <- c(biomarker, velocity, long_cov)
   sum(parameters$coefficients$acceleration * z)
 }
 
@@ -700,11 +690,7 @@ NULL
   long_cov <- .get_longitudinal_covariates(data, time)
 
   # Construct Z vector
-  z_vec <- if (isTRUE(parameters$configurations$autonomous)) {
-    c(biomarker, velocity, long_cov)
-  } else {
-    c(biomarker, velocity, long_cov, time)
-  }
+  z_vec <- c(biomarker, velocity, long_cov)
   beta <- parameters$coefficients$acceleration
 
   # For linear model: acceleration = beta' * Z
@@ -720,9 +706,8 @@ NULL
     # Indirect effect through state feedback
     # Only the first two components of Z (biomarker and velocity) depend on beta
     indirect_effect <- 0
-    if (
-      !is.null(dbiomarker) && !is.null(dvelocity) && j <= length(dbiomarker)
-    ) {
+    if (!is.null(dbiomarker) && !is.null(dvelocity)) {
+      # All beta parameters affect the dynamics, so all have indirect effects
       indirect_effect <- beta[1] * dbiomarker[j] + beta[2] * dvelocity[j]
     }
 
@@ -767,7 +752,7 @@ NULL
 
 .prepare_initial_conditions <- function(
   biomarker_initial,
-  coefficients,
+  parameters,
   sensitivity_type
 ) {
   # Basic state: [Λ(t), m(t), ṁ(t)]
@@ -779,9 +764,9 @@ NULL
     forward = {
       # Augmented for parameters needing ODE: (η, α, β)
       # [Λ, m, ṁ, ∂Λ/∂η, ∂Λ/∂α, ∂m/∂β, ∂ṁ/∂β, ∂Λ/∂β]
-      n_eta <- coefficients$config$baseline$df
+      n_eta <- parameters$config$baseline$df
       n_alpha <- 2
-      n_beta <- length(coefficients$coef$acceleration)
+      n_beta <- nrow(parameters$coef$acceleration)
       c(
         basic_state,
         rep(0, n_eta), # ∂Λ/∂η
@@ -1038,37 +1023,54 @@ NULL
     sensitivity_type
   )
 
-  # Solve ODE System
-  ode_parameters <- list(
-    data = data,
-    parameters = parameters,
-    sensitivity_type = sensitivity_type
-  )
-
   # If custom times provided, add them to ensure they're in the solution
   ode_times <- if (!is.null(times)) {
     sort(unique(c(0, times)))
   } else {
     sort(unique(c(0, data$longitudinal$times, data$time)))
   }
-  solution <- if (length(ode_times) < 2) {
-    matrix(c(0, initial_extended), nrow = 1)
-  } else {
-    # Use deSolve to solve the ODEs
-    deSolve::ode(
-      y = initial_extended,
-      times = ode_times,
-      func = ode_derivatives,
-      parms = ode_parameters,
-      method = "ode45",
-      atol = 1e-8,
-      rtol = 1e-10
+
+  n_groups <- parameters$configurations$n_groups
+  ode_results <- vector("list", n_groups)
+  for (k in seq_len(n_groups)) {
+    parameters_subject <- list(
+      coefficients = list(
+        baseline = parameters$coefficients$baseline,
+        hazard = parameters$coefficients$hazard,
+        acceleration = parameters$coefficients$acceleration[, k],
+        measurement_error_sd = parameters$coefficients$measurement_error_sd,
+        random_effect_sd = parameters$coefficients$random_effect_sd
+      ),
+      configurations = parameters$configurations
+    )
+    ode_parameters <- list(
+      data = data,
+      parameters = parameters_subject,
+      sensitivity_type = sensitivity_type
+    )
+    solution <- if (length(ode_times) < 2) {
+      matrix(c(0, initial_extended), nrow = 1)
+    } else {
+      # Use deSolve to solve the ODEs
+      deSolve::ode(
+        y = initial_extended,
+        times = ode_times,
+        func = ode_derivatives,
+        parms = ode_parameters,
+        method = "ode45",
+        atol = 1e-8,
+        rtol = 1e-10
+      )
+    }
+    ode_results[[k]] <- .extract_ode_results(
+      solution,
+      data,
+      parameters_subject,
+      sensitivity_type,
+      times
     )
   }
-
-  # Extract and return results
-  # Pass the custom times if provided, otherwise NULL for default extraction
-  .extract_ode_results(solution, data, parameters, sensitivity_type, times)
+  ode_results
 }
 
 # Helper functions for posterior computation
@@ -1078,32 +1080,33 @@ NULL
 .compute_posteriors <- function(
   data_list,
   parameters,
-  k = 7,
-  init = NULL,
+  n_points = 7,
   parallel = TRUE,
-  n_cores = NULL,
+  n_cores = 0,
   return_ode_solutions = FALSE
 ) {
   n_subjects <- length(data_list)
-  if (is.null(init)) {
-    init <- rep(0, n_subjects)
-  }
+  init <- parameters$coefficients$random_effect
 
   # Function to compute posterior for a single subject
   compute_subject_posterior <- function(i) {
+    n_groups <- parameters$configurations$n_groups
     ode_solution <- .solve_joint_ode(data_list[[i]], parameters)
-    posterior <- .compute_posterior_aghq(
-      ode_solution = ode_solution,
-      data = data_list[[i]],
-      b_hat_init = init[i],
-      measurement_error_sd = parameters$coefficients$measurement_error_sd,
-      random_effect_sd = parameters$coefficients$random_effect_sd,
-      k = k
-    )
+    posterior <- vector("list", n_groups)
+    for (k in seq_len(n_groups)) {
+      posterior[[k]] <- .compute_posterior_aghq(
+        ode_solution = ode_solution[[k]],
+        data = data_list[[i]],
+        b_hat_init = init[i, k],
+        measurement_error_sd = parameters$coefficients$measurement_error_sd,
+        random_effect_sd = parameters$coefficients$random_effect_sd,
+        n_points = n_points
+      )
 
-    # Optionally include ODE solution for later reuse
-    if (return_ode_solutions) {
-      posterior$ode_solution <- ode_solution
+      # Optionally include ODE solution for later reuse
+      if (return_ode_solutions) {
+        posterior[[k]]$ode_solution <- ode_solution[[k]]
+      }
     }
     posterior
   }
@@ -1124,18 +1127,48 @@ NULL
     posterior_results <- lapply(seq_len(n_subjects), compute_subject_posterior)
   }
 
-  # Aggregate results
+  # Aggregate results - extract matrices for each parameter
+  marginal <- do.call(
+    rbind,
+    lapply(posterior_results, function(x) {
+      vapply(x, `[[`, numeric(1), "marginal")
+    })
+  )
+  # Compute posterior subgroup probabilities
+  weighted_marginal <- sweep(
+    marginal,
+    2,
+    parameters$coefficients$prob,
+    "*"
+  )
+  w <- weighted_marginal / rowSums(weighted_marginal)
+
   posteriors <- list(
-    b = vapply(posterior_results, `[[`, numeric(1), "b"),
-    v = vapply(posterior_results, `[[`, numeric(1), "v"),
-    exp_b = vapply(posterior_results, `[[`, numeric(1), "exp_b")
+    b = do.call(
+      rbind,
+      lapply(posterior_results, function(x) sapply(x, `[[`, "b"))
+    ),
+    v = do.call(
+      rbind,
+      lapply(posterior_results, function(x) sapply(x, `[[`, "v"))
+    ),
+    e = do.call(
+      rbind,
+      lapply(posterior_results, function(x) sapply(x, `[[`, "e"))
+    ),
+    w = w
   )
 
-  # Store ODE solutions if requested
+  # Store ODE solutions if requested (each subject has 4 different solutions)
   if (return_ode_solutions) {
-    posteriors$ode_solutions <- lapply(posterior_results, function(x) {
-      if (!is.null(x$ode_solution)) x$ode_solution else NULL
-    })
+    posteriors$ode_solutions <- lapply(
+      posterior_results,
+      function(subject_results) {
+        lapply(subject_results, function(x) {
+          if (!is.null(x$ode_solution)) x$ode_solution else NULL
+        })
+      }
+    )
   }
 
   posteriors
@@ -1147,7 +1180,7 @@ NULL
   b_hat_init,
   measurement_error_sd,
   random_effect_sd,
-  k = 7
+  n_points = 7
 ) {
   # Extract components
   cum_hazard_0 <- ode_solution$cum_hazard_at_event
@@ -1181,18 +1214,16 @@ NULL
       exp(b) * cum_hazard_0
   }
 
-  # Build adaptive quadrature
   fit_aghq <- aghq::aghq(
     ff = list(
       fn = logpost,
       gr = logpost_grad,
       he = logpost_hess
     ),
-    k = k,
-    startingvalue = b_hat_init,
+    k = n_points,
+    startingvalue = b_hat_init
   )
 
-  # Compute posterior moments
   b_hat <- aghq::compute_moment(
     fit_aghq$normalized_posterior,
     ff = function(x) x
@@ -1202,54 +1233,66 @@ NULL
     ff = function(x) x^2
   )
   v_hat <- b2_hat - b_hat^2
-  # Compute E[exp(b)] for survival component
-  exp_b <- aghq::compute_moment(
+  e <- aghq::compute_moment(
     fit_aghq$normalized_posterior,
     ff = function(x) exp(x)
   )
 
+  lognormconst <- fit_aghq$normalized_posterior$lognormconst
+  log_marginal <- pmin(lognormconst, 30)
+
   list(
     b = b_hat,
     v = v_hat,
-    exp_b = exp_b
+    e = e,
+    marginal = exp(log_marginal)
   )
 }
 
-.update_variance_components <- function(
+.m_step_closed_form <- function(
   data_list,
   parameters,
   posteriors,
   ode_solutions
 ) {
   n_subjects <- length(data_list)
+  n_groups <- parameters$configurations$n_groups
   n_observations <- sum(sapply(data_list, function(d) d$longitudinal$n_obs))
 
-  # Initialize variance accumulators
+  prob <- colMeans(posteriors$w)
+
+  # Update variance components using weighted contributions
   measurement_error_variance <- 0
   random_effect_variance <- 0
-  for (i in seq_along(data_list)) {
+
+  for (i in seq_len(n_subjects)) {
     n_i <- data_list[[i]]$longitudinal$n_obs
 
-    if (n_i > 0) {
-      ode_sol <- ode_solutions[[i]]
-      residuals <- data_list[[i]]$longitudinal$measurements -
-        ode_sol$biomarker -
-        posteriors$b[i]
-      measurement_error_variance <- measurement_error_variance +
-        sum(residuals^2) +
-        n_i * posteriors$v[i]
-    }
+    for (k in seq_len(n_groups)) {
+      # Weight for this subject-group combination
+      w_ik <- posteriors$w[i, k]
 
-    # Always update random effect variance
-    random_effect_variance <- random_effect_variance +
-      posteriors$b[i]^2 +
-      posteriors$v[i]
+      if (n_i > 0) {
+        # Longitudinal residuals
+        residuals <- data_list[[i]]$longitudinal$measurements -
+          ode_solutions[[i]][[k]]$biomarker -
+          posteriors$b[i, k]
+
+        measurement_error_variance <- measurement_error_variance +
+          w_ik * (sum(residuals^2) + n_i * posteriors$v[i, k])
+      }
+
+      # Random effect contribution
+      random_effect_variance <- random_effect_variance +
+        w_ik * (posteriors$b[i, k]^2 + posteriors$v[i, k])
+    }
   }
 
   measurement_error_sd <- sqrt(measurement_error_variance / n_observations)
   random_effect_sd <- sqrt(random_effect_variance / n_subjects)
 
   list(
+    prob = prob, # Updated mixture probabilities
     measurement_error_sd = measurement_error_sd,
     random_effect_sd = random_effect_sd
   )
@@ -1262,52 +1305,33 @@ NULL
   params,
   data_list,
   posteriors,
-  configurations,
-  fixed_parameters,
+  parameters,
   parallel = TRUE,
-  n_cores = NULL
+  n_cores = 0
 ) {
   # Compute negative expected complete-data log-likelihood
   # Input: params = c(eta, alpha, phi, beta) - parameter vector for optim
   # Returns: scalar value (negative log-likelihood) for minimization
 
   # Parse parameters
-  n_eta <- configurations$baseline$df
-  n_alpha <- 2
-  n_phi <- if (!is.null(data_list[[1]]$covariates)) {
-    ncol(data_list[[1]]$covariates)
-  } else {
-    0
-  }
-  n_beta <- length(params) - n_eta - n_alpha - n_phi
+  n_baseline <- parameters$configurations$baseline$df
+  n_hazard <- length(parameters$coefficients$hazard)
+  n_acceleration <- length(parameters$coefficients$acceleration)
 
   idx <- 1
-  eta <- params[idx:(idx + n_eta - 1)]
-  idx <- idx + n_eta
-  alpha <- params[idx:(idx + n_alpha - 1)]
-  idx <- idx + n_alpha
-  phi <- if (n_phi > 0) params[idx:(idx + n_phi - 1)] else numeric(0)
-  idx <- idx + n_phi
-  beta <- params[idx:(idx + n_beta - 1)]
-
-  sigma_e <- fixed_parameters$measurement_error_sd
-  sigma_b <- fixed_parameters$random_effect_sd
-
-  # Build parameters structure
-  parameters <- list(
-    coefficients = list(
-      baseline = eta,
-      hazard = c(alpha, phi),
-      acceleration = beta,
-      measurement_error_sd = sigma_e,
-      random_effect_sd = sigma_b
-    ),
-    configurations = configurations
+  parameters$coefficients$baseline <- params[idx:(idx + n_baseline - 1)]
+  idx <- idx + n_baseline
+  parameters$coefficients$hazard <- params[idx:(idx + n_hazard - 1)]
+  idx <- idx + n_hazard
+  parameters$coefficients$acceleration <- matrix(
+    params[idx:(idx + n_acceleration - 1)],
+    ncol = parameters$configurations$n_groups
   )
 
-  # Use provided posteriors (passed as parameter)
-
   n_subjects <- length(data_list)
+  n_groups <- parameters$configurations$n_groups
+  sigma_e <- parameters$coefficients$measurement_error_sd
+  sigma_b <- parameters$coefficients$random_effect_sd
   inv_sigma_e2 <- 1 / (sigma_e^2)
   inv_sigma_b2 <- 1 / (sigma_b^2)
 
@@ -1326,24 +1350,36 @@ NULL
     obj_i <- 0
     n_obs_i <- 0
 
-    # Survival component
-    if (subject_data$status == 1) {
-      obj_i <- obj_i + ode_sol$log_hazard_at_event
-    }
-    obj_i <- obj_i - posteriors$exp_b[i] * ode_sol$cum_hazard_at_event
+    for (k in seq_len(n_groups)) {
+      # Survival component
+      if (subject_data$status == 1) {
+        obj_i <- obj_i + posteriors$w[i, k] * ode_sol[[k]]$log_hazard_at_event
+      }
+      obj_i <- obj_i -
+        posteriors$e[i, k] *
+          posteriors$w[i, k] *
+          ode_sol[[k]]$cum_hazard_at_event
 
-    # Longitudinal component
-    if (subject_data$longitudinal$n_obs > 0) {
-      residuals <- subject_data$longitudinal$measurements -
-        ode_sol$biomarker -
-        posteriors$b[i]
-      obj_i <- obj_i - 0.5 * sum(residuals^2) * inv_sigma_e2
-      n_obs_i <- subject_data$longitudinal$n_obs
-    }
+      # Longitudinal component
+      if (subject_data$longitudinal$n_obs > 0) {
+        residuals <- subject_data$longitudinal$measurements -
+          ode_sol[[k]]$biomarker -
+          posteriors$b[i, k]
+        obj_i <- obj_i -
+          0.5 * posteriors$w[i, k] * sum(residuals^2) * inv_sigma_e2
+        n_obs_i <- subject_data$longitudinal$n_obs
+      }
 
-    # Random effect component
-    obj_i <- obj_i -
-      0.5 * (posteriors$b[i]^2 + posteriors$v[i]) * inv_sigma_b2
+      # Random effect component
+      obj_i <- obj_i -
+        0.5 *
+          posteriors$w[i, k] *
+          (posteriors$b[i, k]^2 + posteriors$v[i, k]) *
+          inv_sigma_b2
+
+      # Group mixture weight
+      obj_i <- obj_i + posteriors$w[i, k] * log(parameters$coefficients$prob[k])
+    }
 
     list(objective = obj_i, n_obs = n_obs_i)
   }
@@ -1380,49 +1416,29 @@ NULL
   params,
   data_list,
   posteriors,
-  configurations,
-  fixed_parameters,
+  parameters,
   parallel = TRUE,
-  n_cores = NULL,
+  n_cores = 0,
   return_individual = FALSE
 ) {
-  # Compute gradient of negative expected complete-data log-likelihood
-  # Input: params = c(eta, alpha, phi, beta) - parameter vector for optim
-  # Returns: gradient vector matching parameter order
-
-  # Parse parameters
-  n_eta <- configurations$baseline$df
-  n_alpha <- 2
-  n_phi <- if (!is.null(data_list[[1]]$covariates)) {
-    ncol(data_list[[1]]$covariates)
-  } else {
-    0
-  }
-  n_beta <- length(params) - n_eta - n_alpha - n_phi
+  n_baseline <- parameters$configurations$baseline$df
+  n_hazard <- length(parameters$coefficients$hazard)
+  n_acceleration <- length(parameters$coefficients$acceleration)
+  n_groups <- parameters$configurations$n_groups
 
   idx <- 1
-  eta <- params[idx:(idx + n_eta - 1)]
-  idx <- idx + n_eta
-  alpha <- params[idx:(idx + n_alpha - 1)]
-  idx <- idx + n_alpha
-  phi <- if (n_phi > 0) params[idx:(idx + n_phi - 1)] else numeric(0)
-  idx <- idx + n_phi
-  beta <- params[idx:(idx + n_beta - 1)]
-
-  sigma_e <- fixed_parameters$measurement_error_sd
-  sigma_b <- fixed_parameters$random_effect_sd
-
-  # Build parameters structure
-  parameters <- list(
-    coefficients = list(
-      baseline = eta,
-      hazard = c(alpha, phi),
-      acceleration = beta,
-      measurement_error_sd = sigma_e,
-      random_effect_sd = sigma_b
-    ),
-    configurations = configurations
+  parameters$coefficients$baseline <- params[idx:(idx + n_baseline - 1)]
+  idx <- idx + n_baseline
+  parameters$coefficients$hazard <- params[idx:(idx + n_hazard - 1)]
+  idx <- idx + n_hazard
+  parameters$coefficients$acceleration <- matrix(
+    params[idx:(idx + n_acceleration - 1)],
+    ncol = n_groups
   )
+
+  # Extract variance parameters
+  sigma_e <- parameters$coefficients$measurement_error_sd
+  sigma_b <- parameters$coefficients$random_effect_sd
 
   # Use provided posteriors (passed as parameter)
 
@@ -1433,7 +1449,7 @@ NULL
   compute_subject_gradient <- function(i) {
     subject_data <- data_list[[i]]
 
-    # Solve augmented ODE system for sensitivities
+    # Solve ODE for all groups at once
     ode_sol <- .solve_joint_ode(
       subject_data,
       parameters,
@@ -1441,65 +1457,96 @@ NULL
     )
 
     status_i <- subject_data$status
-    exp_b_i <- posteriors$exp_b[i]
-    b_hat_i <- posteriors$b[i]
 
     # Initialize subject-specific gradients
-    grad_eta_i <- numeric(n_eta)
-    grad_alpha_i <- numeric(n_alpha)
-    grad_phi_i <- if (n_phi > 0) numeric(n_phi) else numeric(0)
-    grad_beta_i <- numeric(n_beta)
-
-    # Survival gradients
-    # η (baseline hazard)
-    basis_lambda <- .compute_spline_basis(
-      subject_data$time,
-      parameters$configurations$baseline
+    grad_baseline_i <- numeric(n_baseline)
+    grad_hazard_i <- numeric(n_hazard)
+    grad_acceleration_i <- matrix(
+      0,
+      nrow = nrow(parameters$coefficients$acceleration),
+      ncol = n_groups
     )
-    grad_eta_i <- status_i *
-      basis_lambda -
-      exp_b_i * ode_sol$dcumhazard_deta_at_event
 
-    # α (association parameters)
-    m_vec <- c(
-      ode_sol$biomarker_at_event,
-      ode_sol$velocity_at_event
-    )
-    grad_alpha_i <- status_i *
-      m_vec -
-      exp_b_i * ode_sol$dcumhazard_dalpha_at_event
+    # Aggregate gradients across groups
+    for (k in seq_len(n_groups)) {
+      w_ik <- posteriors$w[i, k]
+      b_ik <- posteriors$b[i, k]
+      e_ik <- posteriors$e[i, k]
 
-    # φ (survival covariates)
-    if (n_phi > 0 && !is.null(subject_data$covariates)) {
-      w_vec <- as.numeric(subject_data$covariates)
-      grad_phi_i <- (status_i - exp_b_i * ode_sol$cum_hazard_at_event) * w_vec
-    }
+      # Survival gradients
+      # η (baseline hazard)
+      basis_lambda <- .compute_spline_basis(
+        subject_data$time,
+        parameters$configurations$baseline
+      )
+      grad_baseline_i <- grad_baseline_i +
+        w_ik *
+          (status_i *
+            basis_lambda -
+            e_ik * ode_sol[[k]]$dcumhazard_deta_at_event)
 
-    # β (acceleration coefficients)
-    # Longitudinal component
-    if (subject_data$longitudinal$n_obs > 0) {
-      residuals <- subject_data$longitudinal$measurements -
-        ode_sol$biomarker -
-        b_hat_i
+      # α (association parameters)
+      m_vec <- c(
+        ode_sol[[k]]$biomarker_at_event,
+        ode_sol[[k]]$velocity_at_event
+      )
+      # First two components of hazard gradient (association parameters)
+      grad_hazard_i[1:2] <- grad_hazard_i[1:2] +
+        w_ik *
+          (status_i *
+            m_vec -
+            e_ik * ode_sol[[k]]$dcumhazard_dalpha_at_event)
 
-      if (!is.null(ode_sol$dbiomarker_dbeta)) {
-        grad_beta_long <- as.vector(
-          crossprod(residuals, ode_sol$dbiomarker_dbeta)
+      # Remaining hazard components (survival covariates)
+      if (n_hazard > 2 && !is.null(subject_data$covariates)) {
+        w_vec <- as.numeric(subject_data$covariates)
+        grad_hazard_i[3:n_hazard] <- grad_hazard_i[3:n_hazard] +
+          w_ik *
+            ((status_i -
+              e_ik * ode_sol[[k]]$cum_hazard_at_event) *
+              w_vec)
+      }
+
+      # β (acceleration coefficients for group k)
+      # Longitudinal component
+      if (subject_data$longitudinal$n_obs > 0) {
+        residuals <- subject_data$longitudinal$measurements -
+          ode_sol[[k]]$biomarker -
+          b_ik
+
+        if (!is.null(ode_sol[[k]]$dbiomarker_dbeta)) {
+          grad_beta_long <- as.vector(
+            crossprod(residuals, ode_sol[[k]]$dbiomarker_dbeta)
+          )
+          grad_acceleration_i[, k] <- grad_acceleration_i[, k] +
+            w_ik * grad_beta_long * inv_sigma_e2
+        }
+      }
+
+      # Survival component for β
+      # Second term: direct contribution at event time
+      if (status_i == 1 && !is.null(ode_sol[[k]]$dbiomarker_dbeta_at_event)) {
+        alpha <- parameters$coefficients$hazard[1:2]
+        dm_dbeta_at_event <- rbind(
+          ode_sol[[k]]$dbiomarker_dbeta_at_event,
+          ode_sol[[k]]$dvelocity_dbeta_at_event
         )
-        grad_beta_i <- grad_beta_i + grad_beta_long * inv_sigma_e2
+        grad_acceleration_i[, k] <- grad_acceleration_i[, k] +
+          w_ik * as.vector(t(alpha) %*% dm_dbeta_at_event)
+      }
+
+      # Third term: integral contribution
+      if (!is.null(ode_sol[[k]]$dcumhazard_dbeta_at_event)) {
+        grad_acceleration_i[, k] <- grad_acceleration_i[, k] -
+          w_ik * e_ik * ode_sol[[k]]$dcumhazard_dbeta_at_event
       }
     }
 
-    # Survival component for β
-    grad_beta_i <- grad_beta_i -
-      exp_b_i * ode_sol$dcumhazard_dbeta_at_event
-
     # Return gradient components
     list(
-      grad_eta = grad_eta_i,
-      grad_alpha = grad_alpha_i,
-      grad_phi = grad_phi_i,
-      grad_beta = grad_beta_i
+      grad_baseline = grad_baseline_i,
+      grad_hazard = grad_hazard_i,
+      grad_acceleration = as.vector(grad_acceleration_i)
     )
   }
 
@@ -1525,24 +1572,22 @@ NULL
     grad_matrix <- do.call(
       rbind,
       lapply(grad_results, function(res) {
-        -c(res$grad_eta, res$grad_alpha, res$grad_phi, res$grad_beta)
+        -c(res$grad_baseline, res$grad_hazard, res$grad_acceleration)
       })
     )
     return(grad_matrix)
   }
 
   # Aggregate results (default behavior)
-  grad_eta <- Reduce(`+`, lapply(grad_results, `[[`, "grad_eta"))
-  grad_alpha <- Reduce(`+`, lapply(grad_results, `[[`, "grad_alpha"))
-  grad_phi <- if (n_phi > 0) {
-    Reduce(`+`, lapply(grad_results, `[[`, "grad_phi"))
-  } else {
-    numeric(0)
-  }
-  grad_beta <- Reduce(`+`, lapply(grad_results, `[[`, "grad_beta"))
+  grad_baseline <- Reduce(`+`, lapply(grad_results, `[[`, "grad_baseline"))
+  grad_hazard <- Reduce(`+`, lapply(grad_results, `[[`, "grad_hazard"))
+  grad_acceleration <- Reduce(
+    `+`,
+    lapply(grad_results, `[[`, "grad_acceleration")
+  )
 
   # Combine all gradients (negative for minimization)
-  grad_all <- -c(grad_eta, grad_alpha, grad_phi, grad_beta)
+  grad_all <- -c(grad_baseline, grad_hazard, grad_acceleration)
 
   grad_all
 }

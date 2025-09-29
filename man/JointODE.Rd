@@ -9,17 +9,15 @@ JointODE(
   survival_formula,
   longitudinal_data,
   survival_data,
+  n_groups = 2,
   state = NULL,
   id = "id",
   time = "time",
-  autonomous = TRUE,
   spline_baseline = list(degree = 3, n_knots = 3, knot_placement = "equal",
     boundary_knots = NULL),
   robust = FALSE,
   init = NULL,
   control = list(),
-  parallel = FALSE,
-  n_cores = NULL,
   ...
 )
 }
@@ -57,14 +55,6 @@ to link observations (default: \code{"id"}).}
 \item{time}{Character string specifying the column name for measurement
 times
 in the longitudinal dataset (default: \code{"time"}).}
-
-\item{autonomous}{Logical flag indicating whether the ODE system is
-autonomous (time-independent). When \code{TRUE}, the acceleration
-computation excludes the explicit time term, resulting in
-\eqn{\ddot{m}(t) = f(m(t), \dot{m}(t), X)} instead of
-\eqn{\ddot{m}(t) = f(m(t), \dot{m}(t), X, t)}. Autonomous systems often
-have better numerical stability and theoretical properties
-(default: \code{TRUE}).}
 
 \item{spline_baseline}{A list controlling the B-spline representation of the
 baseline hazard function with the following components:
@@ -106,24 +96,21 @@ spline configuration from \code{spline_baseline}}
 }
 If \code{NULL}, default initial values are used (default: \code{NULL}).}
 
-\item{control}{A list of optimization and algorithmic settings:
+\item{control}{A list of control parameters for optimization, or output from
+\code{\link{JointODE.control}}. Key parameters include:
 \describe{
-\item{\code{method}}{Optimization algorithm for parameter estimation.
-Options include \code{"L-BFGS-B"}, \code{"BFGS"}, \code{"Nelder-Mead"}
-(default: \code{"L-BFGS-B"})}
-\item{\code{maxit}}{Maximum number of iterations for each M-step
-optimization (default: 1000)}
-\item{\code{em_maxit}}{Maximum number of EM algorithm iterations
-(default: 10)}
-\item{\code{em_tol}}{Convergence criterion for EM algorithm based on
-relative change
-in log-likelihood (default: 1e-4)}
-\item{\code{tol}}{Numerical tolerance for optimization convergence
-(default: 1e-2)}
-\item{\code{verbose}}{Controls diagnostic output: \code{0}/\code{FALSE}
-for silent operation, \code{1}/\code{TRUE} for iteration progress,
-\code{2} for detailed parameter traces (default: \code{FALSE})}
-}}
+\item{\code{maxit}}{Maximum number of EM iterations (default: 100)}
+\item{\code{tol}}{Convergence tolerance for EM algorithm (default: 1e-6)}
+\item{\code{verbose}}{Verbosity level: FALSE/0 for silent, TRUE/1 for
+progress messages, 2 for detailed output (default: FALSE)}
+\item{\code{optim.maxit}}{Maximum iterations for M-step optimization
+(default: 50)}
+\item{\code{optim.factr}}{Convergence factor for L-BFGS-B optimizer
+(default: 1e10)}
+}
+See \code{\link{JointODE.control}} for more details.}
+
+\item{...}{Additional arguments passed to internal optimization routines.}
 
 \item{parallel}{Logical flag enabling parallel computation for
 computationally intensive operations including posterior calculations,
@@ -135,8 +122,6 @@ and \pkg{future.apply} packages
 processing. If \code{NULL}, automatically detects and uses all available
 cores minus one
 (default: \code{NULL}).}
-
-\item{...}{Additional arguments passed to internal optimization routines.}
 }
 \value{
 An S3 object of class \code{"JointODE"} containing fitted model
@@ -223,13 +208,40 @@ provided
 }
 \examples{
 \dontrun{
-fit <- JointODE(
-  longitudinal_formula = sim$formulas$longitudinal,
-  survival_formula = sim$formulas$survival,
-  longitudinal_data = sim$data$longitudinal_data,
-  survival_data = sim$data$survival_data
+# Generate example data
+sim <- simulate(n_subjects = 100, n_times = 10)
+
+# Fit with default control parameters
+fit1 <- JointODE(
+  longitudinal_formula = observed ~ x1 + x2,
+  survival_formula = Surv(event_time, event) ~ x1 + x2,
+  longitudinal_data = sim$longitudinal_data,
+  survival_data = sim$survival_data,
+  id = "id"
 )
-summary(fit)
+
+# Fit with custom control parameters using JointODE.control()
+control <- JointODE.control(maxit = 200, tol = 1e-8, verbose = TRUE)
+fit2 <- JointODE(
+  longitudinal_formula = observed ~ x1 + x2,
+  survival_formula = Surv(event_time, event) ~ x1 + x2,
+  longitudinal_data = sim$longitudinal_data,
+  survival_data = sim$survival_data,
+  id = "id",
+  control = control
+)
+
+# Fit with control parameters as a list
+fit3 <- JointODE(
+  longitudinal_formula = observed ~ x1 + x2,
+  survival_formula = Surv(event_time, event) ~ x1 + x2,
+  longitudinal_data = sim$longitudinal_data,
+  survival_data = sim$survival_data,
+  id = "id",
+  control = list(maxit = 50, verbose = TRUE)
+)
+
+summary(fit1)
 }
 
 }

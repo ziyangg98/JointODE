@@ -22,7 +22,9 @@ test_that("IndividualODE works with new interface", {
   )
 
   # Test single subject with covariates
-  single_subject_data <- sim_data$longitudinal_data[sim_data$longitudinal_data$id == 1, ]
+  single_subject_data <- sim_data$longitudinal_data[
+    sim_data$longitudinal_data$id == 1,
+  ]
   fit1 <- IndividualODE(
     formula = observed ~ x1 + x2,
     data = single_subject_data
@@ -42,7 +44,7 @@ test_that("IndividualODE works with new interface", {
   expect_true("value" %in% names(fit1$coefficients))
   expect_true("slope" %in% names(fit1$coefficients))
   expect_true("covariates" %in% names(fit1$coefficients))
-  expect_true(length(fit1$coefficients$covariates) == 3)  # intercept, x1 and x2
+  expect_true(length(fit1$coefficients$covariates) == 3) # intercept, x1 and x2
 
   # Check fitted values match observations
   n_obs_subject1 <- sum(sim_data$longitudinal_data$id == 1)
@@ -50,13 +52,15 @@ test_that("IndividualODE works with new interface", {
   expect_equal(length(fit1$residuals), n_obs_subject1)
 
   # Test without covariates (intercept only)
-  single_subject_data2 <- sim_data$longitudinal_data[sim_data$longitudinal_data$id == 2, ]
+  single_subject_data2 <- sim_data$longitudinal_data[
+    sim_data$longitudinal_data$id == 2,
+  ]
   fit2 <- IndividualODE(
     formula = observed ~ 1,
     data = single_subject_data2
   )
 
-  expect_equal(length(fit2$coefficients$covariates), 1)  # Only intercept
+  expect_equal(length(fit2$coefficients$covariates), 1) # Only intercept
   expect_true(fit2$convergence)
 
   # Test all subjects
@@ -95,10 +99,12 @@ test_that("IndividualODE handles matrix input", {
   # Create matrix data
   n_obs <- 30
   test_matrix <- matrix(
-    c(rep(1:2, each = 15),                    # id
-      rep(seq(0, 7, by = 0.5), 2),           # time
-      rnorm(30, -2, 0.5),                    # biomarker
-      rnorm(30, 0, 1)),                      # x1
+    c(
+      rep(1:2, each = 15), # id
+      rep(seq(0, 7, by = 0.5), 2), # time
+      rnorm(30, -2, 0.5), # biomarker
+      rnorm(30, 0, 1)
+    ), # x1
     ncol = 4
   )
   colnames(test_matrix) <- c("id", "time", "biomarker", "x1")
@@ -112,7 +118,7 @@ test_that("IndividualODE handles matrix input", {
 
   expect_type(fit, "list")
   expect_true("value" %in% names(fit$coefficients))
-  expect_true(length(fit$coefficients$covariates) == 2)  # intercept and x1
+  expect_true(length(fit$coefficients$covariates) == 2) # intercept and x1
   expect_true("x1" %in% names(fit$coefficients$covariates))
 })
 

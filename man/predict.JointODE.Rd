@@ -4,7 +4,7 @@
 \alias{predict.JointODE}
 \title{Predict Method for JointODE Models}
 \usage{
-\method{predict}{JointODE}(object, times = NULL, parallel = FALSE, n_cores = NULL, ...)
+\method{predict}{JointODE}(object, times = NULL, parallel = FALSE, n_cores = 0, ...)
 }
 \arguments{
 \item{object}{A fitted JointODE model object.}

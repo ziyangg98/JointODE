@@ -24,6 +24,8 @@
 #'   estimated from the data.
 #' @param control A list of control parameters passed to \code{optim}
 #'
+#' @concept model-fitting
+#'
 #' @return For a single subject, returns a list containing:
 #'   \describe{
 #'     \item{\code{subject_id}}{Subject identifier}
@@ -63,12 +65,13 @@
 #'
 #' @export
 IndividualODE <- function(
-    formula,
-    data,
-    time = "time",
-    id = "id",
-    state = NULL,
-    control = list()) {
+  formula,
+  data,
+  time = "time",
+  id = "id",
+  state = NULL,
+  control = list()
+) {
   # Capture call for potential debugging
   cl <- match.call()
 
@@ -117,11 +120,12 @@ IndividualODE <- function(
 
 # Process longitudinal data for individual ODE fitting
 .process_individual_longitudinal_data <- function(
-    formula,
-    data,
-    time,
-    id,
-    state) {
+  formula,
+  data,
+  time,
+  id,
+  state
+) {
   # Convert matrix to data frame if necessary
   if (is.matrix(data)) {
     data <- as.data.frame(data)
@@ -155,7 +159,9 @@ IndividualODE <- function(
   # Validate state if provided
   if (!is.null(state)) {
     stopifnot(
-      "state must be a matrix with 2 columns [m(0), m'(0)]" = is.matrix(state) &&
+      "state must be a matrix with 2 columns [m(0), m'(0)]" = is.matrix(
+        state
+      ) &&
         ncol(state) == 2,
       "state must have one row per subject" = nrow(state) == n_subjects
     )
@@ -323,8 +329,8 @@ IndividualODE <- function(
 
   # Define ODE derivative function
   ode_deriv <- function(t, state, parms) {
-    m <- state[1]  # biomarker
-    v <- state[2]  # velocity
+    m <- state[1] # biomarker
+    v <- state[2] # velocity
 
     # Find nearest time point for covariate interpolation
     idx <- findInterval(t, times)

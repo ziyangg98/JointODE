@@ -36,7 +36,7 @@ library(latex2exp)
 ```{r function, echo=FALSE}
 .solve_simple_biomarker_ode <- function(
   times = seq(0, 100, by = 0.1),
-  init = c(1, 0),
+  init = c(-1, 0),
   configurations = list()
 ) {
   .calculate_acceleration <- function(t, biomarker, velocity, parms) {
@@ -108,34 +108,34 @@ cases <- list(
   list(
     name = "omega^2 < 0, omega*xi < 0",
     xi = 0.5i, period = 20i, k = 1.0,
-    excitation = function(t) 0, init = c(1, 0)
+    excitation = function(t) 0, init = c(-1, 0)
   ),
   list(
     name = "omega^2 < 0, omega*xi = 0",
     xi = 0, period = 20i, k = 1.0,
-    excitation = function(t) 0, init = c(1, 0)
+    excitation = function(t) 0, init = c(-1, 0)
   ),
   list(
     name = "omega^2 < 0, omega*xi > 0",
     xi = -0.5i, period = 20i, k = 1.0,
-    excitation = function(t) 0, init = c(1, 0)
+    excitation = function(t) 0, init = c(-1, 0)
   ),
 
   # omega^2 > 0
   list(
     name = "omega^2 > 0, omega*xi < 0",
     xi = -0.3, period = 20, k = 1.0,
-    excitation = function(t) 0, init = c(1, 0)
+    excitation = function(t) 0, init = c(-1, 0)
   ),
   list(
     name = "omega^2 > 0, omega*xi = 0",
     xi = 0, period = 20, k = 1.0,
-    excitation = function(t) 0, init = c(1, 0)
+    excitation = function(t) 0, init = c(-1, 0)
   ),
   list(
     name = "omega^2 > 0, omega*xi > 0",
     xi = 0.3, period = 20, k = 1.0,
-    excitation = function(t) 0, init = c(1, 0)
+    excitation = function(t) 0, init = c(-1, 0)
   )
 )
 
@@ -402,7 +402,7 @@ p_time_na <- ggplot(
   labs(x = "Time", y = "Biomarker")
 
 phase_data_na <- na_data %>%
-  filter(damping_ratio %in% c(-0.1, 0.707, 1.0, 1.5))
+  filter(damping_ratio %in% c(-0.1, 0.3, 0.707, 1.5))
 
 p_phase_na <- ggplot(phase_data_na, aes(x = biomarker, y = velocity)) +
   geom_path(aes(color = time), linewidth = 1, alpha = 0.8) +

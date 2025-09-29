@@ -35,13 +35,6 @@
 #' @param time Character string specifying the column name for measurement
 #'   times
 #'   in the longitudinal dataset (default: \code{"time"}).
-#' @param autonomous Logical flag indicating whether the ODE system is
-#'   autonomous (time-independent). When \code{TRUE}, the acceleration
-#'   computation excludes the explicit time term, resulting in
-#'   \eqn{\ddot{m}(t) = f(m(t), \dot{m}(t), X)} instead of
-#'   \eqn{\ddot{m}(t) = f(m(t), \dot{m}(t), X, t)}. Autonomous systems often
-#'   have better numerical stability and theoretical properties
-#'   (default: \code{TRUE}).
 #' @param spline_baseline A list controlling the B-spline representation of the
 #'   baseline hazard function with the following components:
 #'   \describe{
@@ -79,24 +72,19 @@
 #'       spline configuration from \code{spline_baseline}}
 #'   }
 #'   If \code{NULL}, default initial values are used (default: \code{NULL}).
-#' @param control A list of optimization and algorithmic settings:
+#' @param control A list of control parameters for optimization, or output from
+#'   \code{\link{JointODE.control}}. Key parameters include:
 #'   \describe{
-#'     \item{\code{method}}{Optimization algorithm for parameter estimation.
-#'       Options include \code{"L-BFGS-B"}, \code{"BFGS"}, \code{"Nelder-Mead"}
-#'       (default: \code{"L-BFGS-B"})}
-#'     \item{\code{maxit}}{Maximum number of iterations for each M-step
-#'       optimization (default: 1000)}
-#'     \item{\code{em_maxit}}{Maximum number of EM algorithm iterations
-#'       (default: 10)}
-#'     \item{\code{em_tol}}{Convergence criterion for EM algorithm based on
-#'       relative change
-#'       in log-likelihood (default: 1e-4)}
-#'     \item{\code{tol}}{Numerical tolerance for optimization convergence
-#'       (default: 1e-2)}
-#'     \item{\code{verbose}}{Controls diagnostic output: \code{0}/\code{FALSE}
-#'       for silent operation, \code{1}/\code{TRUE} for iteration progress,
-#'       \code{2} for detailed parameter traces (default: \code{FALSE})}
+#'     \item{\code{maxit}}{Maximum number of EM iterations (default: 100)}
+#'     \item{\code{tol}}{Convergence tolerance for EM algorithm (default: 1e-6)}
+#'     \item{\code{verbose}}{Verbosity level: FALSE/0 for silent, TRUE/1 for
+#'       progress messages, 2 for detailed output (default: FALSE)}
+#'     \item{\code{optim.maxit}}{Maximum iterations for M-step optimization
+#'       (default: 50)}
+#'     \item{\code{optim.factr}}{Convergence factor for L-BFGS-B optimizer
+#'       (default: 1e10)}
 #'   }
+#'   See \code{\link{JointODE.control}} for more details.
 #' @param parallel Logical flag enabling parallel computation for
 #'   computationally intensive operations including posterior calculations,
 #'   gradient evaluations, and likelihood computations. Requires \pkg{future}
@@ -192,13 +180,40 @@
 #'
 #' @examples
 #' \dontrun{
-#' fit <- JointODE(
-#'   longitudinal_formula = sim$formulas$longitudinal,
-#'   survival_formula = sim$formulas$survival,
-#'   longitudinal_data = sim$data$longitudinal_data,
-#'   survival_data = sim$data$survival_data
+#' # Generate example data
+#' sim <- simulate(n_subjects = 100, n_times = 10)
+#'
+#' # Fit with default control parameters
+#' fit1 <- JointODE(
+#'   longitudinal_formula = observed ~ x1 + x2,
+#'   survival_formula = Surv(event_time, event) ~ x1 + x2,
+#'   longitudinal_data = sim$longitudinal_data,
+#'   survival_data = sim$survival_data,
+#'   id = "id"
 #' )
-#' summary(fit)
+#'
+#' # Fit with custom control parameters using JointODE.control()
+#' control <- JointODE.control(maxit = 200, tol = 1e-8, verbose = TRUE)
+#' fit2 <- JointODE(
+#'   longitudinal_formula = observed ~ x1 + x2,
+#'   survival_formula = Surv(event_time, event) ~ x1 + x2,
+#'   longitudinal_data = sim$longitudinal_data,
+#'   survival_data = sim$survival_data,
+#'   id = "id",
+#'   control = control
+#' )
+#'
+#' # Fit with control parameters as a list
+#' fit3 <- JointODE(
+#'   longitudinal_formula = observed ~ x1 + x2,
+#'   survival_formula = Surv(event_time, event) ~ x1 + x2,
+#'   longitudinal_data = sim$longitudinal_data,
+#'   survival_data = sim$survival_data,
+#'   id = "id",
+#'   control = list(maxit = 50, verbose = TRUE)
+#' )
+#'
+#' summary(fit1)
 #' }
 #'
 #' @concept model-fitting
@@ -208,10 +223,10 @@ JointODE <- function(
   survival_formula,
   longitudinal_data,
   survival_data,
+  n_groups = 2,
   state = NULL,
   id = "id",
   time = "time",
-  autonomous = TRUE,
   spline_baseline = list(
     degree = 3,
     n_knots = 3,
@@ -221,8 +236,6 @@ JointODE <- function(
   robust = FALSE,
   init = NULL,
   control = list(),
-  parallel = FALSE,
-  n_cores = NULL,
   ...
 ) {
   cl <- match.call()
@@ -236,12 +249,11 @@ JointODE <- function(
     state = state,
     id = id,
     time = time,
-    autonomous = autonomous,
     spline_baseline = spline_baseline,
     init = init
   )
 
-  data_process <- .process(
+  data_list <- .process(
     longitudinal_formula = longitudinal_formula,
     survival_formula = survival_formula,
     longitudinal_data = longitudinal_data,
@@ -252,11 +264,11 @@ JointODE <- function(
   )
 
   # Extract data dimensions
-  event_times <- vapply(data_process, `[[`, numeric(1), "time")
-  n_subjects <- attr(data_process, "n_subjects")
+  event_times <- vapply(data_list, `[[`, numeric(1), "time")
+  n_subjects <- attr(data_list, "n_subjects")
   subjects_with_long <- Filter(
     function(s) s$longitudinal$n_obs > 0,
-    data_process
+    data_list
   )
   n_longitudinal_covariates <- if (length(subjects_with_long) > 0) {
     ncol(subjects_with_long[[1]]$longitudinal$covariates)
@@ -289,11 +301,7 @@ JointODE <- function(
 
   # Use mathematical notation for parameter names
   hazard_names <- c("alpha_1", "alpha_2", surv_vars_names)
-  accel_names <- if (autonomous) {
-    c("-omega_n^2", "-2*xi*omega_n", long_vars_names)
-  } else {
-    c("-omega_n^2", "-2*xi*omega_n", long_vars_names, "time")
-  }
+  accel_names <- c("-omega_n^2", "-2*xi*omega_n", long_vars_names)
 
   coef_names <- list(
     baseline = paste0("bs", seq_len(spline_baseline_config$df)),
@@ -307,19 +315,24 @@ JointODE <- function(
   )
 
   # Initialize parameters
-  n_acceleration_params <- n_longitudinal_covariates +
-    (if (autonomous) 2 else 3)
   parameters <- list(
     coefficients = list(
       baseline = rep(0, spline_baseline_config$df),
       hazard = rep(0, n_survival_covariates + 2),
-      acceleration = rep(0, n_acceleration_params),
+      acceleration = matrix(
+        rnorm((2 + n_longitudinal_covariates) * n_groups, mean = -1, sd = 0.1),
+        nrow = 2 + n_longitudinal_covariates,
+        ncol = n_groups
+      ),
+      membership = matrix(1 / n_groups, nrow = n_subjects, ncol = n_groups),
+      prob = rep(1 / n_groups, n_groups),
+      random_effect = matrix(0, nrow = n_subjects, ncol = n_groups),
       measurement_error_sd = 1,
       random_effect_sd = 1
     ),
     configurations = list(
       baseline = spline_baseline_config,
-      autonomous = autonomous
+      n_groups = n_groups
     )
   )
 
@@ -340,19 +353,14 @@ JointODE <- function(
     }
   }
 
-  # Control settings
-  control_settings <- modifyList(
-    list(
-      em_maxit = 100,
-      maxit = 50,
-      factr = 1e10,
-      tol = 1e-4,
-      verbose = FALSE
-    ),
-    control
-  )
-  em_maxit <- control_settings$em_maxit
-  em_tol <- control_settings$em_tol %||% 1e-4
+  # Control settings - use JointODE.control to handle defaults
+  if (is.null(control)) {
+    control <- JointODE.control()
+  } else if (is.list(control)) {
+    control <- JointODE.control(.list = control)
+  } else {
+    stop("control must be a list or NULL")
+  }
 
   # EM Algorithm setup
   converged <- FALSE
@@ -360,77 +368,59 @@ JointODE <- function(
   n_baseline <- spline_baseline_config$df
   n_hazard <- n_survival_covariates + 2
 
-  # Convert verbose to numeric level
-  verbose_level <- if (is.logical(control_settings$verbose)) {
-    as.numeric(control_settings$verbose)
-  } else {
-    control_settings$verbose
-  }
-
-  if (verbose_level > 0) {
+  # Check verbose setting
+  if (control$verbose > 0) {
     cli::cli_h2("EM Algorithm Optimization")
-    cli::cli_alert_info(
-      "Settings: {em_maxit} iterations | tolerance: {em_tol}"
-    )
-    cli::cli_text("")
   }
 
-  for (em_iter in seq_len(em_maxit)) {
+  for (em_iter in seq_len(control$maxit)) {
     # E-step
     posteriors <- .compute_posteriors(
-      data_process,
+      data_list,
       parameters,
-      parallel = parallel,
-      n_cores = n_cores,
+      parallel = control$parallel,
+      n_cores = control$n_cores,
       return_ode_solutions = TRUE
     )
+    ode_solutions <- posteriors$ode_solutions
+    parameters$coefficients$random_effect <- posteriors$b
+    parameters$coefficients$membership <- posteriors$w
 
-    # Update variance components
-    variance_update <- .update_variance_components(
-      data_process,
+    # M-step: Closed-form update for mixture and variance parameters
+    m_step_results <- .m_step_closed_form(
+      data_list,
       parameters,
       posteriors,
-      posteriors$ode_solutions
+      ode_solutions
     )
+    parameters$coefficients$prob <- m_step_results$prob
     parameters$coefficients$measurement_error_sd <-
-      variance_update$measurement_error_sd
+      m_step_results$measurement_error_sd
     parameters$coefficients$random_effect_sd <-
-      variance_update$random_effect_sd
-
-    fixed_parameters <- list(
-      measurement_error_sd = parameters$coefficients$measurement_error_sd,
-      random_effect_sd = parameters$coefficients$random_effect_sd
-    )
+      m_step_results$random_effect_sd
 
     # M-step
     res <- optim(
-      par = unlist(
-        parameters$coefficients[c(
-          "baseline",
-          "hazard",
-          "acceleration"
-        )],
-        use.names = FALSE
+      par = c(
+        parameters$coefficients$baseline,
+        parameters$coefficients$hazard,
+        as.vector(parameters$coefficients$acceleration)
       ),
       fn = .compute_objective_joint,
       gr = .compute_gradient_joint,
       method = "L-BFGS-B",
       control = list(
-        factr = control_settings$factr,
-        pgtol = control_settings$tol,
-        maxit = control_settings$maxit,
-        trace = if (verbose_level >= 3) 1 else 0,
-        REPORT = 5
+        factr = control$optim.factr,
+        pgtol = control$tol,
+        maxit = control$optim.maxit,
+        trace = if (control$verbose >= 3) 3 else 0,
+        REPORT = 1
       ),
-      data_list = data_process,
+      data_list = data_list,
       posteriors = posteriors,
-      configurations = list(
-        baseline = spline_baseline_config,
-        autonomous = autonomous
-      ),
-      fixed_parameters = fixed_parameters,
-      parallel = parallel,
-      n_cores = n_cores
+      parameters = parameters,
+      parallel = control$parallel,
+      n_cores = control$n_cores
     )
 
     # Update parameters
@@ -442,15 +432,19 @@ JointODE <- function(
     idx_start <- c(1, idx_end[-length(idx_end)] + 1)
     parameters$coefficients$baseline <- res$par[idx_start[1]:idx_end[1]]
     parameters$coefficients$hazard <- res$par[idx_start[2]:idx_end[2]]
-    parameters$coefficients$acceleration <- res$par[idx_start[3]:idx_end[3]]
+    parameters$coefficients$acceleration <- matrix(
+      res$par[idx_start[3]:idx_end[3]],
+      nrow = 2 + n_longitudinal_covariates,
+      ncol = n_groups
+    )
 
     # Track convergence
     new_loglik <- -res$value
     loglik_change <- new_loglik - old_loglik
 
-    if (verbose_level > 0) {
+    if (control$verbose > 0) {
       cli::cli_text(
-        "[{sprintf('%3d', em_iter)}/{em_maxit}] ",
+        "[{sprintf('%3d', em_iter)}/{control$maxit}] ",
         "LogLik: {sprintf('%.4f', new_loglik)} ",
         "(Change: {sprintf('%.4f', loglik_change)}) ",
         "\u03c3_e={sprintf('%.3f',
@@ -459,7 +453,7 @@ JointODE <- function(
       )
 
       # Detailed parameter output for verbose=2
-      if (verbose_level >= 2) {
+      if (control$verbose >= 2) {
         cli::cli_text(
           "  Baseline hazard: [{paste(sprintf('%.3f',
             head(parameters$coefficients$baseline, 5)), collapse=', ')}",
@@ -485,9 +479,9 @@ JointODE <- function(
     }
 
     # Check convergence
-    if (abs(loglik_change) < em_tol && em_iter > 1) {
+    if (abs(loglik_change) < control$tol && em_iter > 1) {
       converged <- TRUE
-      if (verbose_level > 0) {
+      if (control$verbose > 0) {
         cli::cli_text("")
         cli::cli_alert_success(
           "Converged after {em_iter} iterations ",
@@ -500,10 +494,10 @@ JointODE <- function(
     old_loglik <- new_loglik
   }
 
-  if (!converged && verbose_level > 0) {
+  if (!converged && control$verbose > 0) {
     cli::cli_text("")
     cli::cli_alert_warning(
-      "Did not converge within {em_maxit} iterations ",
+      "Did not converge within {control$maxit} iterations ",
       "(LogLik: {sprintf('%.4f', new_loglik)})"
     )
     cli::cli_alert_info(
@@ -513,10 +507,10 @@ JointODE <- function(
 
   # Final computations
   final_posteriors <- .compute_posteriors(
-    data_process,
+    data_list,
     parameters,
-    parallel = parallel,
-    n_cores = n_cores,
+    parallel = control$parallel,
+    n_cores = control$n_cores,
     return_ode_solutions = TRUE
   )
 
@@ -526,7 +520,7 @@ JointODE <- function(
 
   # Compute variance-covariance matrix
   vcov_matrix <- if (!converged) {
-    if (verbose_level > 0) {
+    if (control$verbose > 0) {
       cli::cli_alert_warning(
         "Skipping variance-covariance computation (EM did not converge)"
       )
@@ -535,7 +529,7 @@ JointODE <- function(
   } else {
     tryCatch(
       {
-        if (verbose_level > 0) {
+        if (control$verbose > 0) {
           cli::cli_alert_info("Computing variance-covariance matrix...")
         }
 
@@ -545,15 +539,11 @@ JointODE <- function(
           func = function(p) {
             .compute_gradient_joint(
               p,
-              data_list = data_process,
+              data_list = data_list,
               posteriors = final_posteriors,
-              configurations = list(
-                baseline = spline_baseline_config,
-                autonomous = autonomous
-              ),
-              fixed_parameters = fixed_parameters,
-              parallel = parallel,
-              n_cores = n_cores
+              parameters = parameters,
+              parallel = control$parallel,
+              n_cores = control$n_cores
             )
           },
           x = res$par,
@@ -574,15 +564,11 @@ JointODE <- function(
           score_list <- lapply(seq_len(n_subjects), function(i) {
             .compute_gradient_joint(
               res$par,
-              data_list = data_process[i],
+              data_list = data_list[i],
               posteriors = final_posteriors[i],
-              configurations = list(
-                baseline = spline_baseline_config,
-                autonomous = autonomous
-              ),
-              fixed_parameters = fixed_parameters,
-              parallel = parallel,
-              n_cores = n_cores,
+              parameters = parameters,
+              parallel = control$parallel,
+              n_cores = control$n_cores,
               return_individual = TRUE
             )
           })
@@ -596,13 +582,13 @@ JointODE <- function(
         # Set parameter names
         dimnames(V) <- list(coef_names_expanded, coef_names_expanded)
 
-        if (verbose_level > 0) {
+        if (control$verbose > 0) {
           cli::cli_alert_success("Variance-covariance matrix computed")
         }
         V
       },
       error = function(e) {
-        if (verbose_level > 0) {
+        if (control$verbose > 0) {
           cli::cli_alert_warning(
             "Variance-covariance matrix computation failed: {e$message}"
           )
@@ -626,8 +612,8 @@ JointODE <- function(
     ode_sol <- final_posteriors$ode_solutions[[i]]
     ode_sol$log_hazard_at_event + final_posteriors$b[i]
   })
-  event_times <- vapply(data_process, `[[`, numeric(1), "time")
-  event_status <- vapply(data_process, `[[`, numeric(1), "status")
+  event_times <- vapply(data_list, `[[`, numeric(1), "time")
+  event_status <- vapply(data_list, `[[`, numeric(1), "status")
 
   # Create a data frame for concordance calculation
   conc_data <- data.frame(
@@ -642,7 +628,7 @@ JointODE <- function(
     reverse = TRUE # Higher risk should correspond to earlier events
   )$concordance
 
-  if (verbose_level > 0) {
+  if (control$verbose > 0) {
     cli::cli_alert_info(
       "C-index (concordance): {sprintf('%.3f', cindex)}"
     )
@@ -658,11 +644,11 @@ JointODE <- function(
       cindex = cindex,
       convergence = list(
         converged = converged,
-        em_iterations = if (converged) em_iter else em_maxit,
+        em_iterations = if (converged) em_iter else control$maxit,
         message = sprintf(
           "EM algorithm %s after %d iterations",
           if (converged) "converged" else "did not converge within",
-          if (converged) em_iter else em_maxit
+          if (converged) em_iter else control$maxit
         )
       ),
       random_effects = list(
@@ -670,8 +656,8 @@ JointODE <- function(
         variances = final_posteriors$v
       ),
       vcov = vcov_matrix,
-      data = data_process,
-      control = control_settings,
+      data = data_list,
+      control = control,
       robust = robust,
       call = cl
     ),
@@ -1046,17 +1032,17 @@ predict.JointODE <- function(
   object,
   times = NULL,
   parallel = FALSE,
-  n_cores = NULL,
+  n_cores = 0,
   ...
 ) {
   # Extract model components
   parameters <- object$parameters
-  data_process <- object$data
+  data_list <- object$data
   random_effects <- object$random_effects$estimates
 
   # Function to compute predictions for a single subject
   compute_subject_predictions <- function(i) {
-    subject_data <- data_process[[i]]
+    subject_data <- data_list[[i]]
     b_i <- random_effects[i]
 
     # Determine time points for prediction
@@ -1094,7 +1080,7 @@ predict.JointODE <- function(
   }
 
   # Compute predictions for all subjects
-  n_subjects <- length(data_process)
+  n_subjects <- length(data_list)
 
   if (parallel) {
     cleanup <- .setup_parallel_plan(n_cores)
