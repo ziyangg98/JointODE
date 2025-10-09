@@ -11,17 +11,22 @@
 <url><loc>http://gongziyang.com/JointODE/index.html</loc></url>
 <url><loc>http://gongziyang.com/JointODE/news/index.html</loc></url>
 <url><loc>http://gongziyang.com/JointODE/reference/JointODE-package.html</loc></url>
+<url><loc>http://gongziyang.com/JointODE/reference/JointODE.control.html</loc></url>
 <url><loc>http://gongziyang.com/JointODE/reference/JointODE.html</loc></url>
+<url><loc>http://gongziyang.com/JointODE/reference/MarginalODE.html</loc></url>
 <url><loc>http://gongziyang.com/JointODE/reference/adjoint.html</loc></url>
 <url><loc>http://gongziyang.com/JointODE/reference/coef.JointODE.html</loc></url>
 <url><loc>http://gongziyang.com/JointODE/reference/index.html</loc></url>
 <url><loc>http://gongziyang.com/JointODE/reference/logLik.JointODE.html</loc></url>
 <url><loc>http://gongziyang.com/JointODE/reference/predict.JointODE.html</loc></url>
+<url><loc>http://gongziyang.com/JointODE/reference/predict.MarginalODE.html</loc></url>
 <url><loc>http://gongziyang.com/JointODE/reference/print.JointODE.html</loc></url>
 <url><loc>http://gongziyang.com/JointODE/reference/print.adjoint.html</loc></url>
+<url><loc>http://gongziyang.com/JointODE/reference/print.summary.MarginalODE.html</loc></url>
 <url><loc>http://gongziyang.com/JointODE/reference/sim.html</loc></url>
 <url><loc>http://gongziyang.com/JointODE/reference/simulate.html</loc></url>
 <url><loc>http://gongziyang.com/JointODE/reference/summary.JointODE.html</loc></url>
+<url><loc>http://gongziyang.com/JointODE/reference/summary.MarginalODE.html</loc></url>
 <url><loc>http://gongziyang.com/JointODE/reference/vcov.JointODE.html</loc></url>
 </urlset>
 

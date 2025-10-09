@@ -21,7 +21,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">JointODE</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -80,55 +80,137 @@
 <h2 id="simulation-setup">Simulation Setup<a class="anchor" aria-label="anchor" href="#simulation-setup"></a>
 </h2>
 <p>The <code>sim</code> dataset was generated using a joint ODE
-framework with the following structure:</p>
-<p><strong>Longitudinal Process:</strong></p>
-<p>The observed biomarker measurements are: <span class="math display">v_{ij} = m_i(t_{ij}) + b_i +
-\epsilon_{ij}</span></p>
-<p>where the true biomarker trajectory <span class="math inline">m_i(t)</span> evolves according to:</p>
-<p><span class="math display">\ddot{m}_i(t) = \beta_1 m_i(t) + \beta_2
-\dot{m}_i(t) + \beta_3 + \beta_4 x_{i1} + \beta_5 x_{i2}</span></p>
-<p>where <span class="math inline">x_{i1}</span> and <span class="math inline">x_{i2}</span> are longitudinal covariates, with
-<span class="math inline">b_i \sim \mathcal{N}(0, \sigma_b^2)</span>
-representing the random intercept and <span class="math inline">\epsilon_{ij} \sim \mathcal{N}(0, \sigma_e^2)</span>
-representing the measurement error.</p>
-<p><strong>Survival Process:</strong></p>
-<p>The hazard function incorporates biomarker dynamics: <span class="math display">\lambda_i(t) = \lambda_0(t) \exp\{\alpha_1 m_i(t) +
-\alpha_2 \dot{m}_i(t) + \phi_1 w_{i1} + \phi_2 w_{i2} + b_i\}</span></p>
-<p>where <span class="math inline">\lambda_0(t) = 8</span> is the
-constant baseline hazard, <span class="math inline">w_{i1}</span> and
-<span class="math inline">w_{i2}</span> are baseline covariates, and
-<span class="math inline">\boldsymbol{\alpha} = (\alpha_1,
-\alpha_2)^\top</span> captures the association with the biomarker value
-and its velocity.</p>
-<pre><code><span><span class="co">#&gt; True Parameters:</span></span>
-<span><span class="co">#&gt;   Hazard: α = [0.3, 1.0], φ = [0.4, -0.6]</span></span>
-<span><span class="co">#&gt;   ODE: β = [-1.6, -1.8, 0.0, 1.3, -0.8]</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Dataset: 200 subjects, 1052 observations, 67% events</span></span></code></pre>
+framework with patient-specific dynamics parameters. The model comprises
+longitudinal and survival sub-models linked through the biomarker
+trajectory dynamics.</p>
 <div class="section level3">
-<h3 id="ode-dynamics">ODE Dynamics<a class="anchor" aria-label="anchor" href="#ode-dynamics"></a>
+<h3 id="longitudinal-sub-model">Longitudinal Sub-model<a class="anchor" aria-label="anchor" href="#longitudinal-sub-model"></a>
 </h3>
-<p><img src="comparison_files/figure-html/viz-combined-1.png" width="960"></p>
-<p>The left panel shows the complete ODE dynamics for four randomly
-selected subjects, illustrating how the biomarker value, velocity, and
-acceleration evolve over time. The right panel demonstrates the impact
-of random intercept and measurement error by comparing the true
-biomarker trajectories (lines) with the observed measurements
-(points).</p>
+<p>The observed biomarker measurements incorporate measurement error:
+<span class="math display">V_{ij} = m_i(t_{ij}) + \varepsilon_{ij},
+\quad \varepsilon_{ij} \sim \mathcal{N}(0, \sigma_e^2)</span></p>
+<p>The true biomarker trajectory <span class="math inline">m_i(t)</span>
+evolves according to a second-order ODE with patient-specific
+parameters:</p>
+<p><span class="math display">\ddot{m}_i(t) =
+\mathbf{Z}_i(t)^{\top}(\boldsymbol{\beta} + \mathbf{b}_i)</span></p>
+<p>where:</p>
+<ul>
+<li>
+<span class="math inline">\mathbf{Z}_i(t) = [m_i(t), \dot{m}_i(t),
+1, x_{i1}, x_{i2}]^{\top}</span> is the feature vector</li>
+<li>
+<span class="math inline">\boldsymbol{\beta} = [\beta_1, \beta_2,
+\beta_3, \beta_4, \beta_5]^{\top}</span> represents population-level ODE
+parameters</li>
+<li>
+<span class="math inline">\mathbf{b}_i \sim \mathcal{N}(\mathbf{0},
+\boldsymbol{\Sigma}_b)</span> are patient-specific random effects</li>
+</ul>
+</div>
+<div class="section level3">
+<h3 id="survival-sub-model">Survival Sub-model<a class="anchor" aria-label="anchor" href="#survival-sub-model"></a>
+</h3>
+<p>The hazard function incorporates both biomarker value and velocity:
+<span class="math display">\lambda_i(t) = \lambda_0(t)\exp\{\alpha_1
+m_i(t) + \alpha_2[\dot{m}_i(t)]^\gamma + \phi_1 w_{i1} + \phi_2
+w_{i2}\}</span></p>
+<p>where:</p>
+<ul>
+<li>
+<span class="math inline">\lambda_0(t)</span> is the Weibull
+baseline hazard</li>
+<li>
+<span class="math inline">\gamma = 1</span> determines the power of
+velocity contribution (linear in this simulation)</li>
+<li>
+<span class="math inline">w_{i1}, w_{i2}</span> are baseline
+survival covariates</li>
+<li>
+<span class="math inline">\boldsymbol{\alpha} = (\alpha_1,
+\alpha_2)^{\top}</span> captures the association with biomarker
+dynamics</li>
+</ul>
+<pre><code><span><span class="co">#&gt; Population-Level Parameters:</span></span>
+<span><span class="co">#&gt;   Association: α = [0.40, 1.50]</span></span>
+<span><span class="co">#&gt;   Survival covariates: φ = [0.40, -0.80]</span></span>
+<span><span class="co">#&gt;   ODE dynamics (population mean): β = [-0.62, -0.63, 1.23, 0.25, -0.12]</span></span>
+<span><span class="co">#&gt;   Measurement error: σ_e = 0.10</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Random Effects Covariance (Σ_b):</span></span>
+<span><span class="co">#&gt;         [,1]    [,2]    [,3]    [,4]    [,5]</span></span>
+<span><span class="co">#&gt; [1,]  0.0021  0.0011 -0.0043 -0.0009  0.0004</span></span>
+<span><span class="co">#&gt; [2,]  0.0011  0.0067 -0.0022 -0.0004  0.0002</span></span>
+<span><span class="co">#&gt; [3,] -0.0043 -0.0022  0.0186  0.0017 -0.0009</span></span>
+<span><span class="co">#&gt; [4,] -0.0009 -0.0004  0.0017  0.0103 -0.0002</span></span>
+<span><span class="co">#&gt; [5,]  0.0004  0.0002 -0.0009 -0.0002  0.0101</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Dataset: 500 subjects, 34087 observations, 74% events</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Model Configuration:</span></span>
+<span><span class="co">#&gt;   Velocity power parameter: γ = 1</span></span></code></pre>
+</div>
+<div class="section level3">
+<h3 id="patient-specific-dynamics">Patient-Specific Dynamics<a class="anchor" aria-label="anchor" href="#patient-specific-dynamics"></a>
+</h3>
+<p>The simulation incorporates patient heterogeneity through continuous
+distributions of dynamics parameters. Each patient has unique
+oscillatory behavior determined by their damping ratio <span class="math inline">\xi_i</span> and period <span class="math inline">T_i</span>.</p>
+<p><img src="comparison_files/figure-html/dynamics-distribution-1.png" width="960"></p>
+<p>The left panel shows the distribution of patient-specific dynamics in
+the physical parameter space (<span class="math inline">\xi</span>,
+<span class="math inline">T</span>), while the right panel displays the
+distribution in the ODE parameter space (<span class="math inline">\beta_1</span>, <span class="math inline">\beta_2</span>). The green cross marks the
+population mean in the ODE parameter space. Note that a small fraction
+of patients may have invalid dynamics parameters due to the tail
+behavior of the Delta method approximation.</p>
+</div>
+<div class="section level3">
+<h3 id="average-trajectories-by-survival-status">Average Trajectories by Survival Status<a class="anchor" aria-label="anchor" href="#average-trajectories-by-survival-status"></a>
+</h3>
+<p><img src="comparison_files/figure-html/viz-average-trajectories-1.png" width="1152"></p>
+<p>The left panel shows the average observed biomarker trajectories,
+while the right panel shows the average observed velocity estimated
+using finite differences. Both panels use LOESS smoothing with 95%
+confidence intervals.</p>
+</div>
+<div class="section level3">
+<h3 id="individual-patient-trajectories-spaghetti-plot">Individual Patient Trajectories (Spaghetti Plot)<a class="anchor" aria-label="anchor" href="#individual-patient-trajectories-spaghetti-plot"></a>
+</h3>
+<p><img src="comparison_files/figure-html/viz-spaghetti-1.png" width="1152"></p>
+<p>The spaghetti plots show all individual patient trajectories colored
+by event status. The left panel displays raw individual trajectories,
+while the right panel overlays LOESS-smoothed average trajectories to
+highlight the overall patterns. This visualization reveals the
+heterogeneity in patient trajectories and the separation between
+patients who experienced events versus those who were censored.</p>
+<p><img src="comparison_files/figure-html/viz-examples-1.png" width="1152"></p>
+<p>The example trajectories show diverse oscillatory behaviors across
+patients with different dynamics parameters. The damping ratio <span class="math inline">\xi</span> controls oscillation decay (lower values
+produce more persistent oscillations), while the period <span class="math inline">T</span> determines the oscillation frequency. The
+left panel shows biomarker trajectories over time (green lines: true
+values, red points: observed with noise). The right panel displays phase
+portraits showing the relationship between biomarker value and velocity,
+with color indicating time progression and green dots marking initial
+states.</p>
 <pre><code><span><span class="co">#&gt; Variance Components:</span></span>
-<span><span class="co">#&gt;   Biomarker: 1.612</span></span>
-<span><span class="co">#&gt;   Velocity: 0.583</span></span>
-<span><span class="co">#&gt;   Acceleration: 5.677</span></span>
+<span><span class="co">#&gt;   Biomarker: 0.374</span></span>
+<span><span class="co">#&gt;   Velocity: 0.139</span></span>
+<span><span class="co">#&gt;   Acceleration: 0.045</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Pairwise Correlations:</span></span>
-<span><span class="co">#&gt;   ρ(Biomarker, Velocity): -0.107</span></span>
-<span><span class="co">#&gt;   ρ(Biomarker, Acceleration): -0.666</span></span>
-<span><span class="co">#&gt;   ρ(Velocity, Acceleration): -0.321</span></span></code></pre>
+<span><span class="co">#&gt;   ρ(Biomarker, Velocity): -0.348</span></span>
+<span><span class="co">#&gt;   ρ(Biomarker, Acceleration): -0.748</span></span>
+<span><span class="co">#&gt;   ρ(Velocity, Acceleration): -0.022</span></span></code></pre>
 <p>The variance hierarchy and correlation structure reflect the
 fundamental properties of the ODE system. Unlike independent variables
 in traditional models, these components are mechanistically linked
 through differential equations, creating intrinsic dependencies that
-capture the true dynamics of biomarker evolution.</p>
+capture the true dynamics of biomarker evolution. The patient-specific
+random effects <span class="math inline">\mathbf{b}_i</span> introduce
+additional heterogeneity in the dynamics, allowing each patient to have
+unique oscillatory patterns while maintaining the overall population
+structure.</p>
 </div>
 <div class="section level3">
 <h3 id="survival-distribution">Survival Distribution<a class="anchor" aria-label="anchor" href="#survival-distribution"></a>
@@ -161,7 +243,8 @@ interval.</p>
 <td><strong>JointODE</strong></td>
 <td>Proposed</td>
 <td>Noisy observations</td>
-<td>ODE-based; estimates m(t), ṁ(t), m̈(t)</td>
+<td>ODE-based with patient-specific dynamics; estimates m(t), ṁ(t),
+m̈(t)</td>
 </tr>
 <tr class="even">
 <td><strong>JSM</strong></td>
@@ -172,17 +255,18 @@ interval.</p>
 <tr class="odd">
 <td><strong>Time-varying Cox (Oracle)</strong></td>
 <td>Upper bound</td>
-<td>True ODE values + <span class="math inline">b_i</span>
-</td>
+<td>True ODE values</td>
 <td>MPLE benchmark with true values</td>
 </tr>
 </tbody>
 </table>
-<p>The Oracle model uses the true biomarker trajectory, derivatives, and
-random effects at observed time points. While it has perfect
-information, it approximates the time-varying covariates using piecewise
-linear interpolation rather than modeling the continuous ODE
-dynamics.</p>
+<p>The Oracle model uses the true biomarker trajectory and derivatives
+at observed time points. While it has perfect information, it
+approximates the time-varying covariates using piecewise linear
+interpolation rather than modeling the continuous ODE dynamics. The
+JointODE model, in contrast, explicitly models patient heterogeneity
+through random effects on the ODE parameters, allowing for
+individualized dynamics estimation.</p>
 <p>Based on 200 simulation replicates, we evaluate the estimation
 accuracy of the association parameters <span class="math inline">(\alpha_1, \alpha_2)</span> and baseline covariate
 effects <span class="math inline">(\phi_1, \phi_2)</span> using Bias,
@@ -221,7 +305,7 @@ quantification.</p>
 <span>  <span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span></span>
 <span>    <span class="va">ID</span>, <span class="va">obstime</span>, <span class="va">observed</span>, <span class="va">biomarker</span>, <span class="va">velocity</span>, <span class="va">acceleration</span>,</span>
-<span>    <span class="va">x1</span>, <span class="va">x2</span>, <span class="va">w1</span>, <span class="va">w2</span>, <span class="va">b</span>, <span class="va">start</span>, <span class="va">stop</span>, <span class="va">event</span></span>
+<span>    <span class="va">x1</span>, <span class="va">x2</span>, <span class="va">w1</span>, <span class="va">w2</span>, <span class="va">start</span>, <span class="va">stop</span>, <span class="va">event</span></span>
 <span>  <span class="op">)</span></span>
 <span></span>
 <span><span class="co">#--------------------------------------------</span></span>
@@ -268,66 +352,66 @@ quantification.</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Data Descriptives:</span></span>
 <span><span class="co">#&gt; Longitudinal Process     Survival Process</span></span>
-<span><span class="co">#&gt; Number of Observations: 1052 Number of Events: 134 (67%)</span></span>
-<span><span class="co">#&gt; Number of Groups: 200 </span></span>
-<span><span class="co">#&gt;       AIC      BIC    logLik</span></span>
-<span><span class="co">#&gt;  138.3598 214.2211 -46.17991</span></span>
+<span><span class="co">#&gt; Number of Observations: 34087    Number of Events: 372 (74.4%)</span></span>
+<span><span class="co">#&gt; Number of Groups: 500 </span></span>
+<span><span class="co">#&gt;        AIC       BIC   logLik</span></span>
+<span><span class="co">#&gt;  -19331.39 -19234.45 9688.694</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Coefficients:</span></span>
 <span><span class="co">#&gt; Longitudinal Process: Linear mixed-effects model</span></span>
-<span><span class="co">#&gt;                                                       Estimate      StdErr</span></span>
-<span><span class="co">#&gt; (Intercept)                                        -2.98808310  0.01009075</span></span>
-<span><span class="co">#&gt; x1                                                  0.09022121  0.01015549</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1    -0.12886772  0.02177733</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2     3.77164492  0.02617602</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3     2.58036763  0.03665646</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4     3.13534679  0.03653112</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5     2.87692825  0.04331146</span></span>
-<span><span class="co">#&gt; x2                                                 -0.11148082  0.01048302</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))1 -0.02386412  0.02211443</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))2  0.89510875  0.02666223</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))3  0.62183176  0.03791016</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))4  0.73729661  0.03740483</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))5  0.67045499  0.04390277</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1:x2  0.00090229  0.02305005</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2:x2 -0.46481885  0.02754132</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3:x2 -0.37091353  0.03885597</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4:x2 -0.39364308  0.03974588</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5:x2 -0.36961189  0.04769127</span></span>
-<span><span class="co">#&gt;                                                      z.value   p.value    </span></span>
-<span><span class="co">#&gt; (Intercept)                                        -296.1210 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; x1                                                    8.8840 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1      -5.9175 3.268e-09 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2     144.0878 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3      70.3933 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4      85.8267 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5      66.4242 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; x2                                                  -10.6344 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))1   -1.0791    0.2805    </span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))2   33.5722 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))3   16.4028 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))4   19.7113 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))5   15.2714 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1:x2    0.0391    0.9688    </span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2:x2  -16.8771 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3:x2   -9.5459 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4:x2   -9.9040 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5:x2   -7.7501 9.182e-15 ***</span></span>
+<span><span class="co">#&gt;                                                      Estimate     StdErr</span></span>
+<span><span class="co">#&gt; (Intercept)                                         0.0246765  0.0109456</span></span>
+<span><span class="co">#&gt; x1                                                  0.1000730  0.0112716</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1    -0.1572809  0.0079981</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2     2.2911966  0.0055779</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3     2.6734510  0.0087675</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4     1.3796473  0.0082903</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5     2.0009117  0.0085347</span></span>
+<span><span class="co">#&gt; x2                                                 -0.0998473  0.0108448</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))1  0.0816837  0.0082399</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))2  0.4364028  0.0057760</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))3  0.3202963  0.0090531</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))4  0.2156728  0.0086411</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))5  0.3019095  0.0090560</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1:x2 -0.0463551  0.0079017</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2:x2 -0.1560890  0.0054908</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3:x2 -0.1090950  0.0086239</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4:x2 -0.0561396  0.0080527</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5:x2 -0.1164112  0.0080976</span></span>
+<span><span class="co">#&gt;                                                     z.value   p.value    </span></span>
+<span><span class="co">#&gt; (Intercept)                                          2.2545   0.02417 *  </span></span>
+<span><span class="co">#&gt; x1                                                   8.8784 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1    -19.6648 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2    410.7618 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3    304.9259 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4    166.4161 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5    234.4442 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; x2                                                  -9.2070 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))1   9.9132 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))2  75.5551 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))3  35.3799 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))4  24.9588 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))5  33.3382 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1:x2  -5.8665 4.451e-09 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2:x2 -28.4276 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3:x2 -12.6503 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4:x2  -6.9715 3.136e-12 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5:x2 -14.3760 &lt; 2.2e-16 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Survival Process: Proportional hazards model with unspecified baseline hazard function</span></span>
 <span><span class="co">#&gt;           Estimate    StdErr z.value   p.value    </span></span>
-<span><span class="co">#&gt; w1        0.345153  0.087066  3.9643 7.361e-05 ***</span></span>
-<span><span class="co">#&gt; w2       -0.383875  0.176634 -2.1733  0.029759 *  </span></span>
-<span><span class="co">#&gt; observed  0.404643  0.125014  3.2368  0.001209 ** </span></span>
+<span><span class="co">#&gt; w1        0.413571  0.052843  7.8263 5.022e-15 ***</span></span>
+<span><span class="co">#&gt; w2       -0.777274  0.107737 -7.2146 5.411e-13 ***</span></span>
+<span><span class="co">#&gt; observed  0.416949  0.099008  4.2113 2.539e-05 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Variance Components:</span></span>
 <span><span class="co">#&gt;             StdDev</span></span>
-<span><span class="co">#&gt; Random   0.0954256</span></span>
-<span><span class="co">#&gt; Residual 0.1058153</span></span>
+<span><span class="co">#&gt; Random   0.2240952</span></span>
+<span><span class="co">#&gt; Residual 0.1637861</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Integration: (Adaptive Gauss-Hermite Quadrature)</span></span>
 <span><span class="co">#&gt; quadrature points: 9 </span></span>
@@ -337,41 +421,41 @@ quantification.</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Optimization:</span></span>
 <span><span class="co">#&gt; convergence: success</span></span>
-<span><span class="co">#&gt; iterations: 24</span></span>
+<span><span class="co">#&gt; iterations: 3</span></span>
 <span></span>
 <span><span class="co">#--------------------------------------------</span></span>
 <span><span class="co"># Model 3: Time-varying Cox (Oracle - Theoretical Benchmark)</span></span>
 <span><span class="co">#--------------------------------------------</span></span>
 <span><span class="va">fit_oracle</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/survival/man/coxph.html" class="external-link">coxph</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/pkg/survival/man/Surv.html" class="external-link">Surv</a></span><span class="op">(</span><span class="va">start</span>, <span class="va">stop</span>, <span class="va">event</span><span class="op">)</span> <span class="op">~</span> <span class="va">biomarker</span> <span class="op">+</span> <span class="va">velocity</span> <span class="op">+</span> <span class="va">w1</span> <span class="op">+</span> <span class="va">w2</span> <span class="op">+</span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/stats/offset.html" class="external-link">offset</a></span><span class="op">(</span><span class="va">b</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/survival/man/cluster.html" class="external-link">cluster</a></span><span class="op">(</span><span class="va">ID</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/pkg/survival/man/cluster.html" class="external-link">cluster</a></span><span class="op">(</span><span class="va">ID</span><span class="op">)</span>,</span>
 <span>  data <span class="op">=</span> <span class="va">jsm_data</span></span>
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit_oracle</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Call:</span></span>
 <span><span class="co">#&gt; coxph(formula = Surv(start, stop, event) ~ biomarker + velocity + </span></span>
-<span><span class="co">#&gt;     w1 + w2 + offset(b), data = jsm_data, cluster = ID)</span></span>
+<span><span class="co">#&gt;     w1 + w2, data = jsm_data, cluster = ID)</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;   n= 1052, number of events= 134 </span></span>
+<span><span class="co">#&gt;   n= 34087, number of events= 372 </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;               coef exp(coef) se(coef) robust se      z Pr(&gt;|z|)    </span></span>
-<span><span class="co">#&gt; biomarker  0.02000   1.02020  0.17208   0.17009  0.118  0.90640    </span></span>
-<span><span class="co">#&gt; velocity   1.35557   3.87897  0.42644   0.42861  3.163  0.00156 ** </span></span>
-<span><span class="co">#&gt; w1         0.33966   1.40448  0.08634   0.07795  4.357 1.32e-05 ***</span></span>
-<span><span class="co">#&gt; w2        -0.39431   0.67415  0.17629   0.17516 -2.251  0.02438 *  </span></span>
+<span><span class="co">#&gt; biomarker  0.36373   1.43868  0.09566   0.09577  3.798 0.000146 ***</span></span>
+<span><span class="co">#&gt; velocity   2.03974   7.68858  0.53778   0.52082  3.916 8.99e-05 ***</span></span>
+<span><span class="co">#&gt; w1         0.40876   1.50495  0.05283   0.05586  7.318 2.51e-13 ***</span></span>
+<span><span class="co">#&gt; w2        -0.78014   0.45834  0.10769   0.10838 -7.198 6.09e-13 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;           exp(coef) exp(-coef) lower .95 upper .95</span></span>
-<span><span class="co">#&gt; biomarker    1.0202     0.9802    0.7310    1.4239</span></span>
-<span><span class="co">#&gt; velocity     3.8790     0.2578    1.6745    8.9856</span></span>
-<span><span class="co">#&gt; w1           1.4045     0.7120    1.2055    1.6363</span></span>
-<span><span class="co">#&gt; w2           0.6741     1.4834    0.4782    0.9503</span></span>
+<span><span class="co">#&gt; biomarker    1.4387     0.6951    1.1925    1.7357</span></span>
+<span><span class="co">#&gt; velocity     7.6886     0.1301    2.7703   21.3386</span></span>
+<span><span class="co">#&gt; w1           1.5050     0.6645    1.3489    1.6791</span></span>
+<span><span class="co">#&gt; w2           0.4583     2.1818    0.3706    0.5668</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Concordance= 0.637  (se = 0.024 )</span></span>
-<span><span class="co">#&gt; Likelihood ratio test= 32.77  on 4 df,   p=1e-06</span></span>
-<span><span class="co">#&gt; Wald test            = 33.56  on 4 df,   p=9e-07</span></span>
-<span><span class="co">#&gt; Score (logrank) test = 32.25  on 4 df,   p=2e-06,   Robust = 26.87  p=2e-05</span></span>
+<span><span class="co">#&gt; Concordance= 0.67  (se = 0.014 )</span></span>
+<span><span class="co">#&gt; Likelihood ratio test= 133.4  on 4 df,   p=&lt;2e-16</span></span>
+<span><span class="co">#&gt; Wald test            = 124.5  on 4 df,   p=&lt;2e-16</span></span>
+<span><span class="co">#&gt; Score (logrank) test = 133.5  on 4 df,   p=&lt;2e-16,   Robust = 111  p=&lt;2e-16</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;   (Note: the likelihood ratio and score tests assume independence of</span></span>
 <span><span class="co">#&gt;      observations within a cluster, the Wald and robust score tests do not).</span></span></code></pre></div>
