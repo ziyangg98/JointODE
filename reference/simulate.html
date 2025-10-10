@@ -71,13 +71,13 @@ natural period, and excitation amplitude.</p>
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">simulate</span><span class="op">(</span></span>
 <span>  n_subjects <span class="op">=</span> <span class="fl">500</span>,</span>
-<span>  longitudinal <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>xi <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="fl">0.4</span>, sd <span class="op">=</span> <span class="fl">0.05</span><span class="op">)</span>, period <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="fl">8</span>, sd <span class="op">=</span> <span class="fl">0.3</span><span class="op">)</span>,</span>
-<span>    excitation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>offset <span class="op">=</span> <span class="fl">2</span>, covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.4</span>, x2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.2</span><span class="op">)</span><span class="op">)</span>, initial <span class="op">=</span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>offset <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>biomarker <span class="op">=</span> <span class="fl">0</span>, velocity <span class="op">=</span> <span class="op">-</span><span class="fl">0.1</span><span class="op">)</span>, covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>biomarker <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span></span>
-<span>    <span class="fl">0.1</span>, x2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.1</span><span class="op">)</span>, velocity <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.1</span>, x2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.05</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>, error_sd <span class="op">=</span> <span class="fl">0.1</span>, n_measurements</span>
-<span>    <span class="op">=</span> <span class="fl">100</span><span class="op">)</span>,</span>
-<span>  survival <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>baseline <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"weibull"</span>, shape <span class="op">=</span> <span class="fl">3</span>, scale <span class="op">=</span> <span class="fl">10</span><span class="op">)</span>, value <span class="op">=</span> <span class="fl">0.4</span>,</span>
-<span>    slope <span class="op">=</span> <span class="fl">1.5</span>, gamma <span class="op">=</span> <span class="fl">1</span>, covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>w1 <span class="op">=</span> <span class="fl">0.4</span>, w2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.8</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  longitudinal <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>xi <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="fl">0.4</span>, sd <span class="op">=</span> <span class="fl">0.05</span><span class="op">)</span>, period <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="fl">6</span>, sd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span>
+<span>    excitation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>offset <span class="op">=</span> <span class="fl">0</span>, covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.5</span>, x2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.45</span><span class="op">)</span><span class="op">)</span>, initial <span class="op">=</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>offset <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>biomarker <span class="op">=</span> <span class="op">-</span><span class="fl">0.5</span>, velocity <span class="op">=</span> <span class="op">-</span><span class="fl">0.1</span><span class="op">)</span>, covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>biomarker <span class="op">=</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.08</span>, x2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.06</span><span class="op">)</span>, velocity <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.25</span>, x2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.2</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>, error_sd <span class="op">=</span> <span class="fl">0.12</span>,</span>
+<span>    n_measurements <span class="op">=</span> <span class="fl">100</span><span class="op">)</span>,</span>
+<span>  survival <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>baseline <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"weibull"</span>, shape <span class="op">=</span> <span class="fl">2</span>, scale <span class="op">=</span> <span class="fl">15</span><span class="op">)</span>, value <span class="op">=</span> <span class="fl">0.8</span>,</span>
+<span>    slope <span class="op">=</span> <span class="fl">2</span>, gamma <span class="op">=</span> <span class="fl">1</span>, covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>w1 <span class="op">=</span> <span class="fl">0.6</span>, w2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.8</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"normal"</span>, mean <span class="op">=</span> <span class="fl">0</span>, sd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>, x2 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span></span>
 <span>    <span class="st">"normal"</span>, mean <span class="op">=</span> <span class="fl">0</span>, sd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>, w1 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"normal"</span>, mean <span class="op">=</span> <span class="fl">0</span>, sd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>, w2 <span class="op">=</span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"binary"</span>, prob <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span><span class="op">)</span>,</span>
@@ -107,16 +107,16 @@ Default: c(mean = 0.4, sd = 0.05)</p></dd>
 <dd><p>Natural period \(T\) of oscillation in time units,
 related to natural frequency as \(\omega = 2\pi/T\).
 Specified as c(mean = ..., sd = ...) for population mean and
-standard deviation. Default: c(mean = 8, sd = 0.3)</p></dd>
+standard deviation. Default: c(mean = 6, sd = 1.0)</p></dd>
 
 <dt>excitation</dt>
 <dd><p>List specifying external forcing parameters:</p><dl><dt>offset</dt>
-<dd><p>Constant excitation term \(f_0\) (default: 4.0)</p></dd>
+<dd><p>Constant excitation term \(f_0\) (default: 0.0)</p></dd>
 
 <dt>covariates</dt>
 <dd><p>Named vector of covariate effects
 \(\boldsymbol{\beta}_{exc}\) on excitation
-(default: c(x1 = 0.8, x2 = -0.5))</p></dd>
+(default: c(x1 = 0.5, x2 = -0.45))</p></dd>
 
 
 </dl></dd>
@@ -125,16 +125,16 @@ standard deviation. Default: c(mean = 8, sd = 0.3)</p></dd>
 <dd><p>List specifying initial condition parameters:</p><dl><dt>offset</dt>
 <dd><p>Named vector with baseline initial values:
 <code>c(biomarker = ..., velocity = ...)</code>
-(default: c(biomarker = 3.8, velocity = -0.1))</p></dd>
+(default: c(biomarker = -0.5, velocity = -0.05))</p></dd>
 
 <dt>covariates</dt>
 <dd><p>List with two named vectors for covariate effects:</p><dl><dt>biomarker</dt>
 <dd><p>Covariate effects on initial biomarker
-(default: c(x1 = 0.1, x2 = -0.1))</p></dd>
+(default: c(x1 = 0.08, x2 = -0.06))</p></dd>
 
 <dt>velocity</dt>
 <dd><p>Covariate effects on initial velocity
-(default: c(x1 = 0.1, x2 = -0.05))</p></dd>
+(default: c(x1 = 0.25, x2 = -0.2))</p></dd>
 
 
 </dl></dd>
@@ -144,7 +144,7 @@ standard deviation. Default: c(mean = 8, sd = 0.3)</p></dd>
 
 <dt>error_sd</dt>
 <dd><p>Standard deviation \(\sigma_{\epsilon}\) of the
-measurement error process (default: 0.1)</p></dd>
+measurement error process (default: 0.12)</p></dd>
 
 <dt>n_measurements</dt>
 <dd><p>Number of longitudinal measurements per subject
@@ -162,22 +162,22 @@ measurement error process (default: 0.1)</p></dd>
 
 <dt>shape</dt>
 <dd><p>Weibull shape parameter \(\kappa &gt; 0\)
-(default: 3.0)</p></dd>
+(default: 2.0)</p></dd>
 
 <dt>scale</dt>
 <dd><p>Weibull scale parameter \(\lambda &gt; 0\)
-(default: 23.0)</p></dd>
+(default: 100.0)</p></dd>
 
 
 </dl></dd>
 
 <dt>value</dt>
 <dd><p>Association parameter \(\alpha_1\) linking current
-biomarker value to hazard (default: 0.4)</p></dd>
+biomarker value to hazard (default: 0.8)</p></dd>
 
 <dt>slope</dt>
 <dd><p>Association parameter \(\alpha_2\) linking biomarker
-velocity (or its power) to hazard (default: 1.5)</p></dd>
+velocity (or its power) to hazard (default: 2.0)</p></dd>
 
 <dt>gamma</dt>
 <dd><p>Power parameter for velocity contribution, where
@@ -188,7 +188,7 @@ uses quadratic velocity \(\alpha_2[\dot{m}_i(t)]^2\) (default: 1)</p></dd>
 <dt>covariates</dt>
 <dd><p>Named vector of regression coefficients
 \(\boldsymbol{\phi}\) for survival covariates
-(default: c(w1 = 0.4, w2 = -0.6))</p></dd>
+(default: c(w1 = 0.6, w2 = -0.8))</p></dd>
 
 
 </dl></dd>
@@ -276,6 +276,18 @@ and <code>sigma</code> (covariance matrix) for the dynamics parameters.</p></dd>
 and survival sub-models linked through shared random effects and
 trajectory-dependent associations.</p>
 <div class="section">
+<h3 id="default-parameter-design">Default Parameter Design<a class="anchor" aria-label="anchor" href="#default-parameter-design"></a></h3>
+<p>The default parameters are calibrated to achieve the following properties:</p><ul><li><p>Approximately 60\<!-- % censoring rate (40\\% event rate) --></p></li>
+<li><p>Initial biomarker difference between risk groups: ~0.2</p></li>
+<li><p>Final biomarker difference between event and censored groups: ~0.7</p></li>
+<li><p>Damping ratio centered at 0.4 (underdamped oscillations)</p></li>
+<li><p>Significant velocity differences between patients with different
+risk profiles, enabling survival prediction based on trajectory dynamics</p></li>
+</ul><p>These settings produce realistic heterogeneity in biomarker trajectories
+while maintaining numerical stability for joint model estimation.</p>
+</div>
+
+<div class="section">
 <h3 id="longitudinal-sub-model">Longitudinal Sub-model<a class="anchor" aria-label="anchor" href="#longitudinal-sub-model"></a></h3>
 <p>The biomarker trajectory \(m_i(t)\) for subject \(i\) follows a damped
 harmonic oscillator with external forcing:
@@ -342,44 +354,44 @@ structure in the ODE parameter space.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] "longitudinal_data" "survival_data"     "state"            </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [4] "random_effects"   </span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sim_basic</span><span class="op">$</span><span class="va">longitudinal_data</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   id time   biomarker    velocity acceleration    observed         x1        x2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1  0.0 -0.08137942 -0.16871349    1.0606218 -0.01048405 -0.5604756 0.2533185</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1  0.1 -0.09304708 -0.06564490    1.0003681 -0.07771089 -0.5604756 0.2533185</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  1  0.2 -0.09471236  0.03129413    0.9381075  0.01516076 -0.5604756 0.2533185</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  1  0.3 -0.08699828  0.12192713    0.8743293  0.02629899 -0.5604756 0.2533185</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  1  0.4 -0.07054146  0.20612528    0.8094999 -0.07488669 -0.5604756 0.2533185</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  1  0.5 -0.04599012  0.28380626    0.7440624  0.04056100 -0.5604756 0.2533185</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   id time  biomarker   velocity acceleration   observed         x1        x2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1  0.0 -0.5600372 -0.2907826    0.2723237 -0.4749627 -0.5604756 0.2533185</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1  0.1 -0.5877492 -0.2634227    0.2745426 -0.5693457 -0.5604756 0.2533185</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  1  0.2 -0.6127182 -0.2359428    0.2746819 -0.4808704 -0.5604756 0.2533185</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  1  0.3 -0.6349417 -0.2085489    0.2728753 -0.4989850 -0.5604756 0.2533185</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  1  0.4 -0.6544379 -0.1814273    0.2692586 -0.6596522 -0.5604756 0.2533185</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  1  0.5 -0.6712424 -0.1547525    0.2639725 -0.5673810 -0.5604756 0.2533185</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sim_basic</span><span class="op">$</span><span class="va">survival_data</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   id      time status          w1 w2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1  1 10.000000      0 -0.71040656  1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  2  7.206210      1  0.25688371  0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  3  2.767442      1 -0.24669188  1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  2 10.000000      0  0.25688371  0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  3  4.861845      1 -0.24669188  1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 4  4 10.000000      0 -0.34754260  1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 5  5 10.000000      0 -0.95161857  1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  6  1.946136      1 -0.04502772  0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  6  1.373399      1 -0.04502772  0</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Check patient-specific dynamics</span></span></span>
 <span class="r-in"><span><span class="co"># Each patient has unique dynamics drawn from population distribution</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sim_basic</span><span class="op">$</span><span class="va">random_effects</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         dyn_value    dyn_slope    dyn_const      dyn_x1        dyn_x2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  0.016301244 -0.024263978 -0.167206849 -0.02058346 -0.0269875533</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] -0.031824468  0.006897051 -0.007998776  0.05689380  0.0443881107</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [3,] -0.008862783 -0.057590058  0.024166809  0.06864147  0.0323711198</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] -0.021091301 -0.115081419  0.057827450 -0.08860446 -0.0004881598</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [5,] -0.039678527  0.016391671 -0.087653911  0.07616099  0.0505287487</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  0.033030521 -0.053070994 -0.157189200 -0.14496211 -0.2148213887</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>        dyn_value   dyn_slope     dyn_const      dyn_x1      dyn_x2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  0.36725716  0.18010596 -0.0685392832 -0.20083091  0.24048524</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] -0.05988631 -0.04562979  0.0061468202 -0.07022798  0.03971831</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,] -0.10179551 -0.11541126 -0.0632680588  0.03522445 -0.04204680</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] -0.16302948  0.01883995 -0.1333924521  0.08359099 -0.13350013</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  0.08179430  0.01787818 -0.0007198758 -0.19811446  0.17497972</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  0.37736648  0.33538236 -0.1023720312 -0.02204918  0.24367211</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Population parameters (mean and covariance)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">sim_basic</span><span class="op">$</span><span class="va">random_effects</span>, <span class="st">"mu"</span><span class="op">)</span>    <span class="co"># Mean of dynamics distribution</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  dyn_value  dyn_slope  dyn_const     dyn_x1     dyn_x2 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -0.6168503 -0.6283185  1.2337006  0.2467401 -0.1233701 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> -1.0966227 -0.8377580  0.0000000  0.5483114 -0.4934802 </span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">sim_basic</span><span class="op">$</span><span class="va">random_effects</span>, <span class="st">"sigma"</span><span class="op">)</span> <span class="co"># Covariance matrix</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>               [,1]          [,2]          [,3]          [,4]          [,5]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  0.0021403365  0.0010900644 -0.0042806729 -0.0008561346  0.0004280673</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [2,]  0.0010900644  0.0067236680 -0.0021801288 -0.0004360258  0.0002180129</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [3,] -0.0042806729 -0.0021801288  0.0185613459  0.0017122692 -0.0008561346</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] -0.0008561346 -0.0004360258  0.0017122692  0.0103424538 -0.0001712269</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  0.0004280673  0.0002180129 -0.0008561346 -0.0001712269  0.0100856135</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>             [,1]        [,2] [,3]        [,4]        [,5]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  0.13362015  0.05103914 0.00 -0.06681008  0.06012907</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,]  0.05103914  0.03046174 0.00 -0.02551957  0.02296761</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]  0.00000000  0.00000000 0.01  0.00000000  0.00000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] -0.06681008 -0.02551957 0.00  0.04340504 -0.03006453</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  0.06012907  0.02296761 0.00 -0.03006453  0.03705808</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Example 2: Heterogeneous patient dynamics</span></span></span>
 <span class="r-in"><span><span class="co"># Patients differ in damping ratio (xi) and oscillation period</span></span></span>

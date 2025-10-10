@@ -132,20 +132,20 @@ survival covariates</li>
 dynamics</li>
 </ul>
 <pre><code><span><span class="co">#&gt; Population-Level Parameters:</span></span>
-<span><span class="co">#&gt;   Association: α = [0.40, 1.50]</span></span>
-<span><span class="co">#&gt;   Survival covariates: φ = [0.40, -0.80]</span></span>
-<span><span class="co">#&gt;   ODE dynamics (population mean): β = [-0.62, -0.63, 1.23, 0.25, -0.12]</span></span>
-<span><span class="co">#&gt;   Measurement error: σ_e = 0.10</span></span>
+<span><span class="co">#&gt;   Association: α = [0.80, 2.00]</span></span>
+<span><span class="co">#&gt;   Survival covariates: φ = [0.60, -0.80]</span></span>
+<span><span class="co">#&gt;   ODE dynamics (population mean): β = [-1.10, -0.84, 0.00, 0.55, -0.49]</span></span>
+<span><span class="co">#&gt;   Measurement error: σ_e = 0.12</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Random Effects Covariance (Σ_b):</span></span>
-<span><span class="co">#&gt;         [,1]    [,2]    [,3]    [,4]    [,5]</span></span>
-<span><span class="co">#&gt; [1,]  0.0021  0.0011 -0.0043 -0.0009  0.0004</span></span>
-<span><span class="co">#&gt; [2,]  0.0011  0.0067 -0.0022 -0.0004  0.0002</span></span>
-<span><span class="co">#&gt; [3,] -0.0043 -0.0022  0.0186  0.0017 -0.0009</span></span>
-<span><span class="co">#&gt; [4,] -0.0009 -0.0004  0.0017  0.0103 -0.0002</span></span>
-<span><span class="co">#&gt; [5,]  0.0004  0.0002 -0.0009 -0.0002  0.0101</span></span>
+<span><span class="co">#&gt;         [,1]    [,2] [,3]    [,4]    [,5]</span></span>
+<span><span class="co">#&gt; [1,]  0.1336  0.0510 0.00 -0.0668  0.0601</span></span>
+<span><span class="co">#&gt; [2,]  0.0510  0.0305 0.00 -0.0255  0.0230</span></span>
+<span><span class="co">#&gt; [3,]  0.0000  0.0000 0.01  0.0000  0.0000</span></span>
+<span><span class="co">#&gt; [4,] -0.0668 -0.0255 0.00  0.0434 -0.0301</span></span>
+<span><span class="co">#&gt; [5,]  0.0601  0.0230 0.00 -0.0301  0.0371</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Dataset: 500 subjects, 34087 observations, 74% events</span></span>
+<span><span class="co">#&gt; Dataset: 200 subjects, 17254 observations, 33% events</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Model Configuration:</span></span>
 <span><span class="co">#&gt;   Velocity power parameter: γ = 1</span></span></code></pre>
@@ -194,14 +194,14 @@ portraits showing the relationship between biomarker value and velocity,
 with color indicating time progression and green dots marking initial
 states.</p>
 <pre><code><span><span class="co">#&gt; Variance Components:</span></span>
-<span><span class="co">#&gt;   Biomarker: 0.374</span></span>
-<span><span class="co">#&gt;   Velocity: 0.139</span></span>
-<span><span class="co">#&gt;   Acceleration: 0.045</span></span>
+<span><span class="co">#&gt;   Biomarker: 0.489</span></span>
+<span><span class="co">#&gt;   Velocity: 0.026</span></span>
+<span><span class="co">#&gt;   Acceleration: 0.010</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Pairwise Correlations:</span></span>
-<span><span class="co">#&gt;   ρ(Biomarker, Velocity): -0.348</span></span>
-<span><span class="co">#&gt;   ρ(Biomarker, Acceleration): -0.748</span></span>
-<span><span class="co">#&gt;   ρ(Velocity, Acceleration): -0.022</span></span></code></pre>
+<span><span class="co">#&gt;   ρ(Biomarker, Velocity): 0.160</span></span>
+<span><span class="co">#&gt;   ρ(Biomarker, Acceleration): -0.364</span></span>
+<span><span class="co">#&gt;   ρ(Velocity, Acceleration): -0.132</span></span></code></pre>
 <p>The variance hierarchy and correlation structure reflect the
 fundamental properties of the ODE system. Unlike independent variables
 in traditional models, these components are mechanistically linked
@@ -352,66 +352,66 @@ quantification.</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Data Descriptives:</span></span>
 <span><span class="co">#&gt; Longitudinal Process     Survival Process</span></span>
-<span><span class="co">#&gt; Number of Observations: 34087    Number of Events: 372 (74.4%)</span></span>
-<span><span class="co">#&gt; Number of Groups: 500 </span></span>
+<span><span class="co">#&gt; Number of Observations: 17254    Number of Events: 66 (33%)</span></span>
+<span><span class="co">#&gt; Number of Groups: 200 </span></span>
 <span><span class="co">#&gt;        AIC       BIC   logLik</span></span>
-<span><span class="co">#&gt;  -19331.39 -19234.45 9688.694</span></span>
+<span><span class="co">#&gt;  -12437.23 -12361.37 6241.617</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Coefficients:</span></span>
 <span><span class="co">#&gt; Longitudinal Process: Linear mixed-effects model</span></span>
 <span><span class="co">#&gt;                                                      Estimate     StdErr</span></span>
-<span><span class="co">#&gt; (Intercept)                                         0.0246765  0.0109456</span></span>
-<span><span class="co">#&gt; x1                                                  0.1000730  0.0112716</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1    -0.1572809  0.0079981</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2     2.2911966  0.0055779</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3     2.6734510  0.0087675</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4     1.3796473  0.0082903</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5     2.0009117  0.0085347</span></span>
-<span><span class="co">#&gt; x2                                                 -0.0998473  0.0108448</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))1  0.0816837  0.0082399</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))2  0.4364028  0.0057760</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))3  0.3202963  0.0090531</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))4  0.2156728  0.0086411</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))5  0.3019095  0.0090560</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1:x2 -0.0463551  0.0079017</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2:x2 -0.1560890  0.0054908</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3:x2 -0.1090950  0.0086239</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4:x2 -0.0561396  0.0080527</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5:x2 -0.1164112  0.0080976</span></span>
-<span><span class="co">#&gt;                                                     z.value   p.value    </span></span>
-<span><span class="co">#&gt; (Intercept)                                          2.2545   0.02417 *  </span></span>
-<span><span class="co">#&gt; x1                                                   8.8784 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1    -19.6648 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2    410.7618 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3    304.9259 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4    166.4161 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5    234.4442 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; x2                                                  -9.2070 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))1   9.9132 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))2  75.5551 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))3  35.3799 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))4  24.9588 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))5  33.3382 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1:x2  -5.8665 4.451e-09 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2:x2 -28.4276 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3:x2 -12.6503 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4:x2  -6.9715 3.136e-12 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5:x2 -14.3760 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; (Intercept)                                        -0.5465891  0.0150557</span></span>
+<span><span class="co">#&gt; x1                                                  0.0371841  0.0160080</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1     0.1089695  0.0118401</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2     0.8700791  0.0082936</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3     0.3521921  0.0117833</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4     0.5982582  0.0102243</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5     0.5139083  0.0106434</span></span>
+<span><span class="co">#&gt; x2                                                 -0.0241234  0.0151477</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))1  0.4476762  0.0127785</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))2  0.6871928  0.0091609</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))3  0.3052330  0.0127981</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))4  0.5328042  0.0112311</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))5  0.4296311  0.0115747</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1:x2 -0.3665483  0.0119203</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2:x2 -0.6615524  0.0083547</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3:x2 -0.3002436  0.0118403</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4:x2 -0.4951931  0.0102562</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5:x2 -0.4215363  0.0106870</span></span>
+<span><span class="co">#&gt;                                                     z.value p.value    </span></span>
+<span><span class="co">#&gt; (Intercept)                                        -36.3044 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; x1                                                   2.3228 0.02019 *  </span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1      9.2035 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2    104.9097 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3     29.8892 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4     58.5132 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5     48.2844 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; x2                                                  -1.5925 0.11126    </span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))1  35.0335 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))2  75.0140 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))3  23.8499 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))4  47.4399 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))5  37.1183 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1:x2 -30.7498 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2:x2 -79.1833 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3:x2 -25.3579 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4:x2 -48.2824 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5:x2 -39.4438 &lt; 2e-16 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Survival Process: Proportional hazards model with unspecified baseline hazard function</span></span>
-<span><span class="co">#&gt;           Estimate    StdErr z.value   p.value    </span></span>
-<span><span class="co">#&gt; w1        0.413571  0.052843  7.8263 5.022e-15 ***</span></span>
-<span><span class="co">#&gt; w2       -0.777274  0.107737 -7.2146 5.411e-13 ***</span></span>
-<span><span class="co">#&gt; observed  0.416949  0.099008  4.2113 2.539e-05 ***</span></span>
+<span><span class="co">#&gt;          Estimate   StdErr z.value   p.value    </span></span>
+<span><span class="co">#&gt; w1        0.96495  0.16332  5.9082 3.460e-09 ***</span></span>
+<span><span class="co">#&gt; w2       -1.01647  0.26496 -3.8364 0.0001249 ***</span></span>
+<span><span class="co">#&gt; observed  1.19120  0.20141  5.9143 3.333e-09 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Variance Components:</span></span>
 <span><span class="co">#&gt;             StdDev</span></span>
-<span><span class="co">#&gt; Random   0.2240952</span></span>
-<span><span class="co">#&gt; Residual 0.1637861</span></span>
+<span><span class="co">#&gt; Random   0.1934086</span></span>
+<span><span class="co">#&gt; Residual 0.1605020</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Integration: (Adaptive Gauss-Hermite Quadrature)</span></span>
 <span><span class="co">#&gt; quadrature points: 9 </span></span>
@@ -436,26 +436,26 @@ quantification.</p>
 <span><span class="co">#&gt; coxph(formula = Surv(start, stop, event) ~ biomarker + velocity + </span></span>
 <span><span class="co">#&gt;     w1 + w2, data = jsm_data, cluster = ID)</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;   n= 34087, number of events= 372 </span></span>
+<span><span class="co">#&gt;   n= 17254, number of events= 66 </span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;               coef exp(coef) se(coef) robust se      z Pr(&gt;|z|)    </span></span>
-<span><span class="co">#&gt; biomarker  0.36373   1.43868  0.09566   0.09577  3.798 0.000146 ***</span></span>
-<span><span class="co">#&gt; velocity   2.03974   7.68858  0.53778   0.52082  3.916 8.99e-05 ***</span></span>
-<span><span class="co">#&gt; w1         0.40876   1.50495  0.05283   0.05586  7.318 2.51e-13 ***</span></span>
-<span><span class="co">#&gt; w2        -0.78014   0.45834  0.10769   0.10838 -7.198 6.09e-13 ***</span></span>
+<span><span class="co">#&gt;              coef exp(coef) se(coef) robust se      z Pr(&gt;|z|)    </span></span>
+<span><span class="co">#&gt; biomarker  1.0709    2.9180   0.2015    0.1801  5.948 2.72e-09 ***</span></span>
+<span><span class="co">#&gt; velocity   2.4360   11.4267   0.9654    0.6324  3.852 0.000117 ***</span></span>
+<span><span class="co">#&gt; w1         0.9114    2.4877   0.1579    0.1447  6.297 3.04e-10 ***</span></span>
+<span><span class="co">#&gt; w2        -1.0075    0.3651   0.2652    0.2620 -3.846 0.000120 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;           exp(coef) exp(-coef) lower .95 upper .95</span></span>
-<span><span class="co">#&gt; biomarker    1.4387     0.6951    1.1925    1.7357</span></span>
-<span><span class="co">#&gt; velocity     7.6886     0.1301    2.7703   21.3386</span></span>
-<span><span class="co">#&gt; w1           1.5050     0.6645    1.3489    1.6791</span></span>
-<span><span class="co">#&gt; w2           0.4583     2.1818    0.3706    0.5668</span></span>
+<span><span class="co">#&gt; biomarker    2.9180    0.34270    2.0504    4.1529</span></span>
+<span><span class="co">#&gt; velocity    11.4267    0.08751    3.3085   39.4649</span></span>
+<span><span class="co">#&gt; w1           2.4877    0.40197    1.8733    3.3037</span></span>
+<span><span class="co">#&gt; w2           0.3651    2.73878    0.2185    0.6101</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Concordance= 0.67  (se = 0.014 )</span></span>
-<span><span class="co">#&gt; Likelihood ratio test= 133.4  on 4 df,   p=&lt;2e-16</span></span>
-<span><span class="co">#&gt; Wald test            = 124.5  on 4 df,   p=&lt;2e-16</span></span>
-<span><span class="co">#&gt; Score (logrank) test = 133.5  on 4 df,   p=&lt;2e-16,   Robust = 111  p=&lt;2e-16</span></span>
+<span><span class="co">#&gt; Concordance= 0.786  (se = 0.026 )</span></span>
+<span><span class="co">#&gt; Likelihood ratio test= 84.17  on 4 df,   p=&lt;2e-16</span></span>
+<span><span class="co">#&gt; Wald test            = 131.6  on 4 df,   p=&lt;2e-16</span></span>
+<span><span class="co">#&gt; Score (logrank) test = 77.43  on 4 df,   p=6e-16,   Robust = 41.5  p=2e-08</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;   (Note: the likelihood ratio and score tests assume independence of</span></span>
 <span><span class="co">#&gt;      observations within a cluster, the Wald and robust score tests do not).</span></span></code></pre></div>
