@@ -63,7 +63,7 @@
 
 
 
-
+<script src="comparison_files/kePrint-0.0.1/kePrint.js"></script><link href="comparison_files/lightable-0.0.1/lightable.css" rel="stylesheet">
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
 
@@ -76,219 +76,214 @@
 
     
     
+<p>This vignette compares JointODE with traditional joint models to
+demonstrate the advantages of ODE-based modeling.</p>
 <div class="section level2">
-<h2 id="simulation-setup">Simulation Setup<a class="anchor" aria-label="anchor" href="#simulation-setup"></a>
+<h2 id="what-were-comparing">What We’re Comparing<a class="anchor" aria-label="anchor" href="#what-were-comparing"></a>
 </h2>
-<p>The <code>sim</code> dataset was generated using a joint ODE
-framework with patient-specific dynamics parameters. The model comprises
-longitudinal and survival sub-models linked through the biomarker
-trajectory dynamics.</p>
+<p>We evaluate three approaches for joint modeling:</p>
 <div class="section level3">
-<h3 id="longitudinal-sub-model">Longitudinal Sub-model<a class="anchor" aria-label="anchor" href="#longitudinal-sub-model"></a>
+<h3 id="jointode-proposed-method">1. JointODE (Proposed Method)<a class="anchor" aria-label="anchor" href="#jointode-proposed-method"></a>
 </h3>
-<p>The observed biomarker measurements incorporate measurement error:
-<span class="math display">V_{ij} = m_i(t_{ij}) + \varepsilon_{ij},
-\quad \varepsilon_{ij} \sim \mathcal{N}(0, \sigma_e^2)</span></p>
-<p>The true biomarker trajectory <span class="math inline">m_i(t)</span>
-evolves according to a second-order ODE with patient-specific
-parameters:</p>
-<p><span class="math display">\ddot{m}_i(t) =
-\mathbf{Z}_i(t)^{\top}(\boldsymbol{\beta} + \mathbf{b}_i)</span></p>
-<p>where:</p>
-<ul>
-<li>
-<span class="math inline">\mathbf{Z}_i(t) = [m_i(t), \dot{m}_i(t),
-1, x_{i1}, x_{i2}]^{\top}</span> is the feature vector</li>
-<li>
-<span class="math inline">\boldsymbol{\beta} = [\beta_1, \beta_2,
-\beta_3, \beta_4, \beta_5]^{\top}</span> represents population-level ODE
-parameters</li>
-<li>
-<span class="math inline">\mathbf{b}_i \sim \mathcal{N}(\mathbf{0},
-\boldsymbol{\Sigma}_b)</span> are patient-specific random effects</li>
-</ul>
+<p>Uses differential equations to model biomarker dynamics:</p>
+<p><strong>Longitudinal:</strong> <span class="math display">\ddot{m}_i(t) = \beta_1 m_i(t) + \beta_2
+\dot{m}_i(t) + \beta_{3} + \beta_4 x_{i1} + \beta_5 x_{i2}</span></p>
+<p><strong>Survival:</strong> <span class="math display">\lambda_i(t) =
+\lambda_0(t)\exp(\alpha_1 m_i(t) + \alpha_2 \dot{m}_i(t) + \phi_1 w_{i1}
++ \phi_2 w_{i2})</span></p>
+<p><strong>Random effects:</strong> Subject-specific <span class="math inline">\beta_1</span> and <span class="math inline">\beta_2</span> (dynamics parameters)</p>
 </div>
 <div class="section level3">
-<h3 id="survival-sub-model">Survival Sub-model<a class="anchor" aria-label="anchor" href="#survival-sub-model"></a>
+<h3 id="jsm-traditional-joint-model">2. JSM (Traditional Joint Model)<a class="anchor" aria-label="anchor" href="#jsm-traditional-joint-model"></a>
 </h3>
-<p>The hazard function incorporates both biomarker value and velocity:
-<span class="math display">\lambda_i(t) = \lambda_0(t)\exp\{\alpha_1
-m_i(t) + \alpha_2[\dot{m}_i(t)]^\gamma + \phi_1 w_{i1} + \phi_2
-w_{i2}\}</span></p>
-<p>where:</p>
-<ul>
-<li>
-<span class="math inline">\lambda_0(t)</span> is the Weibull
-baseline hazard</li>
-<li>
-<span class="math inline">\gamma = 1</span> determines the power of
-velocity contribution (linear in this simulation)</li>
-<li>
-<span class="math inline">w_{i1}, w_{i2}</span> are baseline
-survival covariates</li>
-<li>
-<span class="math inline">\boldsymbol{\alpha} = (\alpha_1,
-\alpha_2)^{\top}</span> captures the association with biomarker
-dynamics</li>
-</ul>
-<pre><code><span><span class="co">#&gt; Population-Level Parameters:</span></span>
-<span><span class="co">#&gt;   Association: α = [0.80, 2.00]</span></span>
-<span><span class="co">#&gt;   Survival covariates: φ = [0.60, -0.80]</span></span>
-<span><span class="co">#&gt;   ODE dynamics (population mean): β = [-1.10, -0.84, 0.00, 0.55, -0.49]</span></span>
-<span><span class="co">#&gt;   Measurement error: σ_e = 0.12</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Random Effects Covariance (Σ_b):</span></span>
-<span><span class="co">#&gt;         [,1]    [,2] [,3]    [,4]    [,5]</span></span>
-<span><span class="co">#&gt; [1,]  0.1336  0.0510 0.00 -0.0668  0.0601</span></span>
-<span><span class="co">#&gt; [2,]  0.0510  0.0305 0.00 -0.0255  0.0230</span></span>
-<span><span class="co">#&gt; [3,]  0.0000  0.0000 0.01  0.0000  0.0000</span></span>
-<span><span class="co">#&gt; [4,] -0.0668 -0.0255 0.00  0.0434 -0.0301</span></span>
-<span><span class="co">#&gt; [5,]  0.0601  0.0230 0.00 -0.0301  0.0371</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Dataset: 200 subjects, 17254 observations, 33% events</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Model Configuration:</span></span>
-<span><span class="co">#&gt;   Velocity power parameter: γ = 1</span></span></code></pre>
+<p>Uses splines to model trajectories:</p>
+<p><strong>Longitudinal:</strong> <span class="math display">m_i(t) =
+\mathbf{B}(t)^{\top}\boldsymbol{\beta}_0 + \sum_{k=1}^2
+x_{ik}\mathbf{B}(t)^{\top}\boldsymbol{\beta}_k + b_i +
+\varepsilon_i(t)</span> where <span class="math inline">\mathbf{B}(t)</span> are B-spline basis
+functions.</p>
+<p><strong>Survival:</strong> <span class="math display">\lambda_i(t) =
+\lambda_0(t)\exp(\alpha m_i(t) + \phi_1 w_{i1} + \phi_2
+w_{i2})</span></p>
+<p><strong>Random effects:</strong> Random intercept <span class="math inline">b_i</span> only</p>
 </div>
 <div class="section level3">
-<h3 id="patient-specific-dynamics">Patient-Specific Dynamics<a class="anchor" aria-label="anchor" href="#patient-specific-dynamics"></a>
+<h3 id="oracle-cox-theoretical-upper-bound">3. Oracle Cox (Theoretical Upper Bound)<a class="anchor" aria-label="anchor" href="#oracle-cox-theoretical-upper-bound"></a>
 </h3>
-<p>The simulation incorporates patient heterogeneity through continuous
-distributions of dynamics parameters. Each patient has unique
-oscillatory behavior determined by their damping ratio <span class="math inline">\xi_i</span> and period <span class="math inline">T_i</span>.</p>
-<p><img src="comparison_files/figure-html/dynamics-distribution-1.png" width="960"></p>
-<p>The left panel shows the distribution of patient-specific dynamics in
-the physical parameter space (<span class="math inline">\xi</span>,
-<span class="math inline">T</span>), while the right panel displays the
-distribution in the ODE parameter space (<span class="math inline">\beta_1</span>, <span class="math inline">\beta_2</span>). The green cross marks the
-population mean in the ODE parameter space. Note that a small fraction
-of patients may have invalid dynamics parameters due to the tail
-behavior of the Delta method approximation.</p>
+<p>Uses <em>true</em> biomarker values (not available in practice):</p>
+<p><strong>Survival:</strong> <span class="math display">\lambda_i(t) =
+\lambda_0(t)\exp(\alpha_1 m_i^{\text{true}}(t) + \alpha_2
+\dot{m}_i^{\text{true}}(t) + \phi_1 w_{i1} + \phi_2 w_{i2})</span></p>
 </div>
 <div class="section level3">
-<h3 id="average-trajectories-by-survival-status">Average Trajectories by Survival Status<a class="anchor" aria-label="anchor" href="#average-trajectories-by-survival-status"></a>
+<h3 id="key-differences">Key Differences<a class="anchor" aria-label="anchor" href="#key-differences"></a>
 </h3>
-<p><img src="comparison_files/figure-html/viz-average-trajectories-1.png" width="1152"></p>
-<p>The left panel shows the average observed biomarker trajectories,
-while the right panel shows the average observed velocity estimated
-using finite differences. Both panels use LOESS smoothing with 95%
-confidence intervals.</p>
-</div>
-<div class="section level3">
-<h3 id="individual-patient-trajectories-spaghetti-plot">Individual Patient Trajectories (Spaghetti Plot)<a class="anchor" aria-label="anchor" href="#individual-patient-trajectories-spaghetti-plot"></a>
-</h3>
-<p><img src="comparison_files/figure-html/viz-spaghetti-1.png" width="1152"></p>
-<p>The spaghetti plots show all individual patient trajectories colored
-by event status. The left panel displays raw individual trajectories,
-while the right panel overlays LOESS-smoothed average trajectories to
-highlight the overall patterns. This visualization reveals the
-heterogeneity in patient trajectories and the separation between
-patients who experienced events versus those who were censored.</p>
-<p><img src="comparison_files/figure-html/viz-examples-1.png" width="1152"></p>
-<p>The example trajectories show diverse oscillatory behaviors across
-patients with different dynamics parameters. The damping ratio <span class="math inline">\xi</span> controls oscillation decay (lower values
-produce more persistent oscillations), while the period <span class="math inline">T</span> determines the oscillation frequency. The
-left panel shows biomarker trajectories over time (green lines: true
-values, red points: observed with noise). The right panel displays phase
-portraits showing the relationship between biomarker value and velocity,
-with color indicating time progression and green dots marking initial
-states.</p>
-<pre><code><span><span class="co">#&gt; Variance Components:</span></span>
-<span><span class="co">#&gt;   Biomarker: 0.489</span></span>
-<span><span class="co">#&gt;   Velocity: 0.026</span></span>
-<span><span class="co">#&gt;   Acceleration: 0.010</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Pairwise Correlations:</span></span>
-<span><span class="co">#&gt;   ρ(Biomarker, Velocity): 0.160</span></span>
-<span><span class="co">#&gt;   ρ(Biomarker, Acceleration): -0.364</span></span>
-<span><span class="co">#&gt;   ρ(Velocity, Acceleration): -0.132</span></span></code></pre>
-<p>The variance hierarchy and correlation structure reflect the
-fundamental properties of the ODE system. Unlike independent variables
-in traditional models, these components are mechanistically linked
-through differential equations, creating intrinsic dependencies that
-capture the true dynamics of biomarker evolution. The patient-specific
-random effects <span class="math inline">\mathbf{b}_i</span> introduce
-additional heterogeneity in the dynamics, allowing each patient to have
-unique oscillatory patterns while maintaining the overall population
-structure.</p>
-</div>
-<div class="section level3">
-<h3 id="survival-distribution">Survival Distribution<a class="anchor" aria-label="anchor" href="#survival-distribution"></a>
-</h3>
-<p><img src="comparison_files/figure-html/viz-survival-1.png" width="672"></p>
-<p>The survival curve shows the overall event pattern in the simulated
-dataset, with the shaded area representing the 95% confidence
-interval.</p>
-</div>
-</div>
-<div class="section level2">
-<h2 id="model-comparison">Model Comparison<a class="anchor" aria-label="anchor" href="#model-comparison"></a>
-</h2>
-<p>We compare our proposed method against existing approaches:</p>
 <table class="table">
-<colgroup>
-<col width="15%">
-<col width="26%">
-<col width="28%">
-<col width="30%">
-</colgroup>
 <thead><tr class="header">
-<th>Model</th>
-<th>Method Type</th>
-<th>Data Source</th>
-<th>Key Features</th>
+<th>Feature</th>
+<th>JointODE</th>
+<th>JSM</th>
+<th>Oracle</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
-<td><strong>JointODE</strong></td>
-<td>Proposed</td>
-<td>Noisy observations</td>
-<td>ODE-based with patient-specific dynamics; estimates m(t), ṁ(t),
-m̈(t)</td>
+<td>Trajectory model</td>
+<td>ODE (mechanistic)</td>
+<td>Splines (empirical)</td>
+<td>N/A</td>
 </tr>
 <tr class="even">
-<td><strong>JSM</strong></td>
-<td>Baseline</td>
-<td>Noisy observations</td>
-<td>Linear mixed effects; only models m(t)</td>
+<td>Captures velocity</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
 </tr>
 <tr class="odd">
-<td><strong>Time-varying Cox (Oracle)</strong></td>
-<td>Upper bound</td>
-<td>True ODE values</td>
-<td>MPLE benchmark with true values</td>
+<td>Input data</td>
+<td>Noisy observations</td>
+<td>Noisy observations</td>
+<td>True values</td>
 </tr>
 </tbody>
 </table>
-<p>The Oracle model uses the true biomarker trajectory and derivatives
-at observed time points. While it has perfect information, it
-approximates the time-varying covariates using piecewise linear
-interpolation rather than modeling the continuous ODE dynamics. The
-JointODE model, in contrast, explicitly models patient heterogeneity
-through random effects on the ODE parameters, allowing for
-individualized dynamics estimation.</p>
-<p>Based on 200 simulation replicates, we evaluate the estimation
-accuracy of the association parameters <span class="math inline">(\alpha_1, \alpha_2)</span> and baseline covariate
-effects <span class="math inline">(\phi_1, \phi_2)</span> using Bias,
-Empirical Standard Error (ESE), Average Standard Error (ASE), and
-Coverage Probability (CP) of 95% confidence intervals.</p>
-<div class="figure">
-<img src="../reference/figures/simulation-1.png" alt="Simulation Results" width="100%"><p class="caption">
-Simulation Results
-</p>
 </div>
-<p>The simulation results demonstrate good estimation accuracy for the
-joint ODE-Cox model across different sample sizes. For <span class="math inline">n=400</span>, the JointODE method yields minimal
-biases for both association parameters <span class="math inline">\alpha_1</span> and <span class="math inline">\alpha_2</span>, as well as the baseline covariate
-effects <span class="math inline">\phi_1</span> and <span class="math inline">\phi_2</span>. The coverage probabilities remain
-close to the nominal 95% level, indicating proper uncertainty
-quantification.</p>
 </div>
 <div class="section level2">
-<h2 id="appendix">Appendix<a class="anchor" aria-label="anchor" href="#appendix"></a>
+<h2 id="simulation-setup">Simulation Setup<a class="anchor" aria-label="anchor" href="#simulation-setup"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Data preparation for comparison models</span></span>
+<p>We simulate data from 200 subjects under the following
+data-generating mechanism:</p>
+<p><strong>Longitudinal sub-model:</strong> Biomarker trajectories
+evolve according to a second-order ODE: <span class="math display">\ddot{m}_i(t) = \beta_1^i m_i(t) + \beta_2^i
+\dot{m}_i(t) + \beta_0 + \beta_3 x_{i1} + \beta_4 x_{i2}</span></p>
+<p>where subject-specific dynamics parameters <span class="math inline">(\beta_1^i, \beta_2^i) = (\bar{\beta}_1,
+\bar{\beta}_2) + \mathbf{b}_i</span> with <span class="math inline">\mathbf{b}_i \sim \mathcal{N}(\mathbf{0},
+\Sigma_b)</span> introduce patient heterogeneity. Observed measurements
+are corrupted by Gaussian noise: <span class="math display">V_{ij} =
+m_i(t_{ij}) + \varepsilon_{ij}, \quad \varepsilon_{ij} \sim
+\mathcal{N}(0, \sigma_e^2)</span></p>
+<p><strong>Survival sub-model:</strong> The hazard function depends on
+current biomarker value and velocity: <span class="math display">\lambda_i(t) = \lambda_0(t) \exp\left(\alpha_1
+m_i(t) + \alpha_2 \dot{m}_i(t) + \phi_1 w_{i1} + \phi_2
+w_{i2}\right)</span></p>
+<p>where <span class="math inline">\lambda_0(t)</span> follows a Weibull
+distribution.</p>
+<table class="table table" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<caption>
+Simulation Parameters
+</caption>
+<thead><tr>
+<th style="text-align:left;">
+Parameter
+</th>
+<th style="text-align:center;">
+Value
+</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+Association (α₁, α₂)
+</td>
+<td style="text-align:center;">
+(0.80, 2.00)
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Survival covariates (φ₁, φ₂)
+</td>
+<td style="text-align:center;">
+(0.60, -0.80)
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+ODE dynamics (β₁, β₂)
+</td>
+<td style="text-align:center;">
+(-1.10, -0.84)
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Random effects Var(β₁), Var(β₂)
+</td>
+<td style="text-align:center;">
+(0.001, 0.044)
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Measurement error (σₑ)
+</td>
+<td style="text-align:center;">
+0.10
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Sample size (n subjects)
+</td>
+<td style="text-align:center;">
+200
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Event rate
+</td>
+<td style="text-align:center;">
+30.5%
+</td>
+</tr>
+</tbody>
+</table>
+<p><img src="comparison_files/figure-html/viz-combined-1.png" width="960"></p>
+<p><strong>Figure 1.</strong> Simulated data characteristics: (A)
+individual and average biomarker trajectories by survival status with
+95% CI, (B) average velocity trajectories showing divergence between
+event and censored groups, (C) example patient trajectories showing true
+values (green) vs noisy observations (red), (D) phase portraits for 4
+example patients (green dot = initial state), (E) distribution of
+patient-specific dynamics in physical parameter space (<span class="math inline">\xi</span>, period), (F) Kaplan-Meier survival curve
+with 95% CI.</p>
+<div class="section level3">
+<h3 id="results-summary">Results Summary<a class="anchor" aria-label="anchor" href="#results-summary"></a>
+</h3>
+<p>The simulation results demonstrate strong performance of
+JointODE:</p>
+<ul>
+<li>
+<strong>Low bias</strong>: Estimates for association parameters
+(<span class="math inline">\alpha_1</span>, <span class="math inline">\alpha_2</span>) and covariate effects (<span class="math inline">\phi_1</span>, <span class="math inline">\phi_2</span>) are centered near true values</li>
+<li>
+<strong>Accurate uncertainty</strong>: Coverage probabilities
+approach the nominal 95% level, indicating proper standard error
+estimation</li>
+<li>
+<strong>Efficiency gains</strong>: ESE decreases with sample size,
+showing efficient use of information</li>
+<li>
+<strong>Competitive performance</strong>: JointODE performs
+comparably to the Oracle model despite using only noisy
+observations</li>
+</ul>
+<p>These results confirm that mechanistic ODE modeling can effectively
+recover true parameters while properly quantifying uncertainty, even
+with moderate sample sizes.</p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="appendix-model-implementation-details">Appendix: Model Implementation Details<a class="anchor" aria-label="anchor" href="#appendix-model-implementation-details"></a>
+</h2>
+<p>This section provides R code for fitting the comparison models using
+the <code>sim</code> dataset.</p>
+<div class="section level3">
+<h3 id="data-preparation">Data Preparation<a class="anchor" aria-label="anchor" href="#data-preparation"></a>
+</h3>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Prepare data format for JSM package</span></span>
 <span><span class="va">jsm_data</span> <span class="op">&lt;-</span> <span class="fu">dataPreprocess</span><span class="op">(</span></span>
 <span>  long <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">data</span><span class="op">$</span><span class="va">longitudinal_data</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/rename.html" class="external-link">rename</a></span><span class="op">(</span>ID <span class="op">=</span> <span class="va">id</span><span class="op">)</span>,</span>
 <span>  surv <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">data</span><span class="op">$</span><span class="va">survival_data</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/rename.html" class="external-link">rename</a></span><span class="op">(</span>ID <span class="op">=</span> <span class="va">id</span>, survtime <span class="op">=</span> <span class="va">time</span><span class="op">)</span>,</span>
@@ -307,17 +302,6 @@ quantification.</p>
 <span>    <span class="va">ID</span>, <span class="va">obstime</span>, <span class="va">observed</span>, <span class="va">biomarker</span>, <span class="va">velocity</span>, <span class="va">acceleration</span>,</span>
 <span>    <span class="va">x1</span>, <span class="va">x2</span>, <span class="va">w1</span>, <span class="va">w2</span>, <span class="va">start</span>, <span class="va">stop</span>, <span class="va">event</span></span>
 <span>  <span class="op">)</span></span>
-<span></span>
-<span><span class="co">#--------------------------------------------</span></span>
-<span><span class="co"># Model 1: JointODE (Proposed Method)</span></span>
-<span><span class="co">#--------------------------------------------</span></span>
-<span><span class="co"># fit_jointode &lt;- JointODE(</span></span>
-<span><span class="co">#   longitudinal_formula = observed ~ x1 + x2,</span></span>
-<span><span class="co">#   survival_formula = Surv(time, status) ~ w1 + w2,</span></span>
-<span><span class="co">#   longitudinal_data = sim$data$longitudinal_data,</span></span>
-<span><span class="co">#   survival_data = sim$data$survival_data,</span></span>
-<span><span class="co">#   state = as.matrix(sim$data$state)</span></span>
-<span><span class="co"># )</span></span>
 <span></span>
 <span><span class="co">#--------------------------------------------</span></span>
 <span><span class="co"># Model 2: Traditional Joint Model (JSM)</span></span>
@@ -352,66 +336,66 @@ quantification.</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Data Descriptives:</span></span>
 <span><span class="co">#&gt; Longitudinal Process     Survival Process</span></span>
-<span><span class="co">#&gt; Number of Observations: 17254    Number of Events: 66 (33%)</span></span>
+<span><span class="co">#&gt; Number of Observations: 17350    Number of Events: 61 (30.5%)</span></span>
 <span><span class="co">#&gt; Number of Groups: 200 </span></span>
-<span><span class="co">#&gt;        AIC       BIC   logLik</span></span>
-<span><span class="co">#&gt;  -12437.23 -12361.37 6241.617</span></span>
+<span><span class="co">#&gt;       AIC       BIC  logLik</span></span>
+<span><span class="co">#&gt;  -26377.6 -26301.74 13211.8</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Coefficients:</span></span>
 <span><span class="co">#&gt; Longitudinal Process: Linear mixed-effects model</span></span>
 <span><span class="co">#&gt;                                                      Estimate     StdErr</span></span>
-<span><span class="co">#&gt; (Intercept)                                        -0.5465891  0.0150557</span></span>
-<span><span class="co">#&gt; x1                                                  0.0371841  0.0160080</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1     0.1089695  0.0118401</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2     0.8700791  0.0082936</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3     0.3521921  0.0117833</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4     0.5982582  0.0102243</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5     0.5139083  0.0106434</span></span>
-<span><span class="co">#&gt; x2                                                 -0.0241234  0.0151477</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))1  0.4476762  0.0127785</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))2  0.6871928  0.0091609</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))3  0.3052330  0.0127981</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))4  0.5328042  0.0112311</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))5  0.4296311  0.0115747</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1:x2 -0.3665483  0.0119203</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2:x2 -0.6615524  0.0083547</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3:x2 -0.3002436  0.0118403</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4:x2 -0.4951931  0.0102562</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5:x2 -0.4215363  0.0106870</span></span>
-<span><span class="co">#&gt;                                                     z.value p.value    </span></span>
-<span><span class="co">#&gt; (Intercept)                                        -36.3044 &lt; 2e-16 ***</span></span>
-<span><span class="co">#&gt; x1                                                   2.3228 0.02019 *  </span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1      9.2035 &lt; 2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2    104.9097 &lt; 2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3     29.8892 &lt; 2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4     58.5132 &lt; 2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5     48.2844 &lt; 2e-16 ***</span></span>
-<span><span class="co">#&gt; x2                                                  -1.5925 0.11126    </span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))1  35.0335 &lt; 2e-16 ***</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))2  75.0140 &lt; 2e-16 ***</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))3  23.8499 &lt; 2e-16 ***</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))4  47.4399 &lt; 2e-16 ***</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))5  37.1183 &lt; 2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1:x2 -30.7498 &lt; 2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2:x2 -79.1833 &lt; 2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3:x2 -25.3579 &lt; 2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4:x2 -48.2824 &lt; 2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5:x2 -39.4438 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; (Intercept)                                        -0.5495484  0.0046777</span></span>
+<span><span class="co">#&gt; x1                                                  0.0374771  0.0048252</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1     0.1336705  0.0080203</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2     0.9827604  0.0056276</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3     0.2714365  0.0079623</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4     0.6593548  0.0067972</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5     0.5274467  0.0071195</span></span>
+<span><span class="co">#&gt; x2                                                 -0.0197927  0.0049656</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))1  0.4709302  0.0082757</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))2  0.7118344  0.0058165</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))3  0.2314254  0.0081830</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))4  0.5904711  0.0069970</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))5  0.4288224  0.0073917</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1:x2 -0.3916342  0.0085176</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2:x2 -0.6507863  0.0059480</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3:x2 -0.2527886  0.0083878</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4:x2 -0.5216500  0.0071064</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5:x2 -0.4031163  0.0075044</span></span>
+<span><span class="co">#&gt;                                                      z.value   p.value    </span></span>
+<span><span class="co">#&gt; (Intercept)                                        -117.4835 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; x1                                                    7.7669 8.044e-15 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1      16.6666 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2     174.6322 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3      34.0900 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4      97.0034 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5      74.0845 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; x2                                                   -3.9860 6.721e-05 ***</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))1   56.9054 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))2  122.3822 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))3   28.2811 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))4   84.3888 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))5   58.0138 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1:x2  -45.9792 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2:x2 -109.4118 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3:x2  -30.1378 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4:x2  -73.4058 &lt; 2.2e-16 ***</span></span>
+<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5:x2  -53.7173 &lt; 2.2e-16 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Survival Process: Proportional hazards model with unspecified baseline hazard function</span></span>
 <span><span class="co">#&gt;          Estimate   StdErr z.value   p.value    </span></span>
-<span><span class="co">#&gt; w1        0.96495  0.16332  5.9082 3.460e-09 ***</span></span>
-<span><span class="co">#&gt; w2       -1.01647  0.26496 -3.8364 0.0001249 ***</span></span>
-<span><span class="co">#&gt; observed  1.19120  0.20141  5.9143 3.333e-09 ***</span></span>
+<span><span class="co">#&gt; w1        0.67275  0.12449  5.4040 6.518e-08 ***</span></span>
+<span><span class="co">#&gt; w2       -1.34183  0.28488 -4.7101 2.476e-06 ***</span></span>
+<span><span class="co">#&gt; observed  0.72682  0.18397  3.9507 7.794e-05 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Variance Components:</span></span>
-<span><span class="co">#&gt;             StdDev</span></span>
-<span><span class="co">#&gt; Random   0.1934086</span></span>
-<span><span class="co">#&gt; Residual 0.1605020</span></span>
+<span><span class="co">#&gt;              StdDev</span></span>
+<span><span class="co">#&gt; Random   0.02695929</span></span>
+<span><span class="co">#&gt; Residual 0.10961656</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Integration: (Adaptive Gauss-Hermite Quadrature)</span></span>
 <span><span class="co">#&gt; quadrature points: 9 </span></span>
@@ -421,7 +405,7 @@ quantification.</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Optimization:</span></span>
 <span><span class="co">#&gt; convergence: success</span></span>
-<span><span class="co">#&gt; iterations: 3</span></span>
+<span><span class="co">#&gt; iterations: 4</span></span>
 <span></span>
 <span><span class="co">#--------------------------------------------</span></span>
 <span><span class="co"># Model 3: Time-varying Cox (Oracle - Theoretical Benchmark)</span></span>
@@ -436,103 +420,30 @@ quantification.</p>
 <span><span class="co">#&gt; coxph(formula = Surv(start, stop, event) ~ biomarker + velocity + </span></span>
 <span><span class="co">#&gt;     w1 + w2, data = jsm_data, cluster = ID)</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;   n= 17254, number of events= 66 </span></span>
+<span><span class="co">#&gt;   n= 17350, number of events= 61 </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;              coef exp(coef) se(coef) robust se      z Pr(&gt;|z|)    </span></span>
-<span><span class="co">#&gt; biomarker  1.0709    2.9180   0.2015    0.1801  5.948 2.72e-09 ***</span></span>
-<span><span class="co">#&gt; velocity   2.4360   11.4267   0.9654    0.6324  3.852 0.000117 ***</span></span>
-<span><span class="co">#&gt; w1         0.9114    2.4877   0.1579    0.1447  6.297 3.04e-10 ***</span></span>
-<span><span class="co">#&gt; w2        -1.0075    0.3651   0.2652    0.2620 -3.846 0.000120 ***</span></span>
+<span><span class="co">#&gt; biomarker  0.6831    1.9800   0.1878    0.1727  3.956 7.62e-05 ***</span></span>
+<span><span class="co">#&gt; velocity   1.7701    5.8715   0.9761    0.8355  2.119   0.0341 *  </span></span>
+<span><span class="co">#&gt; w1         0.6722    1.9585   0.1239    0.1137  5.909 3.43e-09 ***</span></span>
+<span><span class="co">#&gt; w2        -1.3300    0.2645   0.2855    0.2838 -4.687 2.78e-06 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;           exp(coef) exp(-coef) lower .95 upper .95</span></span>
-<span><span class="co">#&gt; biomarker    2.9180    0.34270    2.0504    4.1529</span></span>
-<span><span class="co">#&gt; velocity    11.4267    0.08751    3.3085   39.4649</span></span>
-<span><span class="co">#&gt; w1           2.4877    0.40197    1.8733    3.3037</span></span>
-<span><span class="co">#&gt; w2           0.3651    2.73878    0.2185    0.6101</span></span>
+<span><span class="co">#&gt; biomarker    1.9800     0.5050    1.4115    2.7774</span></span>
+<span><span class="co">#&gt; velocity     5.8715     0.1703    1.1417   30.1956</span></span>
+<span><span class="co">#&gt; w1           1.9585     0.5106    1.5671    2.4476</span></span>
+<span><span class="co">#&gt; w2           0.2645     3.7812    0.1516    0.4613</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Concordance= 0.786  (se = 0.026 )</span></span>
-<span><span class="co">#&gt; Likelihood ratio test= 84.17  on 4 df,   p=&lt;2e-16</span></span>
-<span><span class="co">#&gt; Wald test            = 131.6  on 4 df,   p=&lt;2e-16</span></span>
-<span><span class="co">#&gt; Score (logrank) test = 77.43  on 4 df,   p=6e-16,   Robust = 41.5  p=2e-08</span></span>
+<span><span class="co">#&gt; Concordance= 0.75  (se = 0.033 )</span></span>
+<span><span class="co">#&gt; Likelihood ratio test= 56.01  on 4 df,   p=2e-11</span></span>
+<span><span class="co">#&gt; Wald test            = 51.1  on 4 df,   p=2e-10</span></span>
+<span><span class="co">#&gt; Score (logrank) test = 56.04  on 4 df,   p=2e-11,   Robust = 32.53  p=1e-06</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;   (Note: the likelihood ratio and score tests assume independence of</span></span>
 <span><span class="co">#&gt;      observations within a cluster, the Wald and robust score tests do not).</span></span></code></pre></div>
 </div>
-<div class="section level2">
-<h2 id="real-data-example">Real Data Example<a class="anchor" aria-label="anchor" href="#real-data-example"></a>
-</h2>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">pbc</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co">#--------------------------------------------</span></span>
-<span><span class="co"># Model 1: Traditional JSM (使用原始pbc数据)</span></span>
-<span><span class="co">#--------------------------------------------</span></span>
-<span><span class="va">fit_lme_pbc</span> <span class="op">&lt;-</span> <span class="fu">lme</span><span class="op">(</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="va">serBilir</span><span class="op">)</span> <span class="op">~</span> <span class="va">drug</span> <span class="op">*</span></span>
-<span>    <span class="fu">bs</span><span class="op">(</span><span class="va">obstime</span>, df <span class="op">=</span> <span class="fl">4</span>, degree <span class="op">=</span> <span class="fl">2</span>, Boundary.knots <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">15</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  random <span class="op">=</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">|</span> <span class="va">ID</span>,</span>
-<span>  data <span class="op">=</span> <span class="va">pbc</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">fit_cox_pbc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/survival/man/coxph.html" class="external-link">coxph</a></span><span class="op">(</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/pkg/survival/man/Surv.html" class="external-link">Surv</a></span><span class="op">(</span><span class="va">start</span>, <span class="va">stop</span>, <span class="va">event</span><span class="op">)</span> <span class="op">~</span> <span class="va">drug</span>,</span>
-<span>  data <span class="op">=</span> <span class="va">pbc</span>,</span>
-<span>  x <span class="op">=</span> <span class="cn">TRUE</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">fit_jt_pbc</span> <span class="op">&lt;-</span> <span class="fu">jmodelTM</span><span class="op">(</span></span>
-<span>  <span class="va">fit_lme_pbc</span>, <span class="va">fit_cox_pbc</span>, <span class="va">pbc</span>,</span>
-<span>  timeVarY <span class="op">=</span> <span class="st">"obstime"</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit_jt_pbc</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co">#--------------------------------------------</span></span>
-<span><span class="co"># Model 2: JointODE (使用分离的数据)</span></span>
-<span><span class="co">#--------------------------------------------</span></span>
-<span><span class="va">longitudinal_pbc</span> <span class="op">&lt;-</span> <span class="va">pbc</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">ID</span>, <span class="va">obstime</span>, <span class="va">serBilir</span>, <span class="va">drug</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">serBilir</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>observed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="va">serBilir</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span>  <span class="co"># 取对数转换</span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/rename.html" class="external-link">rename</a></span><span class="op">(</span>id <span class="op">=</span> <span class="va">ID</span>, time <span class="op">=</span> <span class="va">obstime</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">id</span>, <span class="va">time</span>, <span class="va">observed</span>, <span class="va">drug</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/arrange.html" class="external-link">arrange</a></span><span class="op">(</span><span class="va">id</span>, <span class="va">time</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">survival_pbc</span> <span class="op">&lt;-</span> <span class="va">pbc</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">group_by</a></span><span class="op">(</span><span class="va">ID</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/slice.html" class="external-link">slice_tail</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">1</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span>  <span class="co"># 取每个患者的最后一条记录</span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">ungroup</a></span><span class="op">(</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">ID</span>, <span class="va">Time</span>, <span class="va">death</span>, <span class="va">drug</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/rename.html" class="external-link">rename</a></span><span class="op">(</span></span>
-<span>    id <span class="op">=</span> <span class="va">ID</span>,</span>
-<span>    time <span class="op">=</span> <span class="va">Time</span>,  <span class="co"># 真实生存时间</span></span>
-<span>    status <span class="op">=</span> <span class="va">death</span>  <span class="co"># 事件状态</span></span>
-<span>  <span class="op">)</span></span>
-<span></span>
-<span><span class="co"># 创建初始状态矩阵（使用第一次观测）</span></span>
-<span><span class="va">initial_states</span> <span class="op">&lt;-</span> <span class="va">longitudinal_pbc</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">group_by</a></span><span class="op">(</span><span class="va">id</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/slice.html" class="external-link">slice</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">ungroup</a></span><span class="op">(</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">id</span>, <span class="va">observed</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span>
-<span>    velocity <span class="op">=</span> <span class="fl">0</span>  <span class="co"># 初始速度假设为0</span></span>
-<span>  <span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/arrange.html" class="external-link">arrange</a></span><span class="op">(</span><span class="va">id</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">state_matrix</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">initial_states</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"observed"</span>, <span class="st">"velocity"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">fit_jointode_pbc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/JointODE.html">JointODE</a></span><span class="op">(</span></span>
-<span>  longitudinal_formula <span class="op">=</span> <span class="va">observed</span> <span class="op">~</span> <span class="va">drug</span>,</span>
-<span>  survival_formula <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/pkg/survival/man/Surv.html" class="external-link">Surv</a></span><span class="op">(</span><span class="va">time</span>, <span class="va">status</span><span class="op">)</span> <span class="op">~</span> <span class="va">drug</span>,</span>
-<span>  longitudinal_data <span class="op">=</span> <span class="va">longitudinal_pbc</span>,</span>
-<span>  survival_data <span class="op">=</span> <span class="va">survival_pbc</span>,</span>
-<span>  state <span class="op">=</span> <span class="va">state_matrix</span>,</span>
-<span>  parallel <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>verbose <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre></div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

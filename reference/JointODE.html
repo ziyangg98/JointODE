@@ -73,11 +73,8 @@ shared random effects and flexible hazard specifications.</p>
 <span>  <span class="va">survival_data</span>,</span>
 <span>  gamma <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  state <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  id <span class="op">=</span> <span class="st">"id"</span>,</span>
-<span>  time <span class="op">=</span> <span class="st">"time"</span>,</span>
 <span>  spline_baseline <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>degree <span class="op">=</span> <span class="fl">2</span>, n_knots <span class="op">=</span> <span class="fl">0</span>, knot_placement <span class="op">=</span> <span class="st">"equal"</span>,</span>
 <span>    boundary_knots <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span>,</span>
-<span>  robust <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  init <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  <span class="va">...</span></span>
@@ -130,24 +127,11 @@ corresponds to one subject. If <code>NULL</code>, defaults to a zero matrix with
 appropriate dimensions (default: <code>NULL</code>).</p></dd>
 
 
-<dt id="arg-id">id<a class="anchor" aria-label="anchor" href="#arg-id"></a></dt>
-<dd><p>Character string specifying the column name for subject
-identifiers. This variable must be present in both longitudinal and
-survival datasets
-to link observations (default: <code>"id"</code>).</p></dd>
-
-
-<dt id="arg-time">time<a class="anchor" aria-label="anchor" href="#arg-time"></a></dt>
-<dd><p>Character string specifying the column name for measurement
-times
-in the longitudinal dataset (default: <code>"time"</code>).</p></dd>
-
-
 <dt id="arg-spline-baseline">spline_baseline<a class="anchor" aria-label="anchor" href="#arg-spline-baseline"></a></dt>
 <dd><p>A list controlling the B-spline representation of the
 baseline hazard function with the following components:</p><dl><dt><code>degree</code></dt>
 <dd><p>Polynomial degree of the B-spline basis functions
-(default: 1, linear splines)</p></dd>
+(default: 2, quadratic splines)</p></dd>
 
 <dt><code>n_knots</code></dt>
 <dd><p>Number of interior knots for flexibility
@@ -156,7 +140,7 @@ baseline hazard function with the following components:</p><dl><dt><code>degree<
 <dt><code>knot_placement</code></dt>
 <dd><p>Strategy for positioning knots:
 <code>"quantile"</code> places knots at quantiles of observed event times,
-<code>"equal"</code> uses equally-spaced knots (default: <code>"quantile"</code>)</p></dd>
+<code>"equal"</code> uses equally-spaced knots (default: <code>"equal"</code>)</p></dd>
 
 <dt><code>boundary_knots</code></dt>
 <dd><p>A numeric vector of length 2 specifying
@@ -167,15 +151,10 @@ range of observed event times (default: <code>NULL</code>)</p></dd>
 </dl></dd>
 
 
-<dt id="arg-robust">robust<a class="anchor" aria-label="anchor" href="#arg-robust"></a></dt>
-<dd><p>Logical flag indicating whether to use robust variance
-estimation (default: <code>FALSE</code>).</p></dd>
-
-
 <dt id="arg-init">init<a class="anchor" aria-label="anchor" href="#arg-init"></a></dt>
 <dd><p>Optional initial values for model parameters. Can be either:</p><ul><li><p><code>NULL</code> (default): Automatically calls
 <code><a href="MarginalODE.html">MarginalODE</a></code> to compute data-driven initial estimates
-for acceleration parameters and random effects. Recommended for
+for longitudinal parameters and random effects. Recommended for
 most applications.</p></li>
 <li><p>A list with the same structure as the fitted model's
 <code>parameters</code> component for full manual control</p></li>
@@ -184,7 +163,7 @@ most applications.</p></li>
 hazard (length = number of spline basis functions)</p></li>
 <li><p><code>hazard</code>: Vector of hazard parameters including
 association parameters (2) and survival covariates</p></li>
-<li><p><code>acceleration</code>: Vector of longitudinal fixed effects
+<li><p><code>longitudinal</code>: Vector of longitudinal fixed effects
 including intercept and covariates</p></li>
 <li><p><code>measurement_error_sd</code>: Residual standard deviation
 (positive scalar)</p></li>
@@ -207,27 +186,15 @@ spline configuration from <code>spline_baseline</code></p></dd>
 
 <dt><code>atol</code></dt>
 <dd><p>Absolute tolerance for parameter convergence
-(default: 1e-3)</p></dd>
+(default: 5e-4)</p></dd>
 
 <dt><code>rtol</code></dt>
 <dd><p>Relative tolerance for log-likelihood
-convergence (default: 1e-3)</p></dd>
+convergence (default: 1e-5)</p></dd>
 
 <dt><code>verbose</code></dt>
 <dd><p>Verbosity level: FALSE/0 for silent, TRUE/1 for
 progress messages, 2 for detailed output (default: FALSE)</p></dd>
-
-<dt><code>optim_maxit</code></dt>
-<dd><p>Maximum iterations for M-step optimization
-(default: 50)</p></dd>
-
-<dt><code>optim_factr</code></dt>
-<dd><p>Convergence factor for L-BFGS-B optimizer
-(default: 1e10)</p></dd>
-
-<dt><code>optim_pgtol</code></dt>
-<dd><p>Projected gradient tolerance for L-BFGS-B
-(default: 1e-6)</p></dd>
 
 <dt><code>parallel</code></dt>
 <dd><p>Logical flag enabling parallel computation
@@ -237,11 +204,9 @@ progress messages, 2 for detailed output (default: FALSE)</p></dd>
 <dd><p>Number of CPU cores for parallel processing.
 If 0, automatically detects available cores (default: 0)</p></dd>
 
-<dt><code>ode_rtol</code></dt>
-<dd><p>Relative tolerance for ODE solver (default: 1e-6)</p></dd>
-
-<dt><code>ode_atol</code></dt>
-<dd><p>Absolute tolerance for ODE solver (default: 1e-8)</p></dd>
+<dt><code>quad_level</code></dt>
+<dd><p>Quadrature level for numerical integration
+(default: 4)</p></dd>
 
 
 </dl><p>See <code><a href="JointODE.control.html">JointODE.control</a></code> for complete details and examples.</p></dd>
@@ -257,7 +222,7 @@ If 0, automatically detects available cores (default: 0)</p></dd>
 results:</p><dl><dt><code>parameters</code></dt>
 <dd><p>A list containing all estimated parameters:</p><ul><li><p><code>coefficients</code>: Named list with <code>baseline</code> (B-spline
 coefficients for baseline hazard), <code>hazard</code> (association and
-survival covariate effects), <code>acceleration</code> (longitudinal
+survival covariate effects), <code>longitudinal</code> (longitudinal
 fixed effects), <code>measurement_error_sd</code> (residual standard
 deviation), and <code>random_effect_sigma</code> (random effect
 covariance matrix)</p></li>
@@ -317,10 +282,10 @@ features derived from the longitudinal trajectory.</p>
 <li><p>Rate of change: hazard depends on the biomarker's instantaneous
 slope</p></li>
 </ul><p>Parameter estimation employs an Expectation-Maximization (EM) algorithm
-with:</p><ul><li><p>E-step: Laplace approximation for posterior computation of
-random effects</p></li>
-<li><p>M-step: L-BFGS-B optimization for fixed effects and closed-form
-updates for variance parameters</p></li>
+with:</p><ul><li><p>E-step: Multivariate Gauss-Hermite quadrature (mvQuad) for
+posterior computation of random effects</p></li>
+<li><p>M-step: Optimization for fixed effects and mvQuad-based
+closed-form updates for variance parameters</p></li>
 </ul></div>
 
     <div class="section level2">
@@ -334,18 +299,16 @@ updates for variance parameters</p></li>
 <span class="r-in"><span>  longitudinal_formula <span class="op">=</span> <span class="va">observed</span> <span class="op">~</span> <span class="va">x1</span> <span class="op">+</span> <span class="va">x2</span>,</span></span>
 <span class="r-in"><span>  survival_formula <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/pkg/survival/man/Surv.html" class="external-link">Surv</a></span><span class="op">(</span><span class="va">event_time</span>, <span class="va">event</span><span class="op">)</span> <span class="op">~</span> <span class="va">x1</span> <span class="op">+</span> <span class="va">x2</span>,</span></span>
 <span class="r-in"><span>  longitudinal_data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">longitudinal_data</span>,</span></span>
-<span class="r-in"><span>  survival_data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">survival_data</span>,</span></span>
-<span class="r-in"><span>  id <span class="op">=</span> <span class="st">"id"</span></span></span>
+<span class="r-in"><span>  survival_data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">survival_data</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit with custom control parameters using JointODE.control()</span></span></span>
-<span class="r-in"><span><span class="va">control</span> <span class="op">&lt;-</span> <span class="fu"><a href="JointODE.control.html">JointODE.control</a></span><span class="op">(</span>maxit <span class="op">=</span> <span class="fl">200</span>, tol <span class="op">=</span> <span class="fl">1e-8</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">control</span> <span class="op">&lt;-</span> <span class="fu"><a href="JointODE.control.html">JointODE.control</a></span><span class="op">(</span>maxit <span class="op">=</span> <span class="fl">200</span>, atol <span class="op">=</span> <span class="fl">1e-4</span>, rtol <span class="op">=</span> <span class="fl">1e-6</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">fit2</span> <span class="op">&lt;-</span> <span class="fu">JointODE</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  longitudinal_formula <span class="op">=</span> <span class="va">observed</span> <span class="op">~</span> <span class="va">x1</span> <span class="op">+</span> <span class="va">x2</span>,</span></span>
 <span class="r-in"><span>  survival_formula <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/pkg/survival/man/Surv.html" class="external-link">Surv</a></span><span class="op">(</span><span class="va">event_time</span>, <span class="va">event</span><span class="op">)</span> <span class="op">~</span> <span class="va">x1</span> <span class="op">+</span> <span class="va">x2</span>,</span></span>
 <span class="r-in"><span>  longitudinal_data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">longitudinal_data</span>,</span></span>
 <span class="r-in"><span>  survival_data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">survival_data</span>,</span></span>
-<span class="r-in"><span>  id <span class="op">=</span> <span class="st">"id"</span>,</span></span>
 <span class="r-in"><span>  control <span class="op">=</span> <span class="va">control</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
@@ -356,7 +319,6 @@ updates for variance parameters</p></li>
 <span class="r-in"><span>  survival_formula <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/pkg/survival/man/Surv.html" class="external-link">Surv</a></span><span class="op">(</span><span class="va">event_time</span>, <span class="va">event</span><span class="op">)</span> <span class="op">~</span> <span class="va">x1</span> <span class="op">+</span> <span class="va">x2</span>,</span></span>
 <span class="r-in"><span>  longitudinal_data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">longitudinal_data</span>,</span></span>
 <span class="r-in"><span>  survival_data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">survival_data</span>,</span></span>
-<span class="r-in"><span>  id <span class="op">=</span> <span class="st">"id"</span>,</span></span>
 <span class="r-in"><span>  control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>maxit <span class="op">=</span> <span class="fl">50</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>

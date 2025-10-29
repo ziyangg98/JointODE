@@ -60,16 +60,11 @@ process a list to fill in missing values with defaults.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">JointODE.control</span><span class="op">(</span></span>
 <span>  maxit <span class="op">=</span> <span class="fl">200</span>,</span>
 <span>  atol <span class="op">=</span> <span class="fl">0.001</span>,</span>
-<span>  rtol <span class="op">=</span> <span class="fl">0.001</span>,</span>
+<span>  rtol <span class="op">=</span> <span class="fl">1e-05</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  optim_maxit <span class="op">=</span> <span class="fl">100</span>,</span>
-<span>  optim_pgtol <span class="op">=</span> <span class="fl">1e-06</span>,</span>
 <span>  parallel <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  n_cores <span class="op">=</span> <span class="fl">0</span>,</span>
-<span>  regularize_factor <span class="op">=</span> <span class="fl">1.05</span>,</span>
-<span>  regularize_min <span class="op">=</span> <span class="fl">1e-08</span>,</span>
-<span>  ode_rtol <span class="op">=</span> <span class="fl">1e-06</span>,</span>
-<span>  ode_atol <span class="op">=</span> <span class="fl">1e-08</span>,</span>
+<span>  quad_level <span class="op">=</span> <span class="fl">4</span>,</span>
 <span>  .list <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -80,36 +75,26 @@ process a list to fill in missing values with defaults.</p>
 
 
 <dl><dt id="arg-maxit">maxit<a class="anchor" aria-label="anchor" href="#arg-maxit"></a></dt>
-<dd><p>Maximum number of EM iterations (default: 100)</p></dd>
+<dd><p>Maximum number of EM iterations (default: 200)</p></dd>
 
 
 <dt id="arg-atol">atol<a class="anchor" aria-label="anchor" href="#arg-atol"></a></dt>
 <dd><p>Absolute tolerance for parameter convergence. The EM algorithm
 converges when the maximum absolute change in any parameter (including
 variance parameters) is less than this value:
-max(|theta_new - theta_old|) &lt; atol (default: 1e-3)</p></dd>
+max(|theta_new - theta_old|) &lt; atol (default: 5e-4)</p></dd>
 
 
 <dt id="arg-rtol">rtol<a class="anchor" aria-label="anchor" href="#arg-rtol"></a></dt>
 <dd><p>Relative tolerance for log-likelihood convergence. The EM
 algorithm converges when the relative change in log-likelihood is less
 than this value: |L_new - L_old| / (|L_new| + epsilon) &lt; rtol, where
-epsilon = 1e-8 prevents division by zero (default: 1e-3)</p></dd>
+epsilon = 1e-8 prevents division by zero (default: 1e-5)</p></dd>
 
 
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
 <dd><p>Logical or numeric; controls verbosity level. FALSE/0 for
 silent, TRUE/1 for basic progress, 2 for detailed output (default: FALSE)</p></dd>
-
-
-<dt id="arg-optim-maxit">optim_maxit<a class="anchor" aria-label="anchor" href="#arg-optim-maxit"></a></dt>
-<dd><p>Maximum iterations for M-step optimization (default: 100)</p></dd>
-
-
-<dt id="arg-optim-pgtol">optim_pgtol<a class="anchor" aria-label="anchor" href="#arg-optim-pgtol"></a></dt>
-<dd><p>Relative tolerance for M-step optimizer convergence.
-Controls the precision of M-step optimization: smaller values increase
-accuracy but require more iterations (default: 1e-6)</p></dd>
 
 
 <dt id="arg-parallel">parallel<a class="anchor" aria-label="anchor" href="#arg-parallel"></a></dt>
@@ -121,23 +106,9 @@ accuracy but require more iterations (default: 1e-6)</p></dd>
 If 0, uses all available cores (default: 0)</p></dd>
 
 
-<dt id="arg-regularize-factor">regularize_factor<a class="anchor" aria-label="anchor" href="#arg-regularize-factor"></a></dt>
-<dd><p>Regularization factor for positive definiteness:
-epsilon = max(|min_eigenvalue| * factor, min_epsilon) (default: 1.05)</p></dd>
-
-
-<dt id="arg-regularize-min">regularize_min<a class="anchor" aria-label="anchor" href="#arg-regularize-min"></a></dt>
-<dd><p>Minimum regularization epsilon (default: 1e-8)</p></dd>
-
-
-<dt id="arg-ode-rtol">ode_rtol<a class="anchor" aria-label="anchor" href="#arg-ode-rtol"></a></dt>
-<dd><p>Relative tolerance for ODE solver in forward computation
-(default: 1e-6)</p></dd>
-
-
-<dt id="arg-ode-atol">ode_atol<a class="anchor" aria-label="anchor" href="#arg-ode-atol"></a></dt>
-<dd><p>Absolute tolerance for ODE solver in forward computation
-(default: 1e-8)</p></dd>
+<dt id="arg-quad-level">quad_level<a class="anchor" aria-label="anchor" href="#arg-quad-level"></a></dt>
+<dd><p>Integer; quadrature level for numerical integration
+(default: 4)</p></dd>
 
 
 <dt id="arg--list">.list<a class="anchor" aria-label="anchor" href="#arg--list"></a></dt>
@@ -153,19 +124,6 @@ epsilon = max(|min_eigenvalue| * factor, min_epsilon) (default: 1.05)</p></dd>
     <p>A list of control parameters with all defaults filled in</p>
     </div>
     <div class="section level2">
-    <h2 id="tolerance-hierarchy">Tolerance Hierarchy<a class="anchor" aria-label="anchor" href="#tolerance-hierarchy"></a></h2>
-
-
-<p>The package uses a three-level tolerance hierarchy:</p><ol><li><p><strong>EM Convergence</strong> (<code>atol</code>, <code>rtol</code>): Controls outer
-EM algorithm convergence (default: 1e-3). Set looser for faster
-computation.</p></li>
-<li><p><strong>ODE Solver</strong> (<code>ode_rtol</code>, <code>ode_atol</code>): Controls
-numerical accuracy of forward ODE integration (default: rtol=1e-6,
-atol=1e-8). Affects speed-accuracy tradeoff.</p></li>
-<li><p><strong>M-step Optimization</strong> (<code>optim_pgtol</code>): Controls
-optimizer precision (default: 1e-6). Rarely needs adjustment.</p></li>
-</ol></div>
-    <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
     <div class="dont-index"><p><code><a href="JointODE.html">JointODE</a></code></p></div>
     </div>
@@ -176,19 +134,13 @@ optimizer precision (default: 1e-6). Rarely needs adjustment.</p></li>
 <span class="r-in"><span><span class="va">control</span> <span class="op">&lt;-</span> <span class="fu">JointODE.control</span><span class="op">(</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Custom settings for faster exploration</span></span></span>
-<span class="r-in"><span><span class="va">control</span> <span class="op">&lt;-</span> <span class="fu">JointODE.control</span><span class="op">(</span>maxit <span class="op">=</span> <span class="fl">100</span>, atol <span class="op">=</span> <span class="fl">5e-3</span>, rtol <span class="op">=</span> <span class="fl">5e-3</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Higher precision ODE solving (slower but more accurate)</span></span></span>
-<span class="r-in"><span><span class="va">control</span> <span class="op">&lt;-</span> <span class="fu">JointODE.control</span><span class="op">(</span>ode_rtol <span class="op">=</span> <span class="fl">1e-8</span>, ode_atol <span class="op">=</span> <span class="fl">1e-10</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Faster computation with relaxed tolerances</span></span></span>
-<span class="r-in"><span><span class="va">control</span> <span class="op">&lt;-</span> <span class="fu">JointODE.control</span><span class="op">(</span></span></span>
-<span class="r-in"><span>  atol <span class="op">=</span> <span class="fl">5e-3</span>, rtol <span class="op">=</span> <span class="fl">5e-3</span>,</span></span>
-<span class="r-in"><span>  ode_rtol <span class="op">=</span> <span class="fl">1e-5</span>, ode_atol <span class="op">=</span> <span class="fl">1e-7</span></span></span>
-<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">control</span> <span class="op">&lt;-</span> <span class="fu">JointODE.control</span><span class="op">(</span>maxit <span class="op">=</span> <span class="fl">30</span>, atol <span class="op">=</span> <span class="fl">1e-3</span>, rtol <span class="op">=</span> <span class="fl">1e-3</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Verbose output for debugging</span></span></span>
 <span class="r-in"><span><span class="va">control</span> <span class="op">&lt;-</span> <span class="fu">JointODE.control</span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Parallel computation</span></span></span>
+<span class="r-in"><span><span class="va">control</span> <span class="op">&lt;-</span> <span class="fu">JointODE.control</span><span class="op">(</span>parallel <span class="op">=</span> <span class="cn">TRUE</span>, n_cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Process an existing list</span></span></span>
 <span class="r-in"><span><span class="va">my_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>maxit <span class="op">=</span> <span class="fl">200</span><span class="op">)</span></span></span>
