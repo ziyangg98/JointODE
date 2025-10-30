@@ -35,10 +35,9 @@ library(latex2exp)
 
 ```{r function, echo=FALSE}
 .solve_simple_biomarker_ode <- function(
-  times = seq(0, 100, by = 0.1),
-  init = c(1, 0),
-  configurations = list()
-) {
+    times = seq(0, 100, by = 0.1),
+    init = c(-1, 0),
+    configurations = list()) {
   .calculate_acceleration <- function(t, biomarker, velocity, parms) {
     omega <- 2 * pi / parms$period
     -2 *
@@ -108,34 +107,32 @@ cases <- list(
   list(
     name = "omega^2 < 0, omega*xi < 0",
     xi = 0.5i, period = 20i, k = 1.0,
-    excitation = function(t) 0, init = c(1, 0)
+    excitation = function(t) 0, init = c(-1, 0)
   ),
   list(
     name = "omega^2 < 0, omega*xi = 0",
     xi = 0, period = 20i, k = 1.0,
-    excitation = function(t) 0, init = c(1, 0)
+    excitation = function(t) 0, init = c(-1, 0)
   ),
   list(
     name = "omega^2 < 0, omega*xi > 0",
     xi = -0.5i, period = 20i, k = 1.0,
-    excitation = function(t) 0, init = c(1, 0)
+    excitation = function(t) 0, init = c(-1, 0)
   ),
-
-  # omega^2 > 0
   list(
     name = "omega^2 > 0, omega*xi < 0",
     xi = -0.3, period = 20, k = 1.0,
-    excitation = function(t) 0, init = c(1, 0)
+    excitation = function(t) 0, init = c(-1, 0)
   ),
   list(
     name = "omega^2 > 0, omega*xi = 0",
     xi = 0, period = 20, k = 1.0,
-    excitation = function(t) 0, init = c(1, 0)
+    excitation = function(t) 0, init = c(-1, 0)
   ),
   list(
     name = "omega^2 > 0, omega*xi > 0",
     xi = 0.3, period = 20, k = 1.0,
-    excitation = function(t) 0, init = c(1, 0)
+    excitation = function(t) 0, init = c(-1, 0)
   )
 )
 
@@ -158,7 +155,7 @@ case_data <- map_df(cases, function(case) {
 
   # Calculate ω and display values
   omega <- 2 * pi / case$period
-  omega_squared <- omega^2 * case$k  # Effective omega^2
+  omega_squared <- omega^2 * case$k # Effective omega^2
   omega_xi <- omega * case$xi
 
   data.frame(
@@ -179,10 +176,12 @@ p_cases_time <- ggplot(
 ) +
   geom_line(linewidth = 1, alpha = 0.9, aes(color = omega_squared)) +
   geom_hline(yintercept = 0, linetype = "dotted", alpha = 0.4) +
-  facet_wrap(~case_name, scales = "free", ncol = 3,
-             labeller = labeller(case_name = function(x) {
-               gsub("omega\\^2", "\u03C9\u00B2", gsub("omega\\*xi", "\u03C9\u03BE", x))
-             })) +
+  facet_wrap(~case_name,
+    scales = "free", ncol = 3,
+    labeller = labeller(case_name = function(x) {
+      gsub("omega\\^2", "\u03C9\u00B2", gsub("omega\\*xi", "\u03C9\u03BE", x))
+    })
+  ) +
   scale_color_gradient2(
     name = expression(omega^2),
     low = "red",
@@ -211,17 +210,19 @@ p_cases_phase <- ggplot(
   case_data,
   aes(x = biomarker, y = velocity)
 ) +
-  geom_path(size = 0.8, alpha = 0.7, aes(color = time)) +
+  geom_path(linewidth = 0.8, alpha = 0.7, aes(color = time)) +
   geom_point(
     data = case_data %>%
       group_by(case_name) %>%
       slice_min(time),
     size = 3, shape = 21, fill = "green", color = "darkgreen"
   ) +
-  facet_wrap(~case_name, scales = "free", ncol = 3,
-             labeller = labeller(case_name = function(x) {
-               gsub("omega\\^2", "\u03C9\u00B2", gsub("omega\\*xi", "\u03C9\u03BE", x))
-             })) +
+  facet_wrap(~case_name,
+    scales = "free", ncol = 3,
+    labeller = labeller(case_name = function(x) {
+      gsub("omega\\^2", "\u03C9\u00B2", gsub("omega\\*xi", "\u03C9\u03BE", x))
+    })
+  ) +
   scale_color_viridis_c(name = "Time", option = "magma") +
   theme_minimal() +
   theme(
@@ -291,7 +292,7 @@ p_time <- ggplot(
   simulation_data,
   aes(x = time, y = biomarker, color = as.factor(damping_ratio))
 ) +
-  geom_line(size = 1, alpha = 0.85) +
+  geom_line(linewidth = 1, alpha = 0.85) +
   geom_hline(yintercept = 0, linetype = "dotted", alpha = 0.4) +
   facet_wrap(~group, scales = "free_y", ncol = 2) +
   scale_color_viridis_d(name = expression(xi), option = "plasma") +
@@ -312,7 +313,7 @@ phase_data <- simulation_data %>%
   filter(damping_ratio %in% selected_xi)
 
 p_phase <- ggplot(phase_data, aes(x = biomarker, y = velocity)) +
-  geom_path(aes(color = time), size = 1, alpha = 0.8) +
+  geom_path(aes(color = time), linewidth = 1, alpha = 0.8) +
   geom_point(
     data = phase_data %>%
       group_by(damping_ratio) %>%
@@ -325,8 +326,10 @@ p_phase <- ggplot(phase_data, aes(x = biomarker, y = velocity)) +
       slice_max(time),
     size = 2, shape = 21, fill = "red", color = "darkred"
   ) +
-  facet_wrap(~ damping_ratio, scales = "free", ncol = 2,
-             labeller = labeller(damping_ratio = function(x) paste0("\u03BE = ", x))) +
+  facet_wrap(~damping_ratio,
+    scales = "free", ncol = 2,
+    labeller = labeller(damping_ratio = function(x) paste0("\u03BE = ", x))
+  ) +
   scale_color_viridis_c(name = "Time", option = "magma") +
   theme_minimal() +
   theme(
@@ -381,7 +384,7 @@ p_time_na <- ggplot(
   na_data,
   aes(x = time, y = biomarker, color = as.factor(damping_ratio))
 ) +
-  geom_line(size = 1, alpha = 0.85) +
+  geom_line(linewidth = 1, alpha = 0.85) +
   geom_vline(
     xintercept = 50, linetype = "dashed",
     color = "red", alpha = 0.5
@@ -402,10 +405,10 @@ p_time_na <- ggplot(
   labs(x = "Time", y = "Biomarker")
 
 phase_data_na <- na_data %>%
-  filter(damping_ratio %in% c(-0.1, 0.707, 1.0, 1.5))
+  filter(damping_ratio %in% c(-0.1, 0.3, 0.707, 1.5))
 
 p_phase_na <- ggplot(phase_data_na, aes(x = biomarker, y = velocity)) +
-  geom_path(aes(color = time), size = 1, alpha = 0.8) +
+  geom_path(aes(color = time), linewidth = 1, alpha = 0.8) +
   geom_point(
     data = phase_data_na %>%
       group_by(damping_ratio) %>%
@@ -418,7 +421,7 @@ p_phase_na <- ggplot(phase_data_na, aes(x = biomarker, y = velocity)) +
       slice_max(time),
     size = 2, shape = 21, fill = "red", color = "darkred"
   ) +
-  facet_wrap(~ damping_ratio,
+  facet_wrap(~damping_ratio,
     scales = "free", ncol = 2,
     labeller = labeller(damping_ratio = function(x) paste0("\u03BE = ", x))
   ) +
@@ -469,7 +472,7 @@ orange_df <- data.frame(time = orange_df$age, value = orange_df$circumference)
 
 # Create individual plots with specific axis labels
 p_lynx <- ggplot(lynx_df, aes(x = time, y = value)) +
-  geom_line(size = 1, alpha = 0.9, color = "#C73E1D") +
+  geom_line(linewidth = 1, alpha = 0.9, color = "#C73E1D") +
   geom_point(size = 1.5, alpha = 0.7, color = "#C73E1D") +
   theme_minimal() +
   theme(
@@ -486,7 +489,7 @@ p_lynx <- ggplot(lynx_df, aes(x = time, y = value)) +
   )
 
 p_theoph <- ggplot(theoph_df, aes(x = time, y = value)) +
-  geom_line(size = 1, alpha = 0.9, color = "#2E86AB") +
+  geom_line(linewidth = 1, alpha = 0.9, color = "#2E86AB") +
   geom_point(size = 1.5, alpha = 0.7, color = "#2E86AB") +
   theme_minimal() +
   theme(
@@ -501,7 +504,7 @@ p_theoph <- ggplot(theoph_df, aes(x = time, y = value)) +
   )
 
 p_indo <- ggplot(indo_df, aes(x = time, y = value)) +
-  geom_line(size = 1, alpha = 0.9, color = "#A23B72") +
+  geom_line(linewidth = 1, alpha = 0.9, color = "#A23B72") +
   geom_point(size = 1.5, alpha = 0.7, color = "#A23B72") +
   theme_minimal() +
   theme(
@@ -516,7 +519,7 @@ p_indo <- ggplot(indo_df, aes(x = time, y = value)) +
   )
 
 p_orange <- ggplot(orange_df, aes(x = time, y = value)) +
-  geom_line(size = 1, alpha = 0.9, color = "#F18F01") +
+  geom_line(linewidth = 1, alpha = 0.9, color = "#F18F01") +
   geom_point(size = 1.5, alpha = 0.7, color = "#F18F01") +
   theme_minimal() +
   theme(

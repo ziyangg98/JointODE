@@ -21,43 +21,33 @@ knitr::opts_chunk$set(
 
 <!-- badges: end -->
 
-The **JointODE** package provides a unified framework for joint modeling of longitudinal biomarker measurements and time-to-event outcomes using ordinary differential equations (ODEs). This approach enables the simultaneous analysis of biomarker trajectories and their impact on survival outcomes.
+The **JointODE** package provides a unified framework for joint modeling of longitudinal biomarker measurements and time-to-event outcomes using ordinary differential equations (ODEs).
 
-## Model Setup
+## Overview
 
-The observed biomarker measurements are modeled as:
+JointODE models biomarker evolution using **ordinary differential equations** (ODEs) and links them to survival outcomes. Unlike traditional approaches using splines or polynomials, ODEs naturally capture the dynamic behavior of biomarker trajectories.
 
-$$V_{ij}=m_i(T_{ij})+b_i+\varepsilon_{ij},\quad i=1,\ldots,n,\quad j=1,\ldots,n_i$$
+### Model Structure
 
-where:
+**Longitudinal Model:** Biomarker trajectories evolve according to a second-order ODE:
 
--   $V_{ij}$: Observed biomarker value for subject $i$ at time $T_{ij}$
--   $m_i(t)$: True underlying biomarker trajectory
--   $b_i\sim\mathcal{N}(0,\sigma_{b}^{2})$: Subject-specific random intercept
--   $\varepsilon_{ij}\sim\mathcal{N}(0,\sigma_{e}^{2})$: Measurement error
+$$\ddot{m}_i(t) + 2 \xi_i \omega_i \dot{m}_i(t) + \omega_i^2 m_i(t) = k \omega_i^2 \mu_i(t)$$
 
-The biomarker trajectory evolution is characterized by the following second-order differential equation:
+where $m_i(t)$ is the biomarker value, $\dot{m}_i(t)$ is velocity (rate of change), and $\ddot{m}_i(t)$ is acceleration. Subject-specific dynamics are characterized by natural frequency $\omega_i$ and damping ratio $\xi_i$, with $\mu_i(t)$ representing external forcing (e.g., treatment effects, covariates). Individual heterogeneity is captured through random effects on these ODE parameters.
 
-$$
-\ddot{m}_i(t) + 2 \xi \omega \dot{m}_i(t) + \omega^2 m_i(t) = k \omega^2 \boldsymbol{X}_i(t)^{\top} \boldsymbol{\beta},
-$$
+**Survival Model:** The hazard function incorporates biomarker dynamics:
 
-where $\dot{m}_i(t)$ and $\ddot{m}_i(t)$ denote the biomarker’s velocity and acceleration, respectively, and $\boldsymbol{X}_i(t)$ denotes time-varying covariates. The parameters have the usual interpretations: $\omega > 0$ is the natural frequency, $\xi$ is the damping ratio, and $k$ is the steady-state gain.
+$$\lambda_i(t) = \lambda_{0}(t)\exp\left[\alpha_1 m_i(t) + \alpha_2 \dot{m}_i^{\gamma}(t) + \mathbf{W}_i^{\top}\boldsymbol{\phi}\right]$$
 
-### Survival Sub-Model
+where $\gamma \in \{0, 1, 2\}$ controls the velocity power (0: no velocity, 1: linear, 2: quadratic).
 
-The hazard function incorporates biomarker dynamics:
+### Key Features
 
-$$
-\lambda_i(t) = \lambda_{0}(t)\exp\left[\alpha_1 m_i(t) + \alpha_2 \dot{m}_i(t) + \mathbf{W}_i(t)^{\top}\boldsymbol{\phi}+b_{i}\right]
-$$
+- **Subject-specific dynamics**: Random effects on ODE parameters capture individual heterogeneity
+- **Flexible hazard**: B-spline baseline hazard with biomarker value and velocity effects
+- **Efficient computation**: C++ implementation with parallel processing support
 
-where:
-
--   $\lambda_{0}(t)$: Baseline hazard (e.g., Weibull, piecewise constant)
--   $\mathbf{W}_i(t)$: Time-dependent or time-independent covariates with effects $\boldsymbol{\phi}$
-
-For detailed mathematical derivations including ODE formulation, likelihood construction, and EM algorithm specifics, see the [technical documentation](http://gongziyang.com/JointODE/articles/technical-details.html).
+For full mathematical details, see the [technical documentation](http://gongziyang.com/JointODE/articles/technical-details.html).
 
 ## Installation
 
@@ -68,111 +58,44 @@ You can install the development version of JointODE from [GitHub](https://github
 pak::pak("ziyangg98/JointODE")
 ```
 
-## Example
+## Quick Start
 
-Here's a basic example demonstrating typical usage:
+Here's a basic example using the included simulated dataset:
 
 ```{r example}
 library(JointODE)
 library(survival)
 
-# Load example dataset
+# Load example dataset (200 subjects with longitudinal and survival data)
 data(sim)
 
 # Fit joint ODE model
+longitudinal_data <- sim$data$longitudinal_data[
+  , c("id", "time", "observed", "x1", "x2")
+]
 fit <- JointODE(
-  longitudinal_formula = observed ~ x1 + x2,
+  longitudinal_formula = observed ~ biomarker + velocity + x1 + x2 +
+    (biomarker + velocity | id),
   survival_formula = Surv(time, status) ~ w1 + w2,
-  longitudinal_data = sim$data$longitudinal_data,
+  longitudinal_data = longitudinal_data,
   survival_data = sim$data$survival_data,
-  state = as.matrix(sim$data$state),
-  spline_baseline = list(
-    degree = 2,
-    n_knots = 1,
-    knot_placement = "equal",
-    boundary_knots = NULL
-  ),
-  parallel = TRUE
+  state = as.matrix(sim$data$state)
 )
 
 # Model summary
 summary(fit)
-
-# Generate predictions
-predictions <- predict(fit, times = seq(0, 10, by = 0.25))
 ```
 
-## Visualization
+The formula specifies:
+- **ODE terms**: `biomarker` and `velocity` are the state variables (value and slope) in the ODE
+- **Covariates**: `x1` and `x2` are external variables affecting the dynamics
+- **Random effects**: `(biomarker + velocity | id)` allows subject-specific coefficients on the ODE value and slope terms
 
-```{r visualization, fig.width=12, fig.height=4, echo=FALSE}
-library(ggplot2)
-library(dplyr)
-library(tidyr)
-library(patchwork)
+## Learn More
 
-# Prepare data
-ids <- seq_len(4)
-df <- lapply(ids, \(i) {
-  pred <- predictions[[i]]
-  obs <- filter(sim$data$longitudinal_data, id == i)
-  data.frame(
-    id = i, time = pred$times,
-    biomarker_est = pred$biomarker, velocity_est = pred$velocity,
-    acceleration_est = pred$acceleration, survival = pred$survival
-  ) %>%
-    left_join(select(obs, time, observed,
-      biomarker_true = biomarker,
-      velocity_true = velocity, acceleration_true = acceleration
-    ), by = "time")
-}) %>% bind_rows()
-
-# Biomarker plot
-p1 <- ggplot(df, aes(x = time)) +
-  geom_line(aes(y = biomarker_est, color = "Estimated")) +
-  geom_line(
-    aes(y = biomarker_true, color = "True"),
-    linetype = 2, na.rm = TRUE
-  ) +
-  geom_point(aes(y = observed, color = "Observed"), alpha = 0.3, na.rm = TRUE) +
-  facet_wrap(~id, ncol = 2) +
-  theme_minimal(base_size = 9) +
-  theme(legend.position = "top") +
-  labs(x = "Time", y = "Biomarker", color = "")
-
-# Dynamics plot
-p2 <- df %>%
-  pivot_longer(matches("(velocity|acceleration)_(est|true)"),
-    names_to = c("type", "source"), names_sep = "_"
-  ) %>%
-  filter(!is.na(value)) %>%
-  mutate(
-    type = factor(type,
-      levels = c("velocity", "acceleration"),
-      labels = c("Velocity", "Acceleration")
-    ),
-    source = factor(source,
-      levels = c("est", "true"),
-      labels = c("Estimated", "True")
-    )
-  ) %>%
-  ggplot(aes(x = time, y = value, color = type, linetype = source)) +
-  geom_line() +
-  facet_wrap(~id, scales = "free_y", ncol = 2) +
-  theme_minimal(base_size = 9) +
-  theme(legend.position = "top") +
-  labs(x = "Time", y = "Value", color = "Type", linetype = "Source")
-
-# Survival plot
-p3 <- ggplot(df, aes(x = time, y = survival, color = factor(id))) +
-  geom_line(linewidth = 1) +
-  theme_minimal(base_size = 9) +
-  theme(legend.position = "top") +
-  ylim(0, 1) +
-  labs(x = "Time", y = "Survival Probability", color = "Subject")
-
-# Combine plots
-p1 | p2 | p3
-```
+- **Getting Started**: See `vignette("JointODE")` for a detailed tutorial
+- **Technical Details**: See `vignette("technical-details")` for mathematical formulations
+- **Model Comparison**: See `vignette("comparison")` for comparisons with traditional joint models
 
 
 ## Code of Conduct

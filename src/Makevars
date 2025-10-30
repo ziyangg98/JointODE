@@ -1,0 +1,8 @@
+## Makevars for JointODE package
+
+# Include CppAD headers from inst/include
+# -DNDEBUG: Disable CppAD assertions and debug output (required for CRAN)
+PKG_CPPFLAGS = -I../inst/include -DNDEBUG -DCPPAD_DISABLE_SOME_MICROSOFT_COMPILER_WARNINGS
+
+# Link against LAPACK and BLAS libraries (required by RcppArmadillo)
+PKG_LIBS = $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)

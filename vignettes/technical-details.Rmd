@@ -22,35 +22,43 @@ This vignette describes the mathematical framework and computational implementat
 
 The observed biomarker measurements are modeled as:
 
-$$V_{ij}=m_i(T_{ij})+b_i+\varepsilon_{ij},\quad i=1,\ldots,n,\quad j=1,\ldots,n_i$$
+$$V_{ij}=m_i(T_{ij})+\varepsilon_{ij},\quad i=1,\ldots,n,\quad j=1,\ldots,n_i$$
 
 where:
 
 -   $V_{ij}$: Observed biomarker value for subject $i$ at time $T_{ij}$
 -   $m_i(t)$: True underlying biomarker trajectory
--   $b_i\sim\mathcal{N}(0,\sigma_{b}^{2})$: Subject-specific random intercept
 -   $\varepsilon_{ij}\sim\mathcal{N}(0,\sigma_{e}^{2})$: Measurement error
 
-The biomarker trajectory evolution is characterized by the following second-order differential equation:
+The evolution of biomarker trajectories is governed by a second-order linear differential equation, which captures the dynamic behavior of the system:
 
-$$
-\ddot{m}_i(t) + 2 \xi \omega \dot{m}_i(t) + \omega^2 m_i(t) = k \omega^2 \boldsymbol{X}_i(t)^{\top} \boldsymbol{\beta},
-$$
+$$\ddot{m}_i(t) + 2 \xi_i \omega_i \dot{m}_i(t) + \omega_i^2 m_i(t) = k \omega_i^2 \mu_i(t),$$
 
-where $\dot{m}_i(t)$ and $\ddot{m}_i(t)$ denote the biomarker’s velocity and acceleration, respectively, and $\boldsymbol{X}_i(t)$ denotes time-varying covariates. The parameters have the usual interpretations: $\omega > 0$ is the natural frequency, $\xi$ is the damping ratio, and $k$ is the steady-state gain.
+where $\xi_i$ denotes the damping ratio, $\omega_i$ represents the natural frequency, $k$ serves as a scaling parameter, and $\mu_i(t)$ characterizes the external input function driving the system.
+
+To accommodate subject-specific heterogeneity and covariate effects, we reformulate the differential equation using a linear mixed-effects approach:
+
+$$\ddot{m}_{i}(t) = (\beta_{m} + b_{i,m}) m_{i}(t) + (\beta_{\dot{m}} + b_{i,\dot{m}}) \dot{m}_{i}(t) + (\boldsymbol{\beta}_{X} + \mathbf{b}_{i,X})^{\top} \mathbf{X}_i(t),$$
+
+where $\boldsymbol{\beta} = (\beta_{m}, \beta_{\dot{m}}, \boldsymbol{\beta}_{X}^{\top})^{\top}$ are fixed effects, $\mathbf{b}_i = (b_{i,m}, b_{i,\dot{m}}, \mathbf{b}_{i,X}^{\top})^{\top} \sim \mathcal{N}(\mathbf{0}, \boldsymbol{\Sigma}_b)$ are random effects, and $\mathbf{X}_i(t)$ are covariates. The parameters connect to the standard form via:
+
+$$\beta_{m} + b_{i,m} = -\omega_i^2, \quad \beta_{\dot{m}} + b_{i,\dot{m}} = -2\xi_i\omega_i, \quad (\boldsymbol{\beta}_{X} + \mathbf{b}_{i,X})^{\top} \mathbf{X}_i(t) = k\omega_i^2\mu_i(t)$$
+
+yielding subject-specific dynamics: natural frequency $\omega_i = \sqrt{-(\beta_{m} + b_{i,m})}$, damping ratio $\xi_i = -\frac{\beta_{\dot{m}} + b_{i,\dot{m}}}{2\omega_i}$, and external forcing $k\mu_i(t) = \frac{(\boldsymbol{\beta}_{X} + \mathbf{b}_{i,X})^{\top} \mathbf{X}_i(t)}{\omega_i^2}$.
 
 ### Survival Sub-Model
 
-The hazard function incorporates biomarker dynamics:
+The hazard function incorporates the biomarker dynamics:
 
 $$
-\lambda_i(t) = \lambda_{0}(t)\exp\left[\alpha_1 m_i(t) + \alpha_2 \dot{m}_i(t) + \mathbf{W}_i(t)^{\top}\boldsymbol{\phi}+b_{i}\right]
+\lambda_i(t) = \lambda_{0}(t)\exp\left[\alpha_1 m_i(t) + \alpha_2 \dot{m}_i^{\gamma}(t) + \mathbf{W}_i(t)^{\top}\boldsymbol{\phi}\right]
 $$
 
 where:
 
--   $\lambda_{0}(t)$: Baseline hazard (e.g., Weibull, piecewise constant)
--   $\mathbf{W}_i(t)$: Time-dependent or time-independent covariates with effects $\boldsymbol{\phi}$
+-   $\lambda_{0}(t)$: Baseline hazard function
+-   $\mathbf{W}_i(t)$: Covariate vector (time-dependent or time-independent) with regression coefficients $\boldsymbol{\phi}$
+-   $\gamma \in \{0, 1, 2\}$: Power parameter for the velocity contribution, where $\gamma = 0$ corresponds to no velocity effect (i.e., $\alpha_2$ term is excluded), $\gamma = 1$ yields linear velocity effect $\alpha_2\dot{m}_i(t)$, and $\gamma = 2$ yields quadratic velocity effect $\alpha_2[\dot{m}_i(t)]^2$
 
 ### ODE System
 
@@ -58,7 +66,7 @@ The complete system couples the biomarker trajectory dynamics with the survival 
 
 $$
 \frac{d\mathbf{s}_i}{dt} = \begin{pmatrix}
-\lambda_i(t|b_i) \\
+\lambda_i(t) \\
 \dot{m}_i(t) \\
 \ddot{m}_i(t)
 \end{pmatrix}
@@ -66,266 +74,215 @@ $$
 
 with initial conditions $\mathbf{s}_i(0) = (0, m_{i0}, \dot{m}_{i0})^{\top}$, where $m_{i0}$ and $\dot{m}_{i0}$ are the initial biomarker value and velocity for subject $i$.
 
-## Model Parameterization
+### Model Parameterization
 
-For parameter estimation, we need to specify parametric forms for the model components.
+For parameter estimation, we specify the following parametric forms:
 
-**Hazard Function:**
-We parameterize the log baseline hazard using B-splines:
+**Survival Hazard:** The log baseline hazard is modeled flexibly using B-splines:
 
 $$\log\lambda_0(t) = \boldsymbol{\eta}^{\top} \mathbf{B}^{(\lambda)}(t)$$
 
-Thus, the full hazard function becomes:
+where $\mathbf{B}^{(\lambda)}(t) = [B_1^{(\lambda)}(t), \ldots, B_q^{(\lambda)}(t)]^{\top}$ is a B-spline basis with $q$ basis functions, and $\boldsymbol{\eta} \in \mathbb{R}^q$ are the corresponding coefficients.
 
-$$\lambda_i(t|b_i) = \exp\left[\boldsymbol{\eta}^{\top} \mathbf{B}^{(\lambda)}(t) + \mathbf{W}_i^{\top}\boldsymbol{\phi} + \mathbf{m}_i(t)^{\top}\boldsymbol{\alpha} + b_{i}\right]$$
+$$\lambda_i(t) = \exp\left[\boldsymbol{\eta}^{\top} \mathbf{B}^{(\lambda)}(t) + \alpha_1 m_i(t) + \alpha_2 \dot{m}_i^{\gamma}(t) + \mathbf{W}_i(t)^{\top}\boldsymbol{\phi}\right]$$
 
-where $\mathbf{B}^{(\lambda)}(t)$ is the B-spline basis for the log baseline hazard, and $\boldsymbol{\eta}$ are the corresponding coefficients.
+**Trajectory Dynamics:** For computational convenience, we express the differential equation in compact matrix form:
 
-**Acceleration Function:**
-To make the model tractable, we express the acceleration as a linear function of the feature vector:
+$$\ddot{m}_{i}(t) = \mathbf{Z}_i(t)^{\top}(\boldsymbol{\beta} + \mathbf{b}_i)$$
 
-$$\ddot{m}_i(t) = \boldsymbol{\beta}^{\top} \mathbf{Z}_i(t)$$
+where $\mathbf{Z}_i(t) = [m_{i}(t), \dot{m}_{i}(t), \mathbf{X}_i(t)^{\top}]^{\top}$ combines the state variables and covariates.
 
-where $\mathbf{Z}_i(t) = [m_i(t), \dot{m}_i(t), \mathbf{X}_i(t)^{\top}(t)]^{\top}$ is the feature vector with coefficients $\boldsymbol{\beta} = [\beta_1, \beta_2, \boldsymbol{\beta}_X^{\top}]^{\top}$.
+## Parameter Estimation
 
-The joint likelihood for subject $i$ integrates over the random effect:
+The model contains continuous random effects $\mathbf{b}_i \in \mathbb{R}^p$ as latent variables, necessitating the use of the Expectation-Maximization (EM) algorithm for maximum likelihood estimation.
 
-$$L_i(\boldsymbol{\theta}) = \int p(\mathbf{V}_i | b_i) \cdot p(T_i, \delta_i | b_i) \cdot p(b_i) \, db_i$$
+The marginal likelihood for subject $i$ is obtained by integrating over the unobserved random effects:
 
-where $\boldsymbol{\theta} = (\boldsymbol{\eta}, \boldsymbol{\phi}, \boldsymbol{\alpha}, \boldsymbol{\beta}, \sigma_e^2, \sigma_b^2)$.
+$$L_i(\boldsymbol{\theta}) = \int p(\mathbf{V}_i | \mathbf{b}_i) \cdot p(T_i, \delta_i | \mathbf{b}_i) \cdot p(\mathbf{b}_i) \, d\mathbf{b}_i$$
 
-**Likelihood Components:**
+where $\boldsymbol{\theta} = (\boldsymbol{\beta}, \boldsymbol{\eta}, \boldsymbol{\phi}, \alpha_1, \alpha_2, \gamma, \sigma_e^2, \boldsymbol{\Sigma}_b)$ includes all model parameters, with the following likelihood components:
 
-1. **Longitudinal:**
-   $$p(\mathbf{V}_i | b_i) = \prod_{j=1}^{n_i} \mathcal{N}(V_{ij}; m_i(T_{ij}) + b_i, \sigma_e^2)$$
+$$\begin{aligned}
+\text{Longitudinal:} \quad & p(\mathbf{V}_i | \mathbf{b}_i) = \prod_{j=1}^{n_i} \mathcal{N}(V_{ij}; m_{i}(T_{ij}|\mathbf{b}_i), \sigma_e^2) = (2\pi\sigma_e^2)^{-n_i/2} \exp\left[-\frac{1}{2\sigma_e^2}\sum_{j=1}^{n_i}[V_{ij} - m_{i}(T_{ij}|\mathbf{b}_i)]^2\right]\\
+\text{Survival:} \quad & p(T_i, \delta_i | \mathbf{b}_i) = [\lambda_{i}(T_i|\mathbf{b}_i)]^{\delta_i} \exp[-\Lambda_{i}(T_i|\mathbf{b}_i)]\\
+\text{Random Effects:} \quad & p(\mathbf{b}_i) = \mathcal{N}(\mathbf{0}, \boldsymbol{\Sigma}_b) = (2\pi)^{-p/2}|\boldsymbol{\Sigma}_b|^{-1/2}\exp\left[-\frac{1}{2}\mathbf{b}_i^{\top}\boldsymbol{\Sigma}_b^{-1}\mathbf{b}_i\right]
+\end{aligned}$$
 
-2. **Survival:**
-   $$p(T_i, \delta_i | b_i) = [\lambda_i(T_i|b_i)]^{\delta_i} \exp[-\Lambda_i(T_i|b_i)]$$
+where $m_{i}(t|\mathbf{b}_i)$ denotes the trajectory solution with random effects $\mathbf{b}_i$, and $p = \dim(\mathbf{b}_i)$ is the dimension of the random effects.
 
-3. **Random Effect:**
-   $$p(b_i) \sim \mathcal{N}(0, \sigma_b^2)$$
+### E-Step: AGHQ Posterior Approximation
 
-## Estimation Procedure
+For each subject $i$, apply AGHQ to approximate $p(\mathbf{b}_i | \mathcal{O}_i, \boldsymbol{\theta}^{(t)})$ where $\mathcal{O}_i = \{\mathbf{V}_i, T_i, \delta_i\}$. The joint log-density is:
 
-For the linear acceleration model, we use direct gradient-based optimization of the marginal likelihood.
+$$\begin{aligned}
+\log p(\mathcal{O}_i, \mathbf{b}_i) &= -\frac{n_i}{2}\log(2\pi\sigma_e^2) - \frac{1}{2\sigma_e^2}\sum_{j=1}^{n_i}[V_{ij} - m_{i}(T_{ij}|\mathbf{b}_i)]^2 \\
+&\quad + \delta_i\log\lambda_{i}(T_i|\mathbf{b}_i) - \Lambda_{i}(T_i|\mathbf{b}_i) \\
+&\quad - \frac{p}{2}\log(2\pi) - \frac{1}{2}\log|\boldsymbol{\Sigma}_b| - \frac{1}{2}\mathbf{b}_i^{\top}\boldsymbol{\Sigma}_b^{-1}\mathbf{b}_i
+\end{aligned}$$
 
-### Posterior Computation
+AGHQ procedure:
 
-For each subject $i$, compute the posterior distribution of $b_i$ given observed data $\mathcal{O}_i$.
+1. Find mode: $\hat{\mathbf{b}}_i = \arg\max_{\mathbf{b}_i} \log p(\mathcal{O}_i, \mathbf{b}_i)$
+2. Compute Hessian: $\mathbf{H}_i = -\nabla^2 \log p(\mathcal{O}_i, \mathbf{b}_i)\big|_{\mathbf{b}_i = \hat{\mathbf{b}}_i}$
+3. Cholesky decomposition: $\mathbf{H}_i^{-1} = \mathbf{L}_i \mathbf{L}_i^{\top}$
 
-**Key simplification:** The hazard and cumulative hazard factor as:
+The **AGHQ marginal likelihood** is:
 
-- $\lambda_i(t|b_i) = e^{b_i} \lambda_i(t|0)$
-- $\Lambda_i(t|b_i) = e^{b_i} \Lambda_i(t|0)$
+$$\tilde{p}(\mathcal{O}_i) = |\mathbf{L}_i| \sum_{k=1}^{K} \omega_k p(\mathcal{O}_i, \mathbf{L}_i \mathbf{x}_k + \hat{\mathbf{b}}_i)$$
 
-**Implementation:**
+The **AGHQ posterior density** is:
 
-1. **Solve baseline ODE** with $b_i = 0$ to obtain $m_i(t)$, $\lambda_i(t|0)$, $\Lambda_i(T_i|0)$
-2. **Find posterior mode** $\tilde{b}_i$ by maximizing:
-   $$\ell_i(b) = b\left[\frac{S_i}{\sigma_e^2} + \delta_i\right] - \frac{b^2}{2}\left[\frac{n_i}{\sigma_e^2} + \frac{1}{\sigma_b^2}\right] - e^b\Lambda_i(T_i|0)$$
-   where $S_i = \sum_j(V_{ij} - m_i(T_{ij}))$
-3. **Compute posterior moments** via adaptive Gauss-Hermite quadrature:
-   - Mean: $\hat{b}_i = E[b_i|\mathcal{O}_i]$
-   - Variance: $\hat{v}_i = \text{Var}[b_i|\mathcal{O}_i]$
-   - Transform: $E[e^{b_i}|\mathcal{O}_i]$ for survival updates
+$$\tilde{p}(\mathbf{b}_i | \mathcal{O}_i) = \frac{p(\mathcal{O}_i, \mathbf{b}_i)}{\tilde{p}(\mathcal{O}_i)}$$
 
-### Objective Function
+### M-Step: Maximize Q-Function
 
-We maximize the expected complete-data log-likelihood:
+The Q-function is $Q(\boldsymbol{\theta}) = \sum_{i=1}^n \mathbb{E}_{\mathbf{b}_i | \mathcal{O}_i, \boldsymbol{\theta}^{(t)}}[\ell_i(\mathbf{b}_i; \boldsymbol{\theta})]$ where $\ell_i(\mathbf{b}; \boldsymbol{\theta}) = \log p(\mathcal{O}_i, \mathbf{b} | \boldsymbol{\theta})$. Using AGHQ posterior approximation with nodes $\mathbf{b}_{ik} = \mathbf{L}_i \mathbf{x}_k + \hat{\mathbf{b}}_i$:
 
-$$Q(\boldsymbol{\theta}) = Q_{\text{long}} + Q_{\text{surv}} + Q_{\text{RE}}$$
+$$Q(\boldsymbol{\theta}) \approx \sum_{i=1}^n |\mathbf{L}_i| \sum_{k=1}^{K} \omega_k \ell_i(\mathbf{b}_{ik}; \boldsymbol{\theta}) \tilde{p}(\mathbf{b}_{ik} | \mathcal{O}_i, \boldsymbol{\theta}^{(t)})$$
+
+Since the AGHQ posterior is normalized, define weights $\tilde{w}_{ik} = |\mathbf{L}_i| \omega_k \tilde{p}(\mathbf{b}_{ik} | \mathcal{O}_i, \boldsymbol{\theta}^{(t)})$. Using the definitions:
+
+$$\tilde{p}(\mathbf{b}_{ik} | \mathcal{O}_i) = \frac{p(\mathcal{O}_i, \mathbf{b}_{ik})}{\tilde{p}(\mathcal{O}_i)}, \quad \tilde{p}(\mathcal{O}_i) = |\mathbf{L}_i| \sum_{j=1}^{K} \omega_j p(\mathcal{O}_i, \mathbf{b}_{ij})$$
+
+we obtain:
+
+$$\tilde{w}_{ik} = \frac{\omega_k \exp[\ell_i(\mathbf{b}_{ik}; \boldsymbol{\theta}^{(t)})]}{\sum_{j=1}^{K} \omega_j \exp[\ell_i(\mathbf{b}_{ij}; \boldsymbol{\theta}^{(t)})]}$$
+
+where the Jacobian cancels. Thus:
+
+$$\boxed{Q(\boldsymbol{\theta}) \approx \sum_{i=1}^n \sum_{k=1}^{K} \tilde{w}_{ik} \ell_i(\mathbf{b}_{ik}; \boldsymbol{\theta})}$$
 
 where:
+$$\begin{aligned}
+\ell_i(\mathbf{b}_{ik}; \boldsymbol{\theta}) &= -\frac{n_i}{2}\log(2\pi\sigma_e^2) - \frac{1}{2\sigma_e^2}\sum_{j=1}^{n_i}[V_{ij} - m_{i}(T_{ij}|\mathbf{b}_{ik})]^2 \\
+&\quad + \delta_i\log\lambda_{i}(T_i|\mathbf{b}_{ik}) - \Lambda_{i}(T_i|\mathbf{b}_{ik}) \\
+&\quad - \frac{p}{2}\log(2\pi) - \frac{1}{2}\log|\boldsymbol{\Sigma}_b| - \frac{1}{2}\mathbf{b}_{ik}^{\top}\boldsymbol{\Sigma}_b^{-1}\mathbf{b}_{ik}
+\end{aligned}$$
 
-- $Q_{\text{long}} = -\frac{1}{2\sigma_e^2}\sum_{i,j} [(V_{ij} - m_i(T_{ij}) - \hat{b}_i)^2 + \hat{v}_i] - \frac{N}{2}\log(2\pi\sigma_e^2)$, where $N = \sum_{i=1}^n n_i$ is the total number of observations
-- $Q_{\text{surv}} = \sum_i [\delta_i(\log\lambda_i(T_i|0) + \hat{b}_i) - E[e^{b_i}|\mathcal{O}_i]\Lambda_i(T_i|0)]$
-- $Q_{\text{RE}} = -\frac{1}{2\sigma_b^2}\sum_i (\hat{b}_i^2 + \hat{v}_i) - \frac{n}{2}\log(2\pi\sigma_b^2)$
+**Parameter updates**: Maximize $Q(\boldsymbol{\theta})$ via L-BFGS-B. Variance components have closed-form updates:
 
-**Optimization Strategy:**
+$$\boxed{\sigma_e^2 = \frac{1}{N}\sum_{i=1}^n \sum_{k=1}^{K} \tilde{w}_{ik} \sum_{j=1}^{n_i} [V_{ij} - m_{i}(T_{ij}|\mathbf{b}_{ik})]^2}$$
 
-We optimize all parameters $\boldsymbol{\theta}$ using gradient-based methods:
+$$\boxed{\boldsymbol{\Sigma}_b = \frac{1}{n}\sum_{i=1}^n \left[\hat{\mathbf{b}}_i\hat{\mathbf{b}}_i^{\top} + \hat{\mathbf{V}}_i\right]}$$
 
-$$
-\hat{\boldsymbol{\theta}} = \arg\max_{\boldsymbol{\theta}} Q(\boldsymbol{\theta})
-$$
-
-The variance components are updated using closed-form expressions:
-$$
-\sigma_e^2 = \frac{1}{N}\sum_{i,j}[(V_{ij} - m_i(T_{ij}) - \hat{b}_i)^2 + \hat{v}_i],\quad\sigma_b^2 = \frac{1}{n}\sum_i(\hat{b}_i^2 + \hat{v}_i)
-$$
-
-## Computational Details
-
-### Overview of Gradient Computation
-
-The optimization requires maximization of the expected complete-data log-likelihood $Q(\boldsymbol{\theta})$ with respect to the parameter vector $\boldsymbol{\theta} = (\boldsymbol{\eta}, \boldsymbol{\phi}, \boldsymbol{\alpha}, \boldsymbol{\beta}, \sigma_e^2, \sigma_b^2)$. To perform this optimization efficiently, gradient-based methods necessitate the computation of:
-
-$$\nabla_{\boldsymbol{\theta}} Q = \sum_{i=1}^{n}\sum_{j=1}^{n_i} \frac{r_{ij}}{\sigma_e^2} \frac{\partial m_i(T_{ij})}{\partial \boldsymbol{\theta}} + \sum_{i=1}^{n} \left[\delta_i \frac{\partial \log\lambda_i(T_i|0)}{\partial \boldsymbol{\theta}} - E[e^{b_i}|\mathcal{O}_i] \frac{\partial \Lambda_i(T_i|0)}{\partial \boldsymbol{\theta}}\right]$$
-
-where $r_{ij} = V_{ij} - m_i(T_{ij}) - \hat{b}_i$ denotes the residual between observed and fitted longitudinal values.
-
-This gradient formula reveals the fundamental computational challenge: we must evaluate the sensitivities of both the biomarker trajectory $m_i(t)$ and the hazard functions with respect to all model parameters. Specifically, we require:
-
-- $\frac{\partial m_i(T_{ij})}{\partial \boldsymbol{\theta}}$: trajectory sensitivities at observation times
-- $\frac{\partial \log\lambda_i(T_i|0)}{\partial \boldsymbol{\theta}}$: log hazard sensitivities at event times
-- $\frac{\partial \Lambda_i(T_i|0)}{\partial \boldsymbol{\theta}}$: cumulative hazard sensitivities at event times
-
-These sensitivities depend on the solution of the nonlinear second-order ODE system and cannot be derived in closed form. We first present the explicit forms of these gradients, then discuss numerical methods for their computation.
-
-### Explicit Forms of Gradient Components
-
-The parameter vector $\boldsymbol{\theta} = (\boldsymbol{\eta}, \boldsymbol{\phi}, \boldsymbol{\alpha}, \boldsymbol{\beta})$ includes the hazard model parameters and the linear acceleration coefficients. We derive the gradient with respect to each component.
-
-#### Gradient Components
-
-The gradient components decompose as follows:
-
-**Baseline hazard coefficients** ($\boldsymbol{\eta}$):
-
-$$\nabla_{\boldsymbol{\eta}} Q = \sum_{i=1}^{n} \left[\delta_i \mathbf{B}^{(\lambda)}(T_i) - E[e^{b_i}|\mathcal{O}_i] \frac{\partial\Lambda_i(T_i|0)}{\partial\boldsymbol{\eta}}\right]$$
-
-**Baseline covariate effects** ($\boldsymbol{\phi}$):
-
-$$\nabla_{\boldsymbol{\phi}} Q = \sum_{i=1}^{n} \left[\delta_i - E[e^{b_i}|\mathcal{O}_i] \cdot \Lambda_i(T_i|0)\right] \mathbf{W}_i$$
-
-**Association parameters** ($\boldsymbol{\alpha}$):
-
-$$\nabla_{\boldsymbol{\alpha}} Q = \sum_{i=1}^{n} \left[\delta_i \mathbf{m}_i(T_i) - E[e^{b_i}|\mathcal{O}_i] \frac{\partial\Lambda_i(T_i|0)}{\partial\boldsymbol{\alpha}}\right]$$
-
-#### Gradient with Respect to Linear Acceleration Coefficients $\boldsymbol{\beta}$
-
-The gradient with respect to the linear acceleration coefficients is:
-
-$$\nabla_{\boldsymbol{\beta}} Q = \sum_{i=1}^{n}\sum_{j=1}^{n_i} \frac{r_{ij}}{\sigma_e^2} \frac{\partial m_i(T_{ij})}{\partial \boldsymbol{\beta}} + \sum_{i=1}^{n} \left[\delta_i \boldsymbol{\alpha}^{\top} \frac{\partial \mathbf{m}_i(T_i)}{\partial \boldsymbol{\beta}} - E[e^{b_i}|\mathcal{O}_i] \frac{\partial \Lambda_i(T_i|0)}{\partial \boldsymbol{\beta}}\right]$$
-
-where $r_{ij} = V_{ij} - m_i(T_{ij}) - \hat{b}_i$ denotes the residual between observed and fitted values.
-
-### Computing the Required Sensitivities
-
-The gradient expressions above involve two types of sensitivities that must be computed numerically:
-
-#### Cumulative Hazard Sensitivities
-
-The cumulative hazard function $\Lambda_i(T_i|0)$ depends on parameters through the instantaneous hazard. For parameters affecting the hazard directly, the sensitivities are computed as:
-
-$$
-\frac{\partial\Lambda_i(T_i|0)}{\partial\boldsymbol{\eta}}=\int_{0}^{T_i}\lambda_i(t|0)\mathbf{B}^{(\lambda)}(t)\,\mathrm{d}t,\quad
-\frac{\partial\Lambda_i(T_i|0)}{\partial\boldsymbol{\alpha}}=\int_{0}^{T_i}\lambda_i(t|0)\mathbf{m}_i(t)\,\mathrm{d}t,\quad
-\frac{\partial\Lambda_i(T_i|0)}{\partial\boldsymbol{\phi}}=\int_{0}^{T_i}\lambda_i(t|0)\mathbf{W}_i\,\mathrm{d}t
-$$
-
-For parameters affecting the trajectory $m_i(t)$, the chain rule yields:
-
-$$
-\frac{\partial\Lambda_i(T_i|0)}{\partial\boldsymbol{\beta}}=\int_{0}^{T_i}\lambda_i(t|0)\boldsymbol{\alpha}^{\top}\frac{\partial\mathbf{m}_i(t)}{\partial\boldsymbol{\beta}}\,\mathrm{d}t
-$$
-
-##### Trajectory Sensitivities
-
-The trajectory sensitivities with respect to parameters affecting the ODE system are more complex and must be computed numerically. These sensitivities satisfy the following relationships:
-
-**For single-index coefficients ($\boldsymbol{\beta}$):**
-
-The trajectory sensitivities evolve according to:
-
-$$
-\frac{\partial m_i(t)}{\partial \boldsymbol{\beta}} = \int_{0}^{t} \frac{\partial\dot{m}_i(s)}{\partial \boldsymbol{\beta}} \,\mathrm{d}s,\quad
-\frac{\partial\dot{m}_i(t)}{\partial \boldsymbol{\beta}} = \int_{0}^{t} \frac{\partial \ddot{m}_i(s)}{\partial \boldsymbol{\beta}} \,\mathrm{d}s
-$$
-
-where the acceleration sensitivity is given by:
-
-$$
-\frac{\partial \ddot{m}_i(t)}{\partial \boldsymbol{\beta}} = \mathbf{Z}_i(t) + \boldsymbol{\beta}^{\top} \frac{\partial \mathbf{Z}_i(t)}{\partial\boldsymbol{\beta}}
-$$
-
-Here, $\mathbf{Z}_i(t) = [m_i(t), \dot{m}_i(t), \mathbf{X}_i^{\top}(t), t]^{\top}$ is the feature vector. Since the acceleration is now linear in $\boldsymbol{\beta}$, we have:
-
-$$\frac{\partial \mathbf{Z}_i(t)}{\partial\boldsymbol{\beta}} = \begin{bmatrix}
-\frac{\partial m_i(t)}{\partial \boldsymbol{\beta}} \\ \frac{\partial \dot{m}_i(t)}{\partial \boldsymbol{\beta}} \\ \mathbf{0} \\ 0
-\end{bmatrix}$$
-
-where the covariates $\mathbf{X}_i(t)$ and time $t$ do not depend on $\boldsymbol{\beta}$.
-
-
-
-### Numerical Methods for Sensitivity Computation
-
-For the linear acceleration model, the sensitivities can be computed more efficiently. Two computational strategies are available:
-
-1. **Forward Sensitivity Method**: Augments the original ODE system with sensitivity equations that are integrated simultaneously with the state equations
-2. **Adjoint Method**: Solves a backward-in-time adjoint system, offering computational advantages when the number of parameters exceeds the number of objective function evaluations
-
-#### Forward Sensitivity Method
-
-The forward method extends the original three-dimensional state space to include sensitivity trajectories, solving augmented ODE systems that simultaneously evolve both the primary state variables and their parameter sensitivities.
-
-**Augmented system:**
-
-$$\frac{d}{dt}\begin{bmatrix}
-\Lambda_i \\ m_i \\ \dot{m}_i \\ \partial\Lambda_{\eta,i} \\ \partial\Lambda_{\alpha,i} \\ \partial m_{i,\beta} \\ \partial\dot{m}_{i,\beta} \\ \partial\Lambda_{\beta,i}
-\end{bmatrix} = \begin{bmatrix}
-\lambda_i(t|0) \\
-\dot{m}_i(t) \\
-\boldsymbol{\beta}^{\top}\mathbf{Z}_i(t) \\
-\mathbf{B}^{(\lambda)}(t) \lambda_i(t|0) \\
-\mathbf{m}_i(t) \lambda_i(t|0) \\
-\partial \dot{m}_{i,\beta} \\
-\mathbf{Z}_i(t) + \boldsymbol{\beta}^{\top} \frac{\partial \mathbf{Z}_i(t)}{\partial\boldsymbol{\beta}} \\
-\boldsymbol{\alpha}^{\top}\frac{\partial\mathbf{m}_i(t)}{\partial\boldsymbol{\beta}} \cdot \lambda_i(t|0)
-\end{bmatrix}$$
-
-Note that $\partial\Lambda_{\phi,i} = 0$ since the survival covariates $\mathbf{W}_i$ do not affect the trajectory dynamics.
-
-Here, $\partial\Lambda_{\eta,i}$, $\partial\Lambda_{\alpha,i}$, and $\partial\Lambda_{\beta,i}$ denote the cumulative hazard sensitivities with respect to the corresponding parameter groups. This single augmented system must be integrated from $t=0$ to $t=T_i$ for each subject to obtain the complete sensitivity information required for gradient computation.
-
-#### Adjoint Method
-
-The adjoint method provides an alternative, more memory-efficient approach for computing gradients, particularly advantageous when the number of parameters substantially exceeds the number of objective function components. Instead of propagating sensitivities forward in time, this method solves a backward-in-time adjoint system.
-
-**Mathematical Foundation**
-
-Given the ODE system $\frac{d\mathbf{s}}{dt} = F(t, \mathbf{s}; \boldsymbol{\theta})$ with $\mathbf{s}(0) = \mathbf{s}_0$, we derive the adjoint sensitivity formula.
-
-Since $\mathbf{s}(t)$ satisfies the ODE, for any function $\boldsymbol{\kappa}(t)$:
-$$\mathbf{s}(T) = \mathbf{s}(T) - \int_0^T \boldsymbol{\kappa}^{\top} \left[\frac{d\mathbf{s}}{dt} - F\right] dt$$
-
-Differentiating with respect to $\boldsymbol{\theta}$ and using integration by parts:
-$$\frac{\partial \mathbf{s}(T)}{\partial \boldsymbol{\theta}} = \int_0^T \boldsymbol{\kappa}^{\top} \frac{\partial F}{\partial \boldsymbol{\theta}} dt - \boldsymbol{\kappa}(T)^{\top} \frac{\partial \mathbf{s}(T)}{\partial \boldsymbol{\theta}} + \int_0^T \left[\frac{d\boldsymbol{\kappa}}{dt} + \left(\frac{\partial F}{\partial \mathbf{s}}\right)^{\top} \boldsymbol{\kappa}\right]^{\top} \frac{\partial \mathbf{s}}{\partial \boldsymbol{\theta}} dt$$
-
-Define $\tilde{\boldsymbol{\kappa}} = \boldsymbol{\kappa} + \mathbf{e}_k$ and choose it to satisfy:
-$$\frac{d\tilde{\boldsymbol{\kappa}}}{dt} = -\left(\frac{\partial F}{\partial \mathbf{s}}\right)^{\top} \tilde{\boldsymbol{\kappa}}, \quad \tilde{\boldsymbol{\kappa}}(T) = \mathbf{e}_k$$
-
-This choice eliminates the $\frac{\partial \mathbf{s}}{\partial \boldsymbol{\theta}}$ terms, yielding:
-$$\frac{\partial \mathbf{s}_k(T)}{\partial \boldsymbol{\theta}} = \int_0^T \tilde{\boldsymbol{\kappa}}^{\top} \frac{\partial F}{\partial \boldsymbol{\theta}}\bigg|_{\mathbf{s}} dt$$
-
-where $\mathbf{e}_k$ is the $k$-th unit vector (i.e., a vector with 1 in the $k$-th position and 0 elsewhere).
+where $N = \sum_{i=1}^n n_i$ and $\tilde{w}_{ik}$ are the subject-specific normalized weights.
 
 
 ## Inference
 
-For the longitudinal sub-model, there are several statistcs that are useful for inference, including $T = \frac{2\pi}{\omega}$ and the damping ratio $\xi$.
+### Standard Errors via Louis' Method
 
-However, these are not directly estimated parameters. We can use the delta method to obtain their standard errors.
+Standard errors for model parameters are computed using **Louis' method**, which decomposes the observed information matrix into complete-data and missing information components:
 
-Since
+$$\mathcal{I}(\boldsymbol{\theta}) = \mathcal{I}_c(\boldsymbol{\theta}) - \mathcal{I}_m(\boldsymbol{\theta})$$
+
+**Complete-data information** is the negative Hessian of $Q(\boldsymbol{\theta})$:
+
+$$\mathcal{I}_c(\boldsymbol{\theta}) = -\nabla^2 Q(\boldsymbol{\theta}) = -\sum_{i=1}^n \sum_{k=1}^{K_i} w_{ik} \nabla^2 \ell_i(\mathbf{b}_{ik}; \boldsymbol{\theta})$$
+
+**Missing information** captures the variability of the complete-data score with respect to the posterior distribution of random effects:
+
+$$\mathcal{I}_m(\boldsymbol{\theta}) = \sum_{i=1}^n \text{Var}_{\mathbf{b}_i | \mathcal{O}_i}\left[\nabla \ell_i(\mathbf{b}_i; \boldsymbol{\theta})\right]$$
+
+Using the quadrature approximation, the missing information for subject $i$ is:
+
+$$\mathcal{I}_{m,i}(\boldsymbol{\theta}) = \sum_{k=1}^{K_i} w_{ik} \mathbf{S}_{ik} \mathbf{S}_{ik}^{\top} - \bar{\mathbf{S}}_i \bar{\mathbf{S}}_i^{\top}$$
+
+where $\mathbf{S}_{ik} = \nabla \ell_i(\mathbf{b}_{ik}; \boldsymbol{\theta})$ is the complete-data score at quadrature node $k$, and $\bar{\mathbf{S}}_i = \sum_{k=1}^{K_i} w_{ik} \mathbf{S}_{ik}$ is the weighted mean score.
+
+### Dynamic Parameters
+
+We use the delta method to obtain standard errors for $\omega_0$ and $\xi_0$:
+
 $$
-\omega = \sqrt{-\beta_1}, \quad \xi = -\frac{\beta_2}{2\sqrt{-\beta_1}},
+\frac{\partial \omega_0}{\partial \beta_{1}} = -\frac{1}{2\sqrt{-\beta_{1}}}, \quad \frac{\partial \omega_0}{\partial \beta_{2}} = 0
 $$
-we have
+
 $$
-\frac{\partial T}{\partial \beta_1} = -\frac{\pi}{(-\beta_1)^{3/2}}, \quad \frac{\partial T}{\partial \beta_2} = 0, \quad
-\frac{\partial \xi}{\partial \beta_1} = -\frac{\beta_2}{4(-\beta_1)^{3/2}}, \quad \frac{\partial \xi}{\partial \beta_2} = -\frac{1}{2\sqrt{-\beta_1}}.
+\frac{\partial \xi_0}{\partial \beta_{1}} = -\frac{\beta_{2}}{4(-\beta_{1})^{3/2}}, \quad \frac{\partial \xi_0}{\partial \beta_{2}} = -\frac{1}{2\sqrt{-\beta_{1}}}
 $$
-Thus, the variance-covariance matrix of $(\omega, \xi)$ can be approximated as
+
+The variance-covariance matrix for $(\omega_0, \xi_0)$ is:
 $$
-\mathbf{J} \begin{pmatrix}
-\text{Var}(\beta_1) & \text{Cov}(\beta_1, \beta_2) \\
-\text{Cov}(\beta_1, \beta_2) & \text{Var}(\beta_2)
-\end{pmatrix} \mathbf{J}^{\top},
+\text{Var}\begin{pmatrix}\omega_0 \\ \xi_0\end{pmatrix} = \mathbf{J} \text{Var}\begin{pmatrix}\beta_{1} \\ \beta_{2}\end{pmatrix} \mathbf{J}^{\top}
 $$
-where
+
+where the Jacobian matrix is:
 $$\mathbf{J} = \begin{pmatrix}
-\frac{\partial T}{\partial \beta_1} & \frac{\partial T}{\partial \beta_2} \\
-\frac{\partial \xi}{\partial \beta_1} & \frac{\partial \xi}{\partial \beta_2}
-\end{pmatrix}.$$
+\frac{\partial \omega_0}{\partial \beta_{1}} & \frac{\partial \omega_0}{\partial \beta_{2}} \\
+\frac{\partial \xi_0}{\partial \beta_{1}} & \frac{\partial \xi_0}{\partial \beta_{2}}
+\end{pmatrix}$$
+
+## Computational Implementation
+
+The gradient expressions above involve two types of sensitivities that must be computed numerically:
+
+### Cumulative Hazard Sensitivities
+
+The cumulative hazard function $\Lambda_{i}(T_i)$ depends on parameters through the instantaneous hazard. For parameters affecting the hazard directly, the sensitivities are computed as:
+
+$$\begin{aligned}
+\frac{\partial\Lambda_{i}(T_i)}{\partial\boldsymbol{\eta}} &= \int_{0}^{T_i}\lambda_{i}(t)\mathbf{B}^{(\lambda)}(t)\,\mathrm{d}t\\
+\frac{\partial\Lambda_{i}(T_i)}{\partial\alpha_1} &= \int_{0}^{T_i}\lambda_{i}(t)m_{i}(t)\,\mathrm{d}t\\
+\frac{\partial\Lambda_{i}(T_i)}{\partial\alpha_2} &= \int_{0}^{T_i}\lambda_{i}(t)\dot{m}_{i}^{\gamma}(t)\,\mathrm{d}t\\
+\frac{\partial\Lambda_{i}(T_i)}{\partial\boldsymbol{\phi}} &= \int_{0}^{T_i}\lambda_{i}(t)\mathbf{W}_i(t)\,\mathrm{d}t
+\end{aligned}$$
+
+For parameters affecting the trajectory $m_{i}(t)$ through the ODE dynamics, the chain rule yields:
+
+$$
+\frac{\partial\Lambda_{i}(T_i)}{\partial\boldsymbol{\beta}}=\int_{0}^{T_i}\lambda_{i}(t)\left[\alpha_1\frac{\partial m_{i}(t)}{\partial\boldsymbol{\beta}} + \alpha_2 \frac{\partial \dot{m}_{i}^{\gamma}(t)}{\partial\boldsymbol{\beta}}\right]\,\mathrm{d}t
+$$
+
+where the velocity term derivative depends on $\gamma$:
+
+$$
+\frac{\partial \dot{m}_{i}^{\gamma}(t)}{\partial\boldsymbol{\beta}} = \begin{cases}
+0, & \gamma = 0 \text{ (no velocity effect)} \\
+\frac{\partial \dot{m}_{i}(t)}{\partial\boldsymbol{\beta}}, & \gamma = 1 \text{ (linear velocity)} \\
+2\dot{m}_{i}(t)\frac{\partial \dot{m}_{i}(t)}{\partial\boldsymbol{\beta}}, & \gamma = 2 \text{ (quadratic velocity)}
+\end{cases}
+$$
+
+### Trajectory Sensitivities
+
+The trajectory sensitivities with respect to parameters affecting the ODE system are computed through the chain rule. Since $\ddot{m}_{i}(t) = (\boldsymbol{\beta} + \hat{\mathbf{b}}_i)^{\top} \mathbf{Z}_{i}(t)$, we have:
+
+$$
+\frac{\partial \ddot{m}_{i}(t)}{\partial \boldsymbol{\beta}} = \mathbf{Z}_{i}(t) + (\boldsymbol{\beta} + \hat{\mathbf{b}}_i)^{\top} \frac{\partial \mathbf{Z}_{i}(t)}{\partial \boldsymbol{\beta}}
+$$
+
+where $\mathbf{Z}_{i}(t) = [m_{i}(t), \dot{m}_{i}(t), \mathbf{X}_i(t)^{\top}]^{\top}$.
+
+The trajectory sensitivities evolve as:
+
+$$
+\frac{\partial m_{i}(t)}{\partial \boldsymbol{\beta}} = \int_{0}^{t} \frac{\partial\dot{m}_{i}(s)}{\partial \boldsymbol{\beta}} \,\mathrm{d}s,\quad
+\frac{\partial\dot{m}_{i}(t)}{\partial \boldsymbol{\beta}} = \int_{0}^{t} \frac{\partial \ddot{m}_{i}(s)}{\partial \boldsymbol{\beta}} \,\mathrm{d}s
+$$
+
+### Numerical Methods
+
+Augment the ODE system with sensitivity equations with respect to $\boldsymbol{\beta}$:
+
+$$\frac{d}{dt}\begin{bmatrix}
+\Lambda_{i}(t) \\
+m_{i} \\
+\dot{m}_{i} \\
+\frac{\partial \Lambda_{i}(t)}{\partial \boldsymbol{\eta}} \\
+\frac{\partial \Lambda_{i}(t)}{\partial \boldsymbol{\alpha}} \\
+\frac{\partial m_{i}}{\partial \boldsymbol{\beta}} \\
+\frac{\partial \dot{m}_{i}}{\partial \boldsymbol{\beta}} \\
+\frac{\partial \Lambda_{i}(t)}{\partial \boldsymbol{\beta}}
+\end{bmatrix} = \begin{bmatrix}
+\lambda_{i}(t) \\
+\dot{m}_{i}(t) \\
+(\boldsymbol{\beta} + \hat{\mathbf{b}}_i)^{\top} \mathbf{Z}_{i}(t) \\
+\lambda_{i}(t)\mathbf{B}^{(\lambda)}(t) \\
+\lambda_{i}(t)\begin{bmatrix}m_{i}(t) \\ \dot{m}_{i}^{\gamma}(t)\end{bmatrix} \\
+\frac{\partial \dot{m}_{i}}{\partial \boldsymbol{\beta}} \\
+\mathbf{Z}_{i}(t) + (\boldsymbol{\beta} + \hat{\mathbf{b}}_i)^{\top} \frac{\partial \mathbf{Z}_{i}(t)}{\partial \boldsymbol{\beta}} \\
+\lambda_{i}(t) \left[\alpha_1\frac{\partial m_{i}}{\partial \boldsymbol{\beta}} + \alpha_2 \frac{\partial \dot{m}_{i}^{\gamma}}{\partial \boldsymbol{\beta}}\right]
+\end{bmatrix}$$
+
+where $\mathbf{Z}_{i}(t) = [m_{i}(t), \dot{m}_{i}(t), \mathbf{X}_i(t)^{\top}]^{\top}$, and the last component uses the piecewise derivative for $\frac{\partial \dot{m}_{i}^{\gamma}}{\partial \boldsymbol{\beta}}$ as defined above.

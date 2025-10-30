@@ -9,17 +9,12 @@ JointODE(
   survival_formula,
   longitudinal_data,
   survival_data,
+  gamma = 1,
   state = NULL,
-  id = "id",
-  time = "time",
-  autonomous = TRUE,
-  spline_baseline = list(degree = 3, n_knots = 3, knot_placement = "equal",
+  spline_baseline = list(degree = 2, n_knots = 0, knot_placement = "equal",
     boundary_knots = NULL),
-  robust = FALSE,
   init = NULL,
   control = list(),
-  parallel = FALSE,
-  n_cores = NULL,
   ...
 )
 }
@@ -44,49 +39,41 @@ formula.}
 one row per subject. Must include event/censoring times, event indicators,
 and baseline covariates.}
 
+\item{gamma}{Numeric scalar specifying the power parameter for the velocity
+effect in the hazard function. When \code{gamma = 0}, velocity has no
+effect; \code{gamma = 1} uses linear velocity; \code{gamma = 2} uses
+squared velocity. Default is 1 (default: 1).}
+
 \item{state}{A matrix specifying initial conditions for the ODE system with
 two columns: initial biomarker values and their first derivatives. Each row
 corresponds to one subject. If \code{NULL}, defaults to a zero matrix with
 appropriate dimensions (default: \code{NULL}).}
 
-\item{id}{Character string specifying the column name for subject
-identifiers. This variable must be present in both longitudinal and
-survival datasets
-to link observations (default: \code{"id"}).}
-
-\item{time}{Character string specifying the column name for measurement
-times
-in the longitudinal dataset (default: \code{"time"}).}
-
-\item{autonomous}{Logical flag indicating whether the ODE system is
-autonomous (time-independent). When \code{TRUE}, the acceleration
-computation excludes the explicit time term, resulting in
-\eqn{\ddot{m}(t) = f(m(t), \dot{m}(t), X)} instead of
-\eqn{\ddot{m}(t) = f(m(t), \dot{m}(t), X, t)}. Autonomous systems often
-have better numerical stability and theoretical properties
-(default: \code{TRUE}).}
-
 \item{spline_baseline}{A list controlling the B-spline representation of the
 baseline hazard function with the following components:
 \describe{
 \item{\code{degree}}{Polynomial degree of the B-spline basis functions
-(default: 3, cubic splines)}
+(default: 2, quadratic splines)}
 \item{\code{n_knots}}{Number of interior knots for flexibility
-(default: 3, providing moderate flexibility)}
+(default: 0, providing moderate flexibility)}
 \item{\code{knot_placement}}{Strategy for positioning knots:
 \code{"quantile"} places knots at quantiles of observed event times,
-\code{"equal"} uses equally-spaced knots (default: \code{"quantile"})}
+\code{"equal"} uses equally-spaced knots (default: \code{"equal"})}
 \item{\code{boundary_knots}}{A numeric vector of length 2 specifying
 the boundary knot locations. If \code{NULL}, automatically set to the
 range of observed event times (default: \code{NULL})}
 }}
 
-\item{robust}{Logical flag indicating whether to use robust variance
-estimation (default: \code{FALSE}).}
-
-\item{init}{Optional list providing initial values for model parameters.
-Should have the same structure as the fitted model's \code{parameters}
-component with elements:
+\item{init}{Optional initial values for model parameters. Can be either:
+\itemize{
+\item \code{NULL} (default): Automatically calls
+\code{\link{MarginalODE}} to compute data-driven initial estimates
+for longitudinal parameters and random effects. Recommended for
+most applications.
+\item A list with the same structure as the fitted model's
+\code{parameters} component for full manual control
+}
+When providing a list, it should have elements:
 \describe{
 \item{\code{coefficients}}{A list containing:
 \itemize{
@@ -94,47 +81,35 @@ component with elements:
 hazard (length = number of spline basis functions)
 \item \code{hazard}: Vector of hazard parameters including
 association parameters (2) and survival covariates
-\item \code{acceleration}: Vector of longitudinal fixed effects
+\item \code{longitudinal}: Vector of longitudinal fixed effects
 including intercept and covariates
 \item \code{measurement_error_sd}: Residual standard deviation
 (positive scalar)
-\item \code{random_effect_sd}: Random effect standard deviation
-(positive scalar)
+\item \code{random_effect_sigma}: Random effect covariance matrix
+(positive definite matrix)
 }}
 \item{\code{configurations}}{Optional; if not provided, will use
 spline configuration from \code{spline_baseline}}
-}
-If \code{NULL}, default initial values are used (default: \code{NULL}).}
-
-\item{control}{A list of optimization and algorithmic settings:
-\describe{
-\item{\code{method}}{Optimization algorithm for parameter estimation.
-Options include \code{"L-BFGS-B"}, \code{"BFGS"}, \code{"Nelder-Mead"}
-(default: \code{"L-BFGS-B"})}
-\item{\code{maxit}}{Maximum number of iterations for each M-step
-optimization (default: 1000)}
-\item{\code{em_maxit}}{Maximum number of EM algorithm iterations
-(default: 10)}
-\item{\code{em_tol}}{Convergence criterion for EM algorithm based on
-relative change
-in log-likelihood (default: 1e-4)}
-\item{\code{tol}}{Numerical tolerance for optimization convergence
-(default: 1e-2)}
-\item{\code{verbose}}{Controls diagnostic output: \code{0}/\code{FALSE}
-for silent operation, \code{1}/\code{TRUE} for iteration progress,
-\code{2} for detailed parameter traces (default: \code{FALSE})}
 }}
 
-\item{parallel}{Logical flag enabling parallel computation for
-computationally intensive operations including posterior calculations,
-gradient evaluations, and likelihood computations. Requires \pkg{future}
-and \pkg{future.apply} packages
-(default: \code{FALSE}).}
-
-\item{n_cores}{Integer specifying the number of CPU cores for parallel
-processing. If \code{NULL}, automatically detects and uses all available
-cores minus one
-(default: \code{NULL}).}
+\item{control}{A list of control parameters for optimization, or output from
+\code{\link{JointODE.control}}. Key parameters include:
+\describe{
+\item{\code{maxit}}{Maximum number of EM iterations (default: 200)}
+\item{\code{atol}}{Absolute tolerance for parameter convergence
+(default: 5e-4)}
+\item{\code{rtol}}{Relative tolerance for log-likelihood
+convergence (default: 1e-5)}
+\item{\code{verbose}}{Verbosity level: FALSE/0 for silent, TRUE/1 for
+progress messages, 2 for detailed output (default: FALSE)}
+\item{\code{parallel}}{Logical flag enabling parallel computation
+(default: FALSE)}
+\item{\code{n_cores}}{Number of CPU cores for parallel processing.
+If 0, automatically detects available cores (default: 0)}
+\item{\code{quad_level}}{Quadrature level for numerical integration
+(default: 4)}
+}
+See \code{\link{JointODE.control}} for complete details and examples.}
 
 \item{...}{Additional arguments passed to internal optimization routines.}
 }
@@ -146,10 +121,10 @@ results:
 \itemize{
 \item \code{coefficients}: Named list with \code{baseline} (B-spline
 coefficients for baseline hazard), \code{hazard} (association and
-survival covariate effects), \code{acceleration} (longitudinal
+survival covariate effects), \code{longitudinal} (longitudinal
 fixed effects), \code{measurement_error_sd} (residual standard
-deviation), and \code{random_effect_sd} (random effect standard
-deviation)
+deviation), and \code{random_effect_sigma} (random effect
+covariance matrix)
 \item \code{configurations}: Model configuration including spline
 basis specifications
 }}
@@ -205,31 +180,46 @@ slope
 Parameter estimation employs an Expectation-Maximization (EM) algorithm
 with:
 \itemize{
-\item E-step: Adaptive Gauss-Hermite quadrature for numerical integration
-\item M-step: Quasi-Newton optimization for parameter updates
-}
-}
-\note{
-\itemize{
-\item Data validation is performed automatically with informative error
-messages
-\item For high-dimensional problems, parallel computation is strongly
-recommended
-\item Convergence issues may arise with sparse event data or limited
-follow-up
-\item Initial values are computed using separate model fits when not
-provided
+\item E-step: Multivariate Gauss-Hermite quadrature (mvQuad) for
+posterior computation of random effects
+\item M-step: Optimization for fixed effects and mvQuad-based
+closed-form updates for variance parameters
 }
 }
 \examples{
 \dontrun{
-fit <- JointODE(
-  longitudinal_formula = sim$formulas$longitudinal,
-  survival_formula = sim$formulas$survival,
-  longitudinal_data = sim$data$longitudinal_data,
-  survival_data = sim$data$survival_data
+# Generate example data
+sim <- simulate(n_subjects = 100, n_times = 10)
+
+# Fit with default control parameters
+fit1 <- JointODE(
+  longitudinal_formula = observed ~ x1 + x2,
+  survival_formula = Surv(event_time, event) ~ x1 + x2,
+  longitudinal_data = sim$longitudinal_data,
+  survival_data = sim$survival_data
 )
-summary(fit)
+
+# Fit with custom control parameters using JointODE.control()
+control <- JointODE.control(maxit = 200, atol = 1e-4, rtol = 1e-6, verbose = TRUE)
+fit2 <- JointODE(
+  longitudinal_formula = observed ~ x1 + x2,
+  survival_formula = Surv(event_time, event) ~ x1 + x2,
+  longitudinal_data = sim$longitudinal_data,
+  survival_data = sim$survival_data,
+  control = control
+)
+
+# Fit with control parameters as a list
+# By default, uses MarginalODE for initialization (init = NULL)
+fit3 <- JointODE(
+  longitudinal_formula = observed ~ x1 + x2,
+  survival_formula = Surv(event_time, event) ~ x1 + x2,
+  longitudinal_data = sim$longitudinal_data,
+  survival_data = sim$survival_data,
+  control = list(maxit = 50, verbose = TRUE)
+)
+
+summary(fit1)
 }
 
 }

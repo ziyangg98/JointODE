@@ -1,10 +1,16 @@
 # JointODE Development Roadmap
 
-## Version 0.1.0 (Current Release)
+## Version 0.1.1 (2025-01-10)
+
+* Implemented subject-specific random effects on ODE acceleration parameters to account for population heterogeneity
+* Added Laplace approximation for efficient posterior computation of random effects
+
+## Version 0.1.0 (Initial Release)
 
 * Joint modeling of longitudinal biomarkers and survival outcomes using ODEs
 * Second-order differential equation formulation for biomarker dynamics
-* EM algorithm with parallel processing support
+* EM algorithm for parameter estimation
+* Parallel processing support
 
 ## Version 0.2.0 (Planned - Q2 2025)
 

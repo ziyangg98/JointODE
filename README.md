@@ -15,49 +15,46 @@ coverage](https://codecov.io/gh/ziyangg98/JointODE/graph/badge.svg)](https://app
 
 The **JointODE** package provides a unified framework for joint modeling
 of longitudinal biomarker measurements and time-to-event outcomes using
-ordinary differential equations (ODEs). This approach enables the
-simultaneous analysis of biomarker trajectories and their impact on
-survival outcomes.
+ordinary differential equations (ODEs).
 
-## Model Setup
+## Overview
 
-The observed biomarker measurements are modeled as:
+JointODE models biomarker evolution using **ordinary differential
+equations** (ODEs) and links them to survival outcomes. Unlike
+traditional approaches using splines or polynomials, ODEs naturally
+capture the dynamic behavior of biomarker trajectories.
 
-$$V_{ij}=m_i(T_{ij})+b_i+\varepsilon_{ij},\quad i=1,\ldots,n,\quad j=1,\ldots,n_i$$
+### Model Structure
 
-where:
+**Longitudinal Model:** Biomarker trajectories evolve according to a
+second-order ODE:
 
-- $V_{ij}$: Observed biomarker value for subject $i$ at time $T_{ij}$
-- $m_i(t)$: True underlying biomarker trajectory
-- $b_i\sim\mathcal{N}(0,\sigma_{b}^{2})$: Subject-specific random
-  intercept
-- $\varepsilon_{ij}\sim\mathcal{N}(0,\sigma_{e}^{2})$: Measurement error
+$$\ddot{m}_i(t) + 2 \xi_i \omega_i \dot{m}_i(t) + \omega_i^2 m_i(t) = k \omega_i^2 \mu_i(t)$$
 
-The biomarker trajectory evolution is characterized by the following
-second-order differential equation:
+where $m_i(t)$ is the biomarker value, $\dot{m}_i(t)$ is velocity (rate
+of change), and $\ddot{m}_i(t)$ is acceleration. Subject-specific
+dynamics are characterized by natural frequency $\omega_i$ and damping
+ratio $\xi_i$, with $\mu_i(t)$ representing external forcing (e.g.,
+treatment effects, covariates). Individual heterogeneity is captured
+through random effects on these ODE parameters.
 
-$$\ddot{m}_i(t) + 2 \xi \omega \dot{m}_i(t) + \omega^2 m_i(t) = k \omega^2 \boldsymbol{X}_i(t)^{\top} \boldsymbol{\beta},$$
+**Survival Model:** The hazard function incorporates biomarker dynamics:
 
-where $\dot{m}_i(t)$ and $\ddot{m}_i(t)$ denote the biomarker’s velocity
-and acceleration, respectively, and $\boldsymbol{X}_i(t)$ denotes
-time-varying covariates. The parameters have the usual interpretations:
-$\omega > 0$ is the natural frequency, $\xi$ is the damping ratio, and
-$k$ is the steady-state gain.
+$$\lambda_i(t) = \lambda_{0}(t)\exp\left[\alpha_1 m_i(t) + \alpha_2 \dot{m}_i^{\gamma}(t) + \mathbf{W}_i^{\top}\boldsymbol{\phi}\right]$$
 
-### Survival Sub-Model
+where $\gamma \in \{0, 1, 2\}$ controls the velocity power (0: no
+velocity, 1: linear, 2: quadratic).
 
-The hazard function incorporates biomarker dynamics:
+### Key Features
 
-$$\lambda_i(t) = \lambda_{0}(t)\exp\left[\alpha_1 m_i(t) + \alpha_2 \dot{m}_i(t) + \mathbf{W}_i(t)^{\top}\boldsymbol{\phi}+b_{i}\right]$$
+- **Subject-specific dynamics**: Random effects on ODE parameters
+  capture individual heterogeneity
+- **Flexible hazard**: B-spline baseline hazard with biomarker value and
+  velocity effects
+- **Efficient computation**: C++ implementation with parallel processing
+  support
 
-where:
-
-- $\lambda_{0}(t)$: Baseline hazard (e.g., Weibull, piecewise constant)
-- $\mathbf{W}_i(t)$: Time-dependent or time-independent covariates with
-  effects $\boldsymbol{\phi}$
-
-For detailed mathematical derivations including ODE formulation,
-likelihood construction, and EM algorithm specifics, see the [technical
+For full mathematical details, see the [technical
 documentation](http://gongziyang.com/JointODE/articles/technical-details.html).
 
 ## Installation
@@ -70,111 +67,108 @@ You can install the development version of JointODE from
 pak::pak("ziyangg98/JointODE")
 ```
 
-## Example
+## Quick Start
 
-Here’s a basic example demonstrating typical usage:
+Here’s a basic example using the included simulated dataset:
 
 ``` r
 library(JointODE)
-#> 
+#>
 #> Attaching package: 'JointODE'
 #> The following object is masked from 'package:stats':
-#> 
+#>
 #>     simulate
 library(survival)
 
-# Load example dataset
+# Load example dataset (200 subjects with longitudinal and survival data)
 data(sim)
 
 # Fit joint ODE model
+longitudinal_data <- sim$data$longitudinal_data[
+  , c("id", "time", "observed", "x1", "x2")
+]
 fit <- JointODE(
-  longitudinal_formula = observed ~ x1 + x2,
+  longitudinal_formula = observed ~ biomarker + velocity + x1 + x2 +
+    (biomarker + velocity | id),
   survival_formula = Surv(time, status) ~ w1 + w2,
-  longitudinal_data = sim$data$longitudinal_data,
+  longitudinal_data = longitudinal_data,
   survival_data = sim$data$survival_data,
-  state = as.matrix(sim$data$state),
-  spline_baseline = list(
-    degree = 2,
-    n_knots = 1,
-    knot_placement = "equal",
-    boundary_knots = NULL
-  ),
-  parallel = TRUE
+  state = as.matrix(sim$data$state)
 )
 
 # Model summary
 summary(fit)
-#> 
+#>
 #> Call:
-#> JointODE(longitudinal_formula = observed ~ x1 + x2, survival_formula = Surv(time, 
-#>     status) ~ w1 + w2, longitudinal_data = sim$data$longitudinal_data, 
-#>     survival_data = sim$data$survival_data, state = as.matrix(sim$data$state), 
-#>     spline_baseline = list(degree = 2, n_knots = 1, knot_placement = "equal", 
-#>         boundary_knots = NULL), parallel = TRUE)
-#> 
+#> JointODE(longitudinal_formula = observed ~ biomarker + velocity +
+#>     x1 + x2 + (biomarker + velocity | id), survival_formula = Surv(time,
+#>     status) ~ w1 + w2, longitudinal_data = longitudinal_data,
+#>     survival_data = sim$data$survival_data, state = as.matrix(sim$data$state))
+#>
 #> Data Descriptives:
 #> Longitudinal Process            Survival Process
-#> Number of Observations: 1052    Number of Events: 134 (67%)
+#> Number of Observations: 17350   Number of Events: 61 (30%)
 #> Number of Subjects: 200
-#> 
+#>
 #>        AIC        BIC     logLik
-#>  -1598.511  -1549.036    814.255
-#> 
+#> -30993.374 -30901.021  15524.687
+#>
 #> Coefficients:
 #> Longitudinal Process: Second-Order ODE Model
-#>               Estimate Std. Error z value Pr(>|z|)    
-#> -omega_n^2    -1.53441    0.01770 -86.711  < 2e-16 ***
-#> -2*xi*omega_n -1.71667    0.02512 -68.348  < 2e-16 ***
-#> (Intercept)   -0.02772    0.00791  -3.505 0.000457 ***
-#> x1             1.22683    0.01574  77.918  < 2e-16 ***
-#> x2            -0.75840    0.01111 -68.233  < 2e-16 ***
+#>               Estimate Std. Error  z value Pr(>|z|)
+#> biomarker   -1.0960873  0.0058436 -187.570   <2e-16 ***
+#> velocity    -0.8554664  0.0162565  -52.623   <2e-16 ***
+#> (Intercept)  0.0007733  0.0014363    0.538     0.59
+#> x1           0.5472104  0.0030429  179.830   <2e-16 ***
+#> x2          -0.4926277  0.0028715 -171.558   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#> 
+#>
 #> ODE System Characteristics:
-#>                    Estimate Std. Error z value Pr(>|z|)    
-#> T (period)         5.072347   0.029248   173.4   <2e-16 ***
-#> xi (damping ratio) 0.692924   0.006794   102.0   <2e-16 ***
+#>                    Estimate Std. Error z value Pr(>|z|)
+#> T (period)          6.00146    0.01600  375.14   <2e-16 ***
+#> xi (damping ratio)  0.40856    0.00754   54.19   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#> 
+#>
 #> Survival Process: Proportional Hazards Model
-#>         Estimate Std. Error z value Pr(>|z|)    
-#> alpha_1  0.35166    0.13249   2.654  0.00795 ** 
-#> alpha_2  0.86287    0.19561   4.411 1.03e-05 ***
-#> w1       0.33833    0.08632   3.919 8.88e-05 ***
-#> w2      -0.49025    0.17449  -2.810  0.00496 ** 
+#>         Estimate Std. Error z value Pr(>|z|)
+#> alpha_1   0.7229     0.1886   3.833 0.000127 ***
+#> alpha_2   2.0048     0.7790   2.573 0.010070 *
+#> w1        0.6870     0.1245   5.518 3.43e-08 ***
+#> w2       -1.3419     0.2860  -4.692 2.71e-06 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#> 
-#> Baseline Hazard: B-spline with 4 basis functions
-#> (Coefficients range: [-2.981, -1.664] )
-#> 
+#>
+#> Baseline Hazard: B-spline with 3 basis functions
+#> (Coefficients range: [-4.946, -1.937] )
+#>
 #> Variance Components:
-#>               StdDev
-#> Random Effect       0.088978
-#> Residual            0.103563
-#> 
+#> Measurement Error SD: 0.099867
+#> Random Effect Covariance Matrix:
+#>          [,1]     [,2]
+#> [1,] 0.001591 0.002166
+#> [2,] 0.002166 0.041917
+#>
 #> Model Diagnostics:
-#> C-index (Concordance): 0.845
-#> Convergence: EM algorithm converged after 34 iterations
-
-# Generate predictions
-predictions <- predict(fit, times = seq(0, 10, by = 0.25))
+#> C-index (Concordance): 0.673
+#> Convergence: EM algorithm converged after 15 iterations
 ```
 
-## Visualization
+The formula specifies: - **ODE terms**: `biomarker` and `velocity` are
+the state variables (value and slope) in the ODE - **Covariates**: `x1`
+and `x2` are external variables affecting the dynamics - **Random
+effects**: `(biomarker + velocity | id)` allows subject-specific
+coefficients on the ODE value and slope terms
 
-    #> 
-    #> Attaching package: 'dplyr'
-    #> The following objects are masked from 'package:stats':
-    #> 
-    #>     filter, lag
-    #> The following objects are masked from 'package:base':
-    #> 
-    #>     intersect, setdiff, setequal, union
+## Learn More
 
-<img src="man/figures/README-visualization-1.png" width="100%" />
+- **Getting Started**: See `vignette("JointODE")` for a detailed
+  tutorial
+- **Technical Details**: See `vignette("technical-details")` for
+  mathematical formulations
+- **Model Comparison**: See `vignette("comparison")` for comparisons
+  with traditional joint models
 
 ## Code of Conduct
 

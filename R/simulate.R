@@ -10,41 +10,44 @@
 #' natural period, and excitation amplitude.
 #'
 #' @param n_subjects Integer specifying the number of subjects to simulate
-#'   (default: 200)
-#' @param shared_sd Positive scalar defining the standard deviation of the
-#'   shared random effects, \eqn{\sigma_b} (default: 0.1)
+#'   (default: 500)
 #' @param longitudinal List specifying the longitudinal sub-model parameters:
 #'   \describe{
 #'     \item{xi}{Damping ratio \eqn{\xi} controlling the oscillation decay.
-#'       Values: \eqn{\xi < 1} (underdamped), \eqn{\xi = 1} (critically damped),
-#'       \eqn{\xi > 1} (overdamped) (default: 0.707, slightly underdamped)}
+#'       Specified as c(mean = ..., sd = ...) for population mean and
+#'       standard deviation. Values: \eqn{\xi < 1} (underdamped),
+#'       \eqn{\xi = 1} (critically damped), \eqn{\xi > 1} (overdamped).
+#'       Default: c(mean = 0.4, sd = 0.05)}
 #'     \item{period}{Natural period \eqn{T} of oscillation in time units,
-#'       related to natural frequency as \eqn{\omega = 2\pi/T} (default: 5)}
-#'     \item{k}{Excitation amplitude scaling factor \eqn{k} that modulates
-#'       the strength of external forcing (default: 1.0)}
+#'       related to natural frequency as \eqn{\omega = 2\pi/T}.
+#'       Specified as c(mean = ..., sd = ...) for population mean and
+#'       standard deviation. Default: c(mean = 6, sd = 1.0)}
 #'     \item{excitation}{List specifying external forcing parameters:
 #'       \describe{
 #'         \item{offset}{Constant excitation term \eqn{f_0} (default: 0.0)}
 #'         \item{covariates}{Named vector of covariate effects
 #'           \eqn{\boldsymbol{\beta}_{exc}} on excitation
-#'           (default: c(x1 = 0.8, x2 = -0.5))}
+#'           (default: c(x1 = 0.5, x2 = -0.45))}
 #'       }
 #'     }
 #'     \item{initial}{List specifying initial condition parameters:
 #'       \describe{
-#'         \item{offset}{Baseline initial biomarker value \eqn{\mu_0}
-#'           (default: -3.0)}
-#'         \item{covariates}{Named vector of covariate effects
-#'           \eqn{\boldsymbol{\beta}_{init}} on initial biomarker level
-#'           (default: c(x1 = 0.1, x2 = -0.1))}
-#'         \item{random_coef}{Scaling coefficient \eqn{\psi} for random effect
-#'           influence on initial conditions (default: 0.2)}
+#'         \item{offset}{Named vector with baseline initial values:
+#'           \code{c(biomarker = ..., velocity = ...)}
+#'           (default: c(biomarker = -0.5, velocity = -0.05))}
+#'         \item{covariates}{List with two named vectors for covariate effects:
+#'           \describe{
+#'             \item{biomarker}{Covariate effects on initial biomarker
+#'               (default: c(x1 = 0.08, x2 = -0.06))}
+#'             \item{velocity}{Covariate effects on initial velocity
+#'               (default: c(x1 = 0.25, x2 = -0.2))}
+#'           }}
 #'       }
 #'     }
 #'     \item{error_sd}{Standard deviation \eqn{\sigma_{\epsilon}} of the
 #'       measurement error process (default: 0.1)}
 #'     \item{n_measurements}{Number of longitudinal measurements per subject
-#'       (default: 10)}
+#'       (default: 100)}
 #'   }
 #' @param survival List specifying the survival sub-model parameters:
 #'   \describe{
@@ -53,18 +56,22 @@
 #'         \item{type}{Character string specifying the baseline hazard type
 #'           (currently only "weibull" is supported)}
 #'         \item{shape}{Weibull shape parameter \eqn{\kappa > 0}
-#'           (default: 1.0)}
+#'           (default: 2.0)}
 #'         \item{scale}{Weibull scale parameter \eqn{\lambda > 0}
-#'           (default: 8.0)}
+#'           (default: 100.0)}
 #'       }
 #'     }
 #'     \item{value}{Association parameter \eqn{\alpha_1} linking current
-#'       biomarker value to hazard (default: 0.3)}
+#'       biomarker value to hazard (default: 0.8)}
 #'     \item{slope}{Association parameter \eqn{\alpha_2} linking biomarker
-#'       velocity to hazard (default: 1.0)}
+#'       velocity (or its power) to hazard (default: 2.0)}
+#'     \item{gamma}{Power parameter for velocity contribution, where
+#'       \eqn{\gamma = 0} excludes velocity effect, \eqn{\gamma = 1} uses
+#'       linear velocity \eqn{\alpha_2\dot{m}_i(t)}, and \eqn{\gamma = 2}
+#'       uses quadratic velocity \eqn{\alpha_2[\dot{m}_i(t)]^2} (default: 1)}
 #'     \item{covariates}{Named vector of regression coefficients
 #'       \eqn{\boldsymbol{\phi}} for survival covariates
-#'       (default: c(w1 = 0.4, w2 = -0.6))}
+#'       (default: c(w1 = 0.6, w2 = -0.8))}
 #'   }
 #' @param covariates List defining the distributions of baseline covariates:
 #'   \describe{
@@ -82,7 +89,7 @@
 #' @param seed Integer seed for random number generation to ensure
 #'   reproducibility (default: 42)
 #'
-#' @return A list containing three components:
+#' @return A list containing four components:
 #' \describe{
 #'   \item{\code{longitudinal_data}}{Data frame comprising longitudinal
 #'     observations with columns:
@@ -98,7 +105,7 @@
 #'       \item \code{acceleration}: Second derivative of the biomarker
 #'         trajectory, \eqn{\ddot{m}_i(t_{ij})}
 #'       \item \code{x1}, \code{x2}:
-#'         Time-invariant covariates
+#'         Time-invariant covariates (if specified)
 #'     }
 #'   }
 #'   \item{\code{survival_data}}{Data frame containing time-to-event data
@@ -108,19 +115,45 @@
 #'       \item \code{time}: Observed event or censoring time, \eqn{T_i}
 #'       \item \code{status}: Event indicator, \eqn{\delta_i}
 #'         (1 = event observed, 0 = censored)
-#'       \item \code{b}: Realized subject-specific random effect, \eqn{b_i}
 #'       \item \code{w1}, \code{w2}:
-#'         Baseline survival covariates
+#'         Baseline survival covariates (if specified)
 #'     }
 #'   }
-#'   \item{\code{state}}{An \eqn{n \times 2} matrix containing initial states
-#'     \eqn{[m_i(0), \dot{m}_i(0)]} for each subject}
+#'   \item{\code{state}}{An \eqn{n \times 2} data frame containing
+#'     initial states \eqn{[m_i(0), \dot{m}_i(0)]} for each subject}
+#'   \item{\code{random_effects}}{An \eqn{n \times 2} matrix containing
+#'     subject-specific random effects (centered at zero) for:
+#'     \itemize{
+#'       \item \code{dyn_value}: Random effect for biomarker level term
+#'       \item \code{dyn_slope}: Random effect for velocity term
+#'     }
+#'     The matrix has attributes \code{mu} (population mean vector of length 2)
+#'     and \code{sigma} (\eqn{2 \times 2} covariance matrix). These correspond
+#'     to the random effects specified in the formula structure
+#'     \code{(biomarker + velocity | id)}. Fixed effects (\code{dyn_const}
+#'     and covariate terms) are not included as they have no between-subject
+#'     variability.}
 #' }
 #'
 #' @details
 #' The simulation framework implements a joint model comprising longitudinal
 #' and survival sub-models linked through shared random effects and
 #' trajectory-dependent associations.
+#'
+#' \subsection{Default Parameter Design}{
+#' The default parameters are calibrated to achieve the following properties:
+#' \itemize{
+#'   \item Approximately 60\% censoring rate (40\% event rate)
+#'   \item Initial biomarker difference between risk groups: ~0.2
+#'   \item Final biomarker difference between event and censored groups: ~0.7
+#'   \item Damping ratio centered at 0.4 (underdamped oscillations)
+#'   \item Significant velocity differences between patients with different
+#'         risk profiles, enabling survival prediction based on trajectory
+#'         dynamics
+#' }
+#' These settings produce realistic heterogeneity in biomarker trajectories
+#' while maintaining numerical stability for joint model estimation.
+#' }
 #'
 #' \subsection{Longitudinal Sub-model}{
 #' The biomarker trajectory \eqn{m_i(t)} for subject \eqn{i} follows a damped
@@ -140,9 +173,10 @@
 #'
 #' Initial conditions are specified as:
 #' \itemize{
-#'   \item
-#'     \eqn{m_i(0) = \mu_0 + \mathbf{X}_i^T\boldsymbol{\beta}_{init} + \psi b_i}
-#'   \item \eqn{\dot{m}_i(0) = 0} (zero initial velocity)
+#'   \item \eqn{m_i(0) = \mu_{m,0} +
+#'     \mathbf{X}_i^T\boldsymbol{\beta}_{m,init}}
+#'   \item \eqn{\dot{m}_i(0) = \mu_{v,0} +
+#'     \mathbf{X}_i^T\boldsymbol{\beta}_{v,init}}
 #' }
 #'
 #' The observed longitudinal measurements incorporate additive Gaussian noise:
@@ -153,9 +187,9 @@
 #'
 #' \subsection{Survival Sub-model}{
 #' The instantaneous hazard function incorporates both current biomarker value
-#' and velocity:
-#' \deqn{\lambda_i(t) = \lambda_0(t)\exp(\alpha_1 m_i(t) + \alpha_2\dot{m}_i(t)
-#'  + \mathbf{W}_i^T\boldsymbol{\phi} + b_i)}
+#' and velocity (or its power):
+#' \deqn{\lambda_i(t) = \lambda_0(t)\exp(\alpha_1 m_i(t) +
+#'   \alpha_2[\dot{m}_i(t)]^\gamma + \mathbf{W}_i^T\boldsymbol{\phi})}
 #' where:
 #' \itemize{
 #'   \item \eqn{\lambda_0(t)} denotes the Weibull baseline hazard:
@@ -163,64 +197,195 @@
 #'   \item \eqn{\alpha_1} quantifies the association with current biomarker
 #'     value
 #'   \item \eqn{\alpha_2} quantifies the association with biomarker velocity
+#'     (or its power)
+#'   \item \eqn{\gamma \in \{0, 1, 2\}} determines the power of velocity:
+#'     0 (no velocity effect), 1 (linear), or 2 (quadratic)
 #'   \item \eqn{\mathbf{W}_i} contains baseline covariates
 #'   \item \eqn{\boldsymbol{\phi}} represents covariate effects on survival
 #' }
 #' }
 #'
-#' \subsection{Random Effects Structure}{
-#' Subject-specific random effects \eqn{b_i \sim \mathcal{N}(0, \sigma_b^2)}
-#' induce correlation
-#' between the longitudinal and survival processes through:
-#' \itemize{
-#'   \item Initial biomarker level via \eqn{m_i(0)}
-#'   \item Hazard function via the frailty term
-#'   \item Longitudinal observations via additive shift
-#' }
+#' \subsection{Patient-Specific Dynamics}{
+#' The function models patient heterogeneity through continuous distributions
+#' of dynamics parameters \eqn{\xi_i} (damping ratio) and \eqn{T_i} (period):
+#' \deqn{\xi_i \sim \mathcal{N}(\mu_\xi, \sigma_\xi^2), \quad
+#'   T_i \sim \mathcal{N}(\mu_T, \sigma_T^2)}
+#' These are transformed to ODE parameters via:
+#' \deqn{\omega_i = 2\pi/T_i, \quad
+#'   \beta_{1,i} = -\omega_i^2, \quad
+#'   \beta_{2,i} = -2\xi_i\omega_i}
+#' The transformation uses the Delta method to preserve the correct covariance
+#' structure in the ODE parameter space.
+#'
+#' \strong{Random Effects Structure:} Only \eqn{\beta_{1,i}} (\code{dyn_value})
+#' and \eqn{\beta_{2,i}} (\code{dyn_slope}) have subject-specific random effects.
+#' The constant excitation term (\code{dyn_const}) and all covariate excitation
+#' coefficients (\code{dyn_x1}, \code{dyn_x2}, etc.) are fixed effects that take
+#' the same population mean value for all subjects, with no between-subject
+#' variability. This structure corresponds to the formula specification
+#' \code{observed ~ biomarker + velocity + x1 + x2 + (biomarker + velocity | id)}.
 #' }
 #'
 #' @examples
-#' # Generate a small dataset with default parameters
-#' sim_data <- simulate(n_subjects = 50, seed = 123)
+#' # Example 1: Simple simulation with default parameters
+#' sim_basic <- simulate(n_subjects = 50, seed = 123)
 #'
-#' # Examine the structure of generated data
-#' str(sim_data)
+#' # Explore the output structure
+#' names(sim_basic)
+#' head(sim_basic$longitudinal_data)
+#' head(sim_basic$survival_data)
 #'
-#' \dontrun{
-#' # Customized simulation with underdamped oscillator
-#' sim_data <- simulate(
-#'   n_subjects = 200,
-#'   longitudinal = list(
-#'     xi = 0.3,          # Low damping (more oscillatory)
-#'     period = 3,        # Faster oscillations
-#'     k = 1.5,           # Stronger excitation
-#'     excitation = list(
-#'       offset = 0.5,
-#'       covariates = c(x1 = 1.0, x2 = -0.3)
-#'     ),
-#'     initial = list(
-#'       offset = 0.0,    # Start at equilibrium
-#'       covariates = c(x1 = 0.5, x2 = -0.2),
-#'       random_coef = 0.5
-#'     ),
-#'     error_sd = 0.2     # Moderate measurement error
-#'   )
-#' )
+#' # Check patient-specific dynamics
+#' # Each patient has unique dynamics drawn from population distribution
+#' head(sim_basic$random_effects)
 #'
-#' # Overdamped system (no oscillations)
-#' sim_data_overdamped <- simulate(
+#' # Population parameters (mean and covariance)
+#' attr(sim_basic$random_effects, "mu")    # Mean of dynamics distribution
+#' attr(sim_basic$random_effects, "sigma") # Covariance matrix
+#'
+#' # Example 2: Heterogeneous patient dynamics
+#' # Patients differ in damping ratio (xi) and oscillation period
+#' sim_hetero <- simulate(
 #'   n_subjects = 100,
 #'   longitudinal = list(
-#'     xi = 2.0,          # Overdamped (exponential decay)
-#'     period = 10,       # Slow dynamics
-#'     k = 0.5,           # Weak excitation
+#'     xi = c(mean = 0.5, sd = 0.2),      # Mean damping ratio with variation
+#'     period = c(mean = 8, sd = 2),      # Mean period with variation
 #'     excitation = list(
-#'       offset = -1.0,
-#'       covariates = c(x1 = 0.2, x2 = 0.1)
-#'     )
-#'   )
+#'       offset = 4.0,                    # Constant external force
+#'       covariates = c(x1 = 0.8, x2 = -0.5)  # Covariate effects
+#'     ),
+#'     initial = list(
+#'       offset = c(biomarker = 3.8, velocity = -0.1),
+#'       covariates = list(
+#'         biomarker = c(x1 = 0.1, x2 = -0.1),
+#'         velocity = c(x1 = 0.1, x2 = -0.05)
+#'       )
+#'     ),
+#'     error_sd = 0.1,
+#'     n_measurements = 100
+#'   ),
+#'   covariates = list(
+#'     x1 = list(type = "normal", mean = 0, sd = 1),
+#'     x2 = list(type = "normal", mean = 0, sd = 1),
+#'     w1 = list(type = "normal", mean = 0, sd = 1),
+#'     w2 = list(type = "binary", prob = 0.5)
+#'   ),
+#'   seed = 456
 #' )
-#' }
+#'
+#' # Example 3: Nearly uniform dynamics (low variability)
+#' # Useful for testing when patient heterogeneity should be minimal
+#' sim_uniform <- simulate(
+#'   n_subjects = 50,
+#'   longitudinal = list(
+#'     xi = c(mean = 0.707, sd = 0.01),    # Very small variation
+#'     period = c(mean = 5, sd = 0.1),     # Very small variation
+#'     excitation = list(offset = 0, covariates = numeric(0)),
+#'     initial = list(
+#'       offset = c(biomarker = -2, velocity = 0),
+#'       covariates = list(biomarker = numeric(0), velocity = numeric(0))
+#'     ),
+#'     error_sd = 0.15,
+#'     n_measurements = 50
+#'   ),
+#'   seed = 789
+#' )
+#'
+#' # Verify low variability - all patients should have similar dynamics
+#' apply(sim_uniform$random_effects, 2, sd)
+#'
+#' # Example 4: Comprehensive simulation with survival outcomes
+#' sim_full <- simulate(
+#'   n_subjects = 200,
+#'   longitudinal = list(
+#'     xi = c(mean = 0.4, sd = 0.05),
+#'     period = c(mean = 8, sd = 0.3),
+#'     excitation = list(
+#'       offset = 4.0,
+#'       covariates = c(x1 = 0.8, x2 = -0.5)
+#'     ),
+#'     initial = list(
+#'       offset = c(biomarker = 3.8, velocity = -0.1),
+#'       covariates = list(
+#'         biomarker = c(x1 = 0.1, x2 = -0.1),
+#'         velocity = c(x1 = 0.1, x2 = -0.05)
+#'       )
+#'     ),
+#'     error_sd = 0.1,
+#'     n_measurements = 100
+#'   ),
+#'   survival = list(
+#'     baseline = list(type = "weibull", shape = 3.0, scale = 23),
+#'     value = 0.4,      # Effect of biomarker value on hazard
+#'     slope = 1.5,      # Effect of biomarker velocity on hazard
+#'     gamma = 1,        # Linear velocity effect
+#'     covariates = c(w1 = 0.4, w2 = -0.6)
+#'   ),
+#'   covariates = list(
+#'     x1 = list(type = "normal", mean = 0, sd = 1),
+#'     x2 = list(type = "normal", mean = 0, sd = 1),
+#'     w1 = list(type = "normal", mean = 0, sd = 1),
+#'     w2 = list(type = "binary", prob = 0.5)
+#'   ),
+#'   maxt = 10,
+#'   seed = 42
+#' )
+#'
+#' # Visualize patient-specific dynamics distribution
+#' library(ggplot2)
+#'
+#' # Recover original xi and period from dynamics parameters
+#' mu <- attr(sim_full$random_effects, "mu")
+#' dynamics_df <- as.data.frame(sim_full$random_effects)
+#' dynamics_df$omega <- sqrt(-dynamics_df$dyn_value - mu["dyn_value"])
+#' dynamics_df$xi_implied <- -(dynamics_df$dyn_slope + mu["dyn_slope"]) /
+#'   (2 * dynamics_df$omega)
+#' dynamics_df$period_implied <- 2 * pi / dynamics_df$omega
+#'
+#' # Distribution of damping ratios
+#' ggplot(dynamics_df, aes(x = xi_implied)) +
+#'   geom_histogram(bins = 30, fill = "steelblue", alpha = 0.7) +
+#'   geom_vline(xintercept = 0.4, color = "red", linetype = "dashed") +
+#'   labs(title = "Distribution of Patient Damping Ratios",
+#'        x = "Damping Ratio (xi)", y = "Count") +
+#'   theme_minimal()
+#'
+#' # Joint distribution of xi and period
+#' ggplot(dynamics_df, aes(x = period_implied, y = xi_implied)) +
+#'   geom_point(alpha = 0.5) +
+#'   geom_density_2d(color = "steelblue") +
+#'   labs(title = "Patient-Specific Dynamics",
+#'        x = "Period", y = "Damping Ratio (xi)") +
+#'   theme_minimal()
+#'
+#' # Compare trajectories for patients with different dynamics
+#' # Select patients at 10th, 50th, 90th percentiles of xi
+#' quantiles <- quantile(dynamics_df$xi_implied, probs = c(0.1, 0.5, 0.9))
+#' example_ids <- sapply(quantiles, function(q) {
+#'   which.min(abs(dynamics_df$xi_implied - q))
+#' })
+#'
+#' plot_data <- sim_full$longitudinal_data[
+#'   sim_full$longitudinal_data$id %in% example_ids,
+#' ]
+#' plot_data$xi_group <- factor(
+#'   plot_data$id,
+#'   levels = example_ids,
+#'   labels = c("Low xi (10%)", "Median xi (50%)", "High xi (90%)")
+#' )
+#'
+#' ggplot(plot_data, aes(x = time, y = biomarker, color = xi_group)) +
+#'   geom_line(linewidth = 1) +
+#'   labs(title = "Biomarker Trajectories by Damping Ratio",
+#'        x = "Time", y = "Biomarker Value",
+#'        color = "Patient Group") +
+#'   theme_minimal()
+#'
+#' # Kaplan-Meier survival curve
+#' library(survival)
+#' km_fit <- survfit(Surv(time, status) ~ 1, data = sim_full$survival_data)
+#' plot(km_fit, xlab = "Time", ylab = "Survival Probability",
+#'      main = "Kaplan-Meier Survival Curve")
 #' @concept data-simulation
 #'
 #' @importFrom stats rnorm rbinom
@@ -228,33 +393,34 @@
 #'
 #' @export
 simulate <- function(
-  n_subjects = 200,
-  shared_sd = 0.1,
+  n_subjects = 500,
   longitudinal = list(
-    xi = 0.707,
-    period = 5,
-    k = 1.0,
+    xi = c(mean = 0.4, sd = 0.1),
+    period = c(mean = 6, sd = 0.1),
     excitation = list(
       offset = 0.0,
-      covariates = c(x1 = 0.8, x2 = -0.5)
+      covariates = c(x1 = 0.5, x2 = -0.45)
     ),
     initial = list(
-      offset = -3.0,
-      covariates = c(x1 = 0.1, x2 = -0.1),
-      random_coef = 0.2
+      offset = c(biomarker = -0.5, velocity = -0.1),
+      covariates = list(
+        biomarker = c(x1 = 0.08, x2 = -0.06),
+        velocity = c(x1 = 0.25, x2 = -0.2)
+      )
     ),
     error_sd = 0.1,
-    n_measurements = 10
+    n_measurements = 100
   ),
   survival = list(
     baseline = list(
       type = "weibull",
-      shape = 1.0,
-      scale = 8.0
+      shape = 2.0,
+      scale = 15.0
     ),
-    value = 0.3,
-    slope = 1.0,
-    covariates = c(w1 = 0.4, w2 = -0.6)
+    value = 0.8,
+    slope = 2.0,
+    gamma = 1,
+    covariates = c(w1 = 0.6, w2 = -0.8)
   ),
   covariates = list(
     x1 = list(type = "normal", mean = 0, sd = 1),
@@ -271,9 +437,6 @@ simulate <- function(
       length(n_subjects) == 1 &&
       n_subjects > 0 &&
       n_subjects == round(n_subjects),
-    "shared_sd must be positive" = is.numeric(shared_sd) &&
-      length(shared_sd) == 1 &&
-      shared_sd > 0,
     "maxt must be positive" = is.numeric(maxt) && length(maxt) == 1 && maxt > 0
   )
 
@@ -288,14 +451,23 @@ simulate <- function(
   }
 
   # Validate remaining longitudinal parameters
+  # Only support mean/sd format
   stopifnot(
-    "longitudinal parameters must be numeric" = is.numeric(
-      longitudinal$xi
-    ) &&
-      is.numeric(longitudinal$period) &&
-      is.numeric(longitudinal$k),
-    "longitudinal$period must be positive" = longitudinal$period > 0,
-    "longitudinal$k must be numeric" = is.numeric(longitudinal$k),
+    "xi must have mean and sd components" = !is.null(names(longitudinal$xi)) &&
+      length(longitudinal$xi) == 2 &&
+      all(c("mean", "sd") %in% names(longitudinal$xi)),
+    "period must have mean and sd components" = !is.null(names(
+      longitudinal$period
+    )) &&
+      length(longitudinal$period) == 2 &&
+      all(c("mean", "sd") %in% names(longitudinal$period)),
+    "xi mean must be positive" = longitudinal$xi["mean"] > 0,
+    "xi sd must be non-negative" = longitudinal$xi["sd"] >= 0,
+    "period mean must be positive" = longitudinal$period["mean"] > 0,
+    "period sd must be non-negative" = longitudinal$period["sd"] >= 0
+  )
+
+  stopifnot(
     "longitudinal$error_sd must be positive" = is.numeric(
       longitudinal$error_sd
     ) &&
@@ -314,14 +486,25 @@ simulate <- function(
     ) &&
       is.vector(longitudinal$excitation$covariates),
     "longitudinal$initial must be a list" = is.list(longitudinal$initial),
-    "initial parameters must be numeric" = is.numeric(
+    "initial$offset: named vector with biomarker and velocity" = is.numeric(
       longitudinal$initial$offset
     ) &&
-      is.numeric(longitudinal$initial$random_coef),
-    "initial$covariates must be numeric vector" = is.numeric(
+      length(longitudinal$initial$offset) == 2 &&
+      all(c("biomarker", "velocity") %in% names(longitudinal$initial$offset)),
+    "initial$covariates must be a list" = is.list(
       longitudinal$initial$covariates
+    ),
+    "initial$covariates must have biomarker and velocity components" = all(
+      c("biomarker", "velocity") %in% names(longitudinal$initial$covariates)
+    ),
+    "initial$covariates$biomarker must be numeric vector" = is.numeric(
+      longitudinal$initial$covariates$biomarker
     ) &&
-      is.vector(longitudinal$initial$covariates)
+      is.vector(longitudinal$initial$covariates$biomarker),
+    "initial$covariates$velocity must be numeric vector" = is.numeric(
+      longitudinal$initial$covariates$velocity
+    ) &&
+      is.vector(longitudinal$initial$covariates$velocity)
   )
 
   # Handle empty covariates (convert numeric(0) to named numeric vector)
@@ -329,9 +512,13 @@ simulate <- function(
     longitudinal$excitation$covariates <- numeric(0)
     names(longitudinal$excitation$covariates) <- character(0)
   }
-  if (length(longitudinal$initial$covariates) == 0) {
-    longitudinal$initial$covariates <- numeric(0)
-    names(longitudinal$initial$covariates) <- character(0)
+  if (length(longitudinal$initial$covariates$biomarker) == 0) {
+    longitudinal$initial$covariates$biomarker <- numeric(0)
+    names(longitudinal$initial$covariates$biomarker) <- character(0)
+  }
+  if (length(longitudinal$initial$covariates$velocity) == 0) {
+    longitudinal$initial$covariates$velocity <- numeric(0)
+    names(longitudinal$initial$covariates$velocity) <- character(0)
   }
   if (length(survival$covariates) == 0) {
     survival$covariates <- numeric(0)
@@ -352,6 +539,7 @@ simulate <- function(
       survival$baseline$scale > 0,
     "survival coefficients must be numeric" = is.numeric(survival$value) &&
       is.numeric(survival$slope),
+    "gamma must be 0, 1, or 2" = survival$gamma %in% c(0, 1, 2),
     "survival$covariates must be numeric vector" = is.numeric(
       survival$covariates
     ) &&
@@ -384,7 +572,10 @@ simulate <- function(
 
   # Validate dimension consistency
   long_cov_names <- names(longitudinal$excitation$covariates)
-  init_cov_names <- names(longitudinal$initial$covariates)
+  init_cov_names <- unique(c(
+    names(longitudinal$initial$covariates$biomarker),
+    names(longitudinal$initial$covariates$velocity)
+  ))
 
   # Handle survival covariates - if user passes numeric(0), ignore defaults
   if (
@@ -410,61 +601,85 @@ simulate <- function(
   }
 
   set.seed(seed)
-  b <- .generate_shared_effects(n_subjects, shared_sd)
   x <- .generate_covariates(n_subjects, covariates)
+
+  # Sample patient-specific dynamics
+  dynamics <- .generate_patient_dynamics(
+    n_subjects,
+    longitudinal$xi,
+    longitudinal$period,
+    longitudinal$excitation
+  )
   x_init <- x[, c("id", init_cov_names), drop = FALSE]
   x_long <- x[, c("id", long_cov_names), drop = FALSE]
   x_surv <- x[, c("id", surv_cov_names), drop = FALSE]
+
   init <- .compute_initial_biomarker(
     x_init,
-    b,
     longitudinal$initial
   )
+
   surv <- .generate_survival_data(
     x_surv,
     x_long,
-    b,
+    dynamics,
     init,
-    longitudinal,
+    longitudinal$excitation,
     survival,
     maxt
   )
+
   long <- .generate_longitudinal_data(
     x_long,
-    b,
+    dynamics,
     init,
     surv,
-    longitudinal
+    longitudinal$n_measurements,
+    longitudinal$error_sd
   )
-
-  surv_data <- merge(surv, x_surv, by = "id")
-  surv_data <- merge(surv_data, b, by = "id")
-  names(surv_data)[names(surv_data) == "eventtime"] <- "time"
 
   long_data <- merge(long, x_long, by = "id")
-  col_order <- c(
-    "id",
-    "time",
-    "observed",
-    "biomarker",
-    "velocity",
-    "acceleration",
-    long_cov_names
-  )
-  long_data <- long_data[, col_order]
 
-  init_final <- init[, c("biomarker", "velocity")]
+  surv_data <- merge(surv, x_surv, by = "id")
+  names(surv_data)[names(surv_data) == "eventtime"] <- "time"
+
+  init_final <- as.matrix(init[, c("biomarker", "velocity")])
+
+  mu <- attr(dynamics, "mu")
+  sigma <- attr(dynamics, "sigma")
+  random_effects <- dynamics[, c("dyn_value", "dyn_slope"), drop = FALSE]
+  random_effects <- sweep(
+    random_effects,
+    2,
+    mu[c("dyn_value", "dyn_slope")],
+    "-"
+  )
+  random_effects <- as.matrix(random_effects)
+  attr(random_effects, "mu") <- mu[c("dyn_value", "dyn_slope")]
+  attr(random_effects, "sigma") <- sigma[1:2, 1:2]
 
   list(
     longitudinal_data = long_data,
     survival_data = surv_data,
-    state = init_final
+    state = init_final,
+    random_effects = random_effects
   )
 }
 
-.create_example_data <- function(n_subjects = 200, seed = 123) {
-  data <- simulate(n_subjects = n_subjects, seed = seed)
+.create_example_data <- function(
+  n_subjects = 200,
+  n_measurements = 100,
+  seed = 42
+) {
   coef_args <- formals(simulate)
+  long_params <- eval(coef_args$longitudinal)
+  long_params$n_measurements <- n_measurements
+
+  data <- simulate(
+    n_subjects = n_subjects,
+    longitudinal = long_params,
+    seed = seed
+  )
   f0 <- function(t) {
     baseline_type <- eval(coef_args$survival$baseline$type)
     res <- switch(
@@ -495,25 +710,14 @@ simulate <- function(
     f0 = f0,
     config = spline_config
   )
-
-  omega <- 2 * pi / eval(coef_args$longitudinal$period)
-  xi <- eval(coef_args$longitudinal$xi)
-  k <- eval(coef_args$longitudinal$k)
-  excitation_value <- -omega^2
-  excitation_slope <- -2 * xi * omega
-  excitation_offset <- k *
-    omega^2 *
-    eval(coef_args$longitudinal$excitation$offset)
-  excitation_coefs <- k *
-    omega^2 *
-    eval(coef_args$longitudinal$excitation$covariates)
-
-  acceleration_coef <- c(
-    excitation_value,
-    excitation_slope,
-    excitation_offset,
-    excitation_coefs
+  dynamics_params <- .compute_dynamics_parameters(
+    long_params$xi,
+    long_params$period,
+    long_params$excitation
   )
+  longitudinal_coef <- dynamics_params$mu
+  random_effect_sigma <- dynamics_params$sigma
+
   hazard_coef <- c(
     eval(coef_args$survival$value),
     eval(coef_args$survival$slope),
@@ -522,44 +726,40 @@ simulate <- function(
   parameters <- list(
     coefficients = list(
       baseline = baseline_coef,
-      acceleration = acceleration_coef,
       hazard = hazard_coef,
+      longitudinal = longitudinal_coef,
       measurement_error_sd = eval(coef_args$longitudinal$error_sd),
-      random_effect_sd = eval(coef_args$shared_sd)
+      random_effect_sigma = random_effect_sigma
     ),
     configurations = list(
       baseline = spline_config,
-      autonomous = TRUE
+      gamma = eval(coef_args$survival$gamma),
+      biomarker = list(fixed = TRUE, random = TRUE),
+      velocity = list(fixed = TRUE, random = TRUE)
     )
   )
   list(data = data, init = parameters)
 }
 
 .estimate_bspline_coef <- function(x, f0, config) {
-  # Compute B-spline basis at grid points
-  basis_matrix <- .compute_spline_basis(x, config)
+  basis_matrix <- splines2::bSpline(
+    x,
+    knots = config$knots,
+    Boundary.knots = config$boundary_knots,
+    degree = config$degree,
+    intercept = TRUE
+  )
 
-  # Compute target values
   y_target <- f0(x)
-
-  # Ensure y_target is a column vector
   if (!is.matrix(y_target)) {
     y_target <- matrix(y_target, ncol = 1)
   }
 
-  # Fit coefficients using least squares
   spline_coefficients <- solve(
     t(basis_matrix) %*% basis_matrix,
     t(basis_matrix) %*% y_target
   )
   as.vector(spline_coefficients)
-}
-
-.generate_shared_effects <- function(n_subjects, shared_sd) {
-  data.frame(
-    id = seq_len(n_subjects),
-    b = rnorm(n_subjects, mean = 0, sd = shared_sd)
-  )
 }
 
 .generate_covariates <- function(n_subjects, covariates) {
@@ -581,32 +781,108 @@ simulate <- function(
   covariate_data
 }
 
-.compute_initial_biomarker <- function(x, b, initial) {
-  value <- initial$offset +
-    as.matrix(x[, names(x) != "id"]) %*% initial$covariates +
-    initial$random_coef * b[, names(b) != "id"]
-  slope <- rep(0, nrow(x))
-  data.frame(id = x$id, biomarker = value, velocity = slope)
+.compute_dynamics_parameters <- function(xi, period, excitation) {
+  mu_period <- period["mean"]
+  sigma_period <- period["sd"]
+  mu_xi <- xi["mean"]
+  sigma_xi <- xi["sd"]
+  mu_omega <- 2 * pi / mu_period
+  sigma_omega <- (2 * pi / mu_period^2) * sigma_period
+
+  mu <- c(
+    -mu_omega^2,
+    -2 * mu_xi * mu_omega,
+    mu_omega^2 * excitation$offset,
+    mu_omega^2 * excitation$covariates
+  )
+  cov_names <- if (length(excitation$covariates) > 0) {
+    paste0("dyn_", names(excitation$covariates))
+  } else {
+    character(0)
+  }
+  names(mu) <- c("dyn_value", "dyn_slope", "dyn_const", cov_names)
+
+  jacobian <- matrix(0, nrow = 2, ncol = 2)
+  jacobian[1, 1] <- -2 * mu_omega
+  jacobian[2, 1] <- -2 * mu_xi
+  jacobian[2, 2] <- -2 * mu_omega
+
+  sigma_orig <- diag(c(sigma_omega^2, sigma_xi^2))
+  sigma <- jacobian %*% sigma_orig %*% t(jacobian)
+
+  list(mu = mu, sigma = sigma)
 }
 
-.solve_biomarker_ode <- function(times, x, init, longitudinal) {
-  .ode_deriv <- function(t, state, parms) {
-    biomarker <- state[1]
-    velocity <- state[2]
-    acceleration <- parms$offset +
-      parms$value * biomarker +
-      parms$slope * velocity
-    list(c(velocity, acceleration))
+.generate_patient_dynamics <- function(n_subjects, xi, period, excitation) {
+  params <- .compute_dynamics_parameters(xi, period, excitation)
+
+  random_effects_2d <- MASS::mvrnorm(
+    n_subjects,
+    mu = params$mu[1:2],
+    Sigma = params$sigma
+  )
+
+  if (n_subjects == 1) {
+    random_effects_2d <- matrix(random_effects_2d, nrow = 1)
   }
-  omega <- 2 * pi / longitudinal$period
-  offset <- longitudinal$k *
-    omega^2 *
-    (longitudinal$excitation$offset +
-      sum(x * longitudinal$excitation$covariates))
+
+  n_beta <- length(params$mu)
+  random_effects <- matrix(0, nrow = n_subjects, ncol = n_beta)
+  random_effects[, 1:2] <- random_effects_2d
+  random_effects[, 3:n_beta] <- matrix(
+    rep(params$mu[3:n_beta], each = n_subjects),
+    nrow = n_subjects,
+    byrow = FALSE
+  )
+  colnames(random_effects) <- names(params$mu)
+
+  dynamics <- data.frame(id = seq_len(n_subjects), random_effects)
+  attr(dynamics, "mu") <- params$mu
+  attr(dynamics, "sigma") <- params$sigma
+  dynamics
+}
+
+.compute_initial_biomarker <- function(x, initial) {
+  biomarker_offset <- initial$offset["biomarker"]
+  biomarker_covs <- initial$covariates$biomarker
+
+  if (length(biomarker_covs) > 0) {
+    x_biomarker <- x[, names(biomarker_covs), drop = FALSE]
+    biomarker_value <- biomarker_offset +
+      as.matrix(x_biomarker) %*% biomarker_covs
+  } else {
+    biomarker_value <- rep(biomarker_offset, nrow(x))
+  }
+
+  velocity_offset <- initial$offset["velocity"]
+  velocity_covs <- initial$covariates$velocity
+
+  if (length(velocity_covs) > 0) {
+    x_velocity <- x[, names(velocity_covs), drop = FALSE]
+    velocity_value <- velocity_offset +
+      as.matrix(x_velocity) %*% velocity_covs
+  } else {
+    velocity_value <- rep(velocity_offset, nrow(x))
+  }
+
+  data.frame(id = x$id, biomarker = biomarker_value, velocity = velocity_value)
+}
+
+.solve_biomarker_ode <- function(times, x, init, dynamic) {
+  .ode_deriv <- function(t, state, parms) {
+    list(c(
+      state[2],
+      parms$offset + parms$value * state[1] + parms$slope * state[2]
+    ))
+  }
+
+  x_vec <- as.numeric(x)
+  dynamic_vec <- as.numeric(dynamic)
+
   ode_parms <- list(
-    offset = offset,
-    value = -omega^2,
-    slope = -2 * longitudinal$xi * omega
+    offset = dynamic_vec[3] + sum(dynamic_vec[-(1:3)] * x_vec),
+    value = dynamic_vec[1],
+    slope = dynamic_vec[2]
   )
 
   ode_solution <- deSolve::ode(
@@ -618,7 +894,7 @@ simulate <- function(
   idx <- match(times, ode_solution[, 1])
   biomarker <- ode_solution[idx, 2]
   velocity <- ode_solution[idx, 3]
-  acceleration <- rep(offset, length(times)) +
+  acceleration <- rep(ode_parms$offset, length(times)) +
     ode_parms$value * biomarker +
     ode_parms$slope * velocity
   data.frame(
@@ -632,15 +908,13 @@ simulate <- function(
 .generate_survival_data <- function(
   x_surv,
   x_long,
-  b,
+  dynamics,
   init,
-  longitudinal,
+  excitation,
   survival,
   maxt
 ) {
-  # Define hazard function
   hazard_function <- function(t, x, betas, ...) {
-    # baseline hazard
     h0 <- switch(
       survival$baseline$type,
       weibull = {
@@ -650,69 +924,79 @@ simulate <- function(
       },
       stop(paste("Unsupported baseline hazard type:", survival$baseline$type))
     )
+
     x_surv <- x[names(survival$covariates)]
-    x_long <- x[names(longitudinal$excitation$covariates)]
+    x_long <- x[names(excitation$covariates)]
     init <- x[c("biomarker", "velocity")]
+    dyn_cols <- c("dyn_value", "dyn_slope", "dyn_const")
+    if (length(excitation$covariates) > 0) {
+      dyn_cols <- c(dyn_cols, paste0("dyn_", names(excitation$covariates)))
+    }
+    dynamic <- x[, dyn_cols, drop = FALSE]
 
-    biomarker <- .solve_biomarker_ode(
-      t,
-      x_long,
-      init,
-      longitudinal
-    )
+    biomarker <- .solve_biomarker_ode(t, x_long, init, dynamic)
 
-    linpred <- survival$value *
-      biomarker$biomarker +
-      survival$slope * biomarker$velocity +
-      sum(x_surv * survival$covariates) +
-      x$b
+    biomarker_term <- survival$value * biomarker$biomarker
+    velocity_term <- if (survival$gamma == 0) {
+      0
+    } else if (survival$gamma == 1) {
+      survival$slope * biomarker$velocity
+    } else if (survival$gamma == 2) {
+      survival$slope * biomarker$velocity^2
+    } else {
+      stop("gamma must be 0, 1, or 2")
+    }
+    covariate_term <- sum(x_surv * survival$covariates)
 
+    linpred <- biomarker_term + velocity_term + covariate_term
     h0 * exp(linpred)
   }
 
   covs <- merge(x_surv, x_long, by = "id")
-  covs <- merge(covs, b, by = "id")
   covs <- merge(covs, init, by = "id")
+  covs <- merge(covs, dynamics, by = "id")
 
-  # Generate event times
-  simsurv::simsurv(
-    hazard = hazard_function,
-    x = covs,
-    maxt = maxt
-  )
+  simsurv::simsurv(hazard = hazard_function, x = covs, maxt = maxt)
 }
 
-.generate_longitudinal_data <- function(x, b, init, surv, longitudinal) {
+.generate_longitudinal_data <- function(
+  x,
+  dynamics,
+  init,
+  surv,
+  n_measurements,
+  error_sd
+) {
   n <- nrow(surv)
   data_list <- vector("list", n)
   maxt <- max(surv$eventtime)
+
   for (i in seq_len(n)) {
     times <- seq(
       0,
       surv[i, "eventtime"],
-      by = maxt / longitudinal$n_measurements
+      by = maxt / n_measurements
     )
     if (tail(times, 1) == surv[i, "eventtime"]) {
       times <- times[-length(times)]
     }
 
+    patient_id <- surv[i, "id"]
     biomarkers <- .solve_biomarker_ode(
       times,
-      x[x$id == surv[i, "id"], names(x) != "id"],
-      init[init$id == surv[i, "id"], names(init) != "id"],
-      longitudinal
+      x[x$id == patient_id, names(x) != "id"],
+      init[init$id == patient_id, names(init) != "id"],
+      dynamics[dynamics$id == patient_id, names(dynamics) != "id"]
     )
-    biomarkers$id <- surv[i, "id"]
-    random_effect <- b[b$id == surv[i, "id"], "b"]
+    biomarkers$id <- patient_id
+
     measurement_error <- rnorm(
       nrow(biomarkers),
       mean = 0,
-      sd = longitudinal$error_sd
+      sd = error_sd
     )
 
-    biomarkers$observed <- biomarkers$biomarker +
-      random_effect +
-      measurement_error
+    biomarkers$observed <- biomarkers$biomarker + measurement_error
 
     data_list[[i]] <- biomarkers
   }

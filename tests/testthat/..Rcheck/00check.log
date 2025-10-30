@@ -1,0 +1,13 @@
+* using log directory ‘/Users/gongziyang/Desktop/JointODE/tests/testthat/..Rcheck’
+* using R version 4.5.1 (2025-06-13)
+* using platform: aarch64-apple-darwin24.4.0
+* R was compiled by
+    Apple clang version 17.0.0 (clang-1700.0.13.3)
+    GNU Fortran (Homebrew GCC 15.1.0) 15.1.0
+* running under: macOS Tahoe 26.0.1
+* using session charset: UTF-8
+* using options ‘--no-manual --no-build-vignettes’
+* checking for file ‘./DESCRIPTION’ ... ERROR
+File DESCRIPTION does not exist
+* DONE
+Status: 1 ERROR

@@ -5,14 +5,14 @@
 \title{Simulate Data from a Joint Ordinary Differential Equation Model}
 \usage{
 simulate(
-  n_subjects = 200,
-  shared_sd = 0.1,
-  longitudinal = list(xi = c(0.3, 0.707, 1, 2), period = c(5, 5, 3, 3), prob = c(0.25,
-    0.25, 0.25, 0.25), excitation = list(offset = 0, covariates = c(x1 = 0.8, x2 =
-    -0.5)), initial = list(offset = -3, covariates = c(x1 = 0.1, x2 = -0.1), random_coef
-    = 0.2), error_sd = 0.1, n_measurements = 10),
-  survival = list(baseline = list(type = "weibull", shape = 1, scale = 8), value = 0.3,
-    slope = 1, covariates = c(w1 = 0.4, w2 = -0.6)),
+  n_subjects = 500,
+  longitudinal = list(xi = c(mean = 0.4, sd = 0.1), period = c(mean = 6, sd = 0.1),
+    excitation = list(offset = 0, covariates = c(x1 = 0.5, x2 = -0.45)), initial =
+    list(offset = c(biomarker = -0.5, velocity = -0.1), covariates = list(biomarker =
+    c(x1 = 0.08, x2 = -0.06), velocity = c(x1 = 0.25, x2 = -0.2))), error_sd = 0.1,
+    n_measurements = 100),
+  survival = list(baseline = list(type = "weibull", shape = 2, scale = 15), value = 0.8,
+    slope = 2, gamma = 1, covariates = c(w1 = 0.6, w2 = -0.8)),
   covariates = list(x1 = list(type = "normal", mean = 0, sd = 1), x2 = list(type =
     "normal", mean = 0, sd = 1), w1 = list(type = "normal", mean = 0, sd = 1), w2 =
     list(type = "binary", prob = 0.5)),
@@ -22,47 +22,45 @@ simulate(
 }
 \arguments{
 \item{n_subjects}{Integer specifying the number of subjects to simulate
-(default: 200)}
-
-\item{shared_sd}{Positive scalar defining the standard deviation of the
-shared random effects, \eqn{\sigma_b} (default: 0.1)}
+(default: 500)}
 
 \item{longitudinal}{List specifying the longitudinal sub-model parameters:
 \describe{
 \item{xi}{Damping ratio \eqn{\xi} controlling the oscillation decay.
-Can be a scalar or vector of values for different patient groups.
-Values: \eqn{\xi < 1} (underdamped), \eqn{\xi = 1} (critically damped),
-\eqn{\xi > 1} (overdamped). Default: c(0.3, 0.707, 1.0, 2.0)}
+Specified as c(mean = ..., sd = ...) for population mean and
+standard deviation. Values: \eqn{\xi < 1} (underdamped),
+\eqn{\xi = 1} (critically damped), \eqn{\xi > 1} (overdamped).
+Default: c(mean = 0.4, sd = 0.05)}
 \item{period}{Natural period \eqn{T} of oscillation in time units,
 related to natural frequency as \eqn{\omega = 2\pi/T}.
-Must have same length as xi. Default: c(5, 5, 3, 3)}
-\item{prob}{Optional probability weights for sampling from
-xi/period groups. Must sum to 1 and have same length as xi/period.
-If NULL, uniform probabilities are used.
-Default: c(0.25, 0.25, 0.25, 0.25)}
+Specified as c(mean = ..., sd = ...) for population mean and
+standard deviation. Default: c(mean = 6, sd = 1.0)}
 \item{excitation}{List specifying external forcing parameters:
 \describe{
 \item{offset}{Constant excitation term \eqn{f_0} (default: 0.0)}
 \item{covariates}{Named vector of covariate effects
 \eqn{\boldsymbol{\beta}_{exc}} on excitation
-(default: c(x1 = 0.8, x2 = -0.5))}
+(default: c(x1 = 0.5, x2 = -0.45))}
 }
 }
 \item{initial}{List specifying initial condition parameters:
 \describe{
-\item{offset}{Baseline initial biomarker value \eqn{\mu_0}
-(default: -3.0)}
-\item{covariates}{Named vector of covariate effects
-\eqn{\boldsymbol{\beta}_{init}} on initial biomarker level
-(default: c(x1 = 0.1, x2 = -0.1))}
-\item{random_coef}{Scaling coefficient \eqn{\psi} for random effect
-influence on initial conditions (default: 0.2)}
+\item{offset}{Named vector with baseline initial values:
+\code{c(biomarker = ..., velocity = ...)}
+(default: c(biomarker = -0.5, velocity = -0.05))}
+\item{covariates}{List with two named vectors for covariate effects:
+\describe{
+\item{biomarker}{Covariate effects on initial biomarker
+(default: c(x1 = 0.08, x2 = -0.06))}
+\item{velocity}{Covariate effects on initial velocity
+(default: c(x1 = 0.25, x2 = -0.2))}
+}}
 }
 }
 \item{error_sd}{Standard deviation \eqn{\sigma_{\epsilon}} of the
 measurement error process (default: 0.1)}
 \item{n_measurements}{Number of longitudinal measurements per subject
-(default: 10)}
+(default: 100)}
 }}
 
 \item{survival}{List specifying the survival sub-model parameters:
@@ -72,18 +70,22 @@ measurement error process (default: 0.1)}
 \item{type}{Character string specifying the baseline hazard type
 (currently only "weibull" is supported)}
 \item{shape}{Weibull shape parameter \eqn{\kappa > 0}
-(default: 1.0)}
+(default: 2.0)}
 \item{scale}{Weibull scale parameter \eqn{\lambda > 0}
-(default: 8.0)}
+(default: 100.0)}
 }
 }
 \item{value}{Association parameter \eqn{\alpha_1} linking current
-biomarker value to hazard (default: 0.3)}
+biomarker value to hazard (default: 0.8)}
 \item{slope}{Association parameter \eqn{\alpha_2} linking biomarker
-velocity to hazard (default: 1.0)}
+velocity (or its power) to hazard (default: 2.0)}
+\item{gamma}{Power parameter for velocity contribution, where
+\eqn{\gamma = 0} excludes velocity effect, \eqn{\gamma = 1} uses
+linear velocity \eqn{\alpha_2\dot{m}_i(t)}, and \eqn{\gamma = 2}
+uses quadratic velocity \eqn{\alpha_2[\dot{m}_i(t)]^2} (default: 1)}
 \item{covariates}{Named vector of regression coefficients
 \eqn{\boldsymbol{\phi}} for survival covariates
-(default: c(w1 = 0.4, w2 = -0.6))}
+(default: c(w1 = 0.6, w2 = -0.8))}
 }}
 
 \item{covariates}{List defining the distributions of baseline covariates:
@@ -105,7 +107,7 @@ study (default: 10 time units)}
 reproducibility (default: 42)}
 }
 \value{
-A list containing three components:
+A list containing four components:
 \describe{
 \item{\code{longitudinal_data}}{Data frame comprising longitudinal
 observations with columns:
@@ -121,7 +123,7 @@ measurement error, \eqn{y_{ij}}
 \item \code{acceleration}: Second derivative of the biomarker
 trajectory, \eqn{\ddot{m}_i(t_{ij})}
 \item \code{x1}, \code{x2}:
-Time-invariant covariates
+Time-invariant covariates (if specified)
 }
 }
 \item{\code{survival_data}}{Data frame containing time-to-event data
@@ -131,13 +133,24 @@ with columns:
 \item \code{time}: Observed event or censoring time, \eqn{T_i}
 \item \code{status}: Event indicator, \eqn{\delta_i}
 (1 = event observed, 0 = censored)
-\item \code{b}: Realized subject-specific random effect, \eqn{b_i}
 \item \code{w1}, \code{w2}:
-Baseline survival covariates
+Baseline survival covariates (if specified)
 }
 }
-\item{\code{state}}{An \eqn{n \times 2} matrix containing initial states
-\eqn{[m_i(0), \dot{m}_i(0)]} for each subject}
+\item{\code{state}}{An \eqn{n \times 2} data frame containing
+initial states \eqn{[m_i(0), \dot{m}_i(0)]} for each subject}
+\item{\code{random_effects}}{An \eqn{n \times 2} matrix containing
+subject-specific random effects (centered at zero) for:
+\itemize{
+\item \code{dyn_value}: Random effect for biomarker level term
+\item \code{dyn_slope}: Random effect for velocity term
+}
+The matrix has attributes \code{mu} (population mean vector of length 2)
+and \code{sigma} (\eqn{2 \times 2} covariance matrix). These correspond
+to the random effects specified in the formula structure
+\code{(biomarker + velocity | id)}. Fixed effects (\code{dyn_const}
+and covariate terms) are not included as they have no between-subject
+variability.}
 }
 }
 \description{
@@ -153,6 +166,21 @@ natural period, and excitation amplitude.
 The simulation framework implements a joint model comprising longitudinal
 and survival sub-models linked through shared random effects and
 trajectory-dependent associations.
+
+\subsection{Default Parameter Design}{
+The default parameters are calibrated to achieve the following properties:
+\itemize{
+\item Approximately 60\\% censoring rate (40\\% event rate)
+\item Initial biomarker difference between risk groups: ~0.2
+\item Final biomarker difference between event and censored groups: ~0.7
+\item Damping ratio centered at 0.4 (underdamped oscillations)
+\item Significant velocity differences between patients with different
+risk profiles, enabling survival prediction based on trajectory
+dynamics
+}
+These settings produce realistic heterogeneity in biomarker trajectories
+while maintaining numerical stability for joint model estimation.
+}
 
 \subsection{Longitudinal Sub-model}{
 The biomarker trajectory \eqn{m_i(t)} for subject \eqn{i} follows a damped
@@ -172,9 +200,10 @@ excitation
 
 Initial conditions are specified as:
 \itemize{
-\item
-\eqn{m_i(0) = \mu_0 + \mathbf{X}_i^T\boldsymbol{\beta}_{init} + \psi b_i}
-\item \eqn{\dot{m}_i(0) = 0} (zero initial velocity)
+\item \eqn{m_i(0) = \mu_{m,0} +
+    \mathbf{X}_i^T\boldsymbol{\beta}_{m,init}}
+\item \eqn{\dot{m}_i(0) = \mu_{v,0} +
+    \mathbf{X}_i^T\boldsymbol{\beta}_{v,init}}
 }
 
 The observed longitudinal measurements incorporate additive Gaussian noise:
@@ -185,9 +214,9 @@ represents independent measurement error.
 
 \subsection{Survival Sub-model}{
 The instantaneous hazard function incorporates both current biomarker value
-and velocity:
-\deqn{\lambda_i(t) = \lambda_0(t)\exp(\alpha_1 m_i(t) + \alpha_2\dot{m}_i(t)
- + \mathbf{W}_i^T\boldsymbol{\phi} + b_i)}
+and velocity (or its power):
+\deqn{\lambda_i(t) = \lambda_0(t)\exp(\alpha_1 m_i(t) +
+  \alpha_2[\dot{m}_i(t)]^\gamma + \mathbf{W}_i^T\boldsymbol{\phi})}
 where:
 \itemize{
 \item \eqn{\lambda_0(t)} denotes the Weibull baseline hazard:
@@ -195,145 +224,194 @@ where:
 \item \eqn{\alpha_1} quantifies the association with current biomarker
 value
 \item \eqn{\alpha_2} quantifies the association with biomarker velocity
+(or its power)
+\item \eqn{\gamma \in \{0, 1, 2\}} determines the power of velocity:
+0 (no velocity effect), 1 (linear), or 2 (quadratic)
 \item \eqn{\mathbf{W}_i} contains baseline covariates
 \item \eqn{\boldsymbol{\phi}} represents covariate effects on survival
 }
 }
 
-\subsection{Random Effects Structure}{
-Subject-specific random effects \eqn{b_i \sim \mathcal{N}(0, \sigma_b^2)}
-induce correlation
-between the longitudinal and survival processes through:
-\itemize{
-\item Initial biomarker level via \eqn{m_i(0)}
-\item Hazard function via the frailty term
-\item Longitudinal observations via additive shift
-}
+\subsection{Patient-Specific Dynamics}{
+The function models patient heterogeneity through continuous distributions
+of dynamics parameters \eqn{\xi_i} (damping ratio) and \eqn{T_i} (period):
+\deqn{\xi_i \sim \mathcal{N}(\mu_\xi, \sigma_\xi^2), \quad
+  T_i \sim \mathcal{N}(\mu_T, \sigma_T^2)}
+These are transformed to ODE parameters via:
+\deqn{\omega_i = 2\pi/T_i, \quad
+  \beta_{1,i} = -\omega_i^2, \quad
+  \beta_{2,i} = -2\xi_i\omega_i}
+The transformation uses the Delta method to preserve the correct covariance
+structure in the ODE parameter space.
+
+\strong{Random Effects Structure:} Only \eqn{\beta_{1,i}} (\code{dyn_value})
+and \eqn{\beta_{2,i}} (\code{dyn_slope}) have subject-specific random effects.
+The constant excitation term (\code{dyn_const}) and all covariate excitation
+coefficients (\code{dyn_x1}, \code{dyn_x2}, etc.) are fixed effects that take
+the same population mean value for all subjects, with no between-subject
+variability. This structure corresponds to the formula specification
+\code{observed ~ biomarker + velocity + x1 + x2 + (biomarker + velocity | id)}.
 }
 }
 \examples{
-# Example 1: Generate data with heterogeneous patient dynamics
-sim_data <- simulate(
+# Example 1: Simple simulation with default parameters
+sim_basic <- simulate(n_subjects = 50, seed = 123)
+
+# Explore the output structure
+names(sim_basic)
+head(sim_basic$longitudinal_data)
+head(sim_basic$survival_data)
+
+# Check patient-specific dynamics
+# Each patient has unique dynamics drawn from population distribution
+head(sim_basic$random_effects)
+
+# Population parameters (mean and covariance)
+attr(sim_basic$random_effects, "mu")    # Mean of dynamics distribution
+attr(sim_basic$random_effects, "sigma") # Covariance matrix
+
+# Example 2: Heterogeneous patient dynamics
+# Patients differ in damping ratio (xi) and oscillation period
+sim_hetero <- simulate(
   n_subjects = 100,
   longitudinal = list(
-    xi = c(0.3, 1.0, 2.0),       # Underdamped, critical, overdamped
-    period = c(3, 5, 8),         # Different natural periods
-    prob = c(0.4, 0.4, 0.2),     # Group probabilities
+    xi = c(mean = 0.5, sd = 0.2),      # Mean damping ratio with variation
+    period = c(mean = 8, sd = 2),      # Mean period with variation
     excitation = list(
-      offset = 0,
-      covariates = c(x1 = 0.5)
+      offset = 4.0,                    # Constant external force
+      covariates = c(x1 = 0.8, x2 = -0.5)  # Covariate effects
     ),
     initial = list(
-      offset = -1,
-      covariates = c(x1 = 0.2),
-      random_coef = 0.5
+      offset = c(biomarker = 3.8, velocity = -0.1),
+      covariates = list(
+        biomarker = c(x1 = 0.1, x2 = -0.1),
+        velocity = c(x1 = 0.1, x2 = -0.05)
+      )
     ),
-    n_measurements = 10,
-    error_sd = 0.1
+    error_sd = 0.1,
+    n_measurements = 100
   ),
-  seed = 123
-)
-
-# Examine patient dynamics distribution
-dynamics_table <- table(
-  sim_data$longitudinal_data[!duplicated(sim_data$longitudinal_data$id),
-                             c("xi", "period")]
-)
-print(dynamics_table)
-
-# Example 2: Backward compatible - single dynamics for all patients
-sim_uniform <- simulate(
-  n_subjects = 50,
-  longitudinal = list(
-    xi = 0.707,                  # Single value
-    period = 5,                  # Single value
-    excitation = list(
-      offset = 0,
-      covariates = numeric(0)
-    ),
-    initial = list(
-      offset = -2,
-      covariates = numeric(0),
-      random_coef = 0.5
-    ),
-    n_measurements = 10,
-    error_sd = 0.15
+  covariates = list(
+    x1 = list(type = "normal", mean = 0, sd = 1),
+    x2 = list(type = "normal", mean = 0, sd = 1),
+    w1 = list(type = "normal", mean = 0, sd = 1),
+    w2 = list(type = "binary", prob = 0.5)
   ),
   seed = 456
 )
 
-\dontrun{
-# Example 3: Comprehensive simulation with all features
+# Example 3: Nearly uniform dynamics (low variability)
+# Useful for testing when patient heterogeneity should be minimal
+sim_uniform <- simulate(
+  n_subjects = 50,
+  longitudinal = list(
+    xi = c(mean = 0.707, sd = 0.01),    # Very small variation
+    period = c(mean = 5, sd = 0.1),     # Very small variation
+    excitation = list(offset = 0, covariates = numeric(0)),
+    initial = list(
+      offset = c(biomarker = -2, velocity = 0),
+      covariates = list(biomarker = numeric(0), velocity = numeric(0))
+    ),
+    error_sd = 0.15,
+    n_measurements = 50
+  ),
+  seed = 789
+)
+
+# Verify low variability - all patients should have similar dynamics
+apply(sim_uniform$random_effects, 2, sd)
+
+# Example 4: Comprehensive simulation with survival outcomes
 sim_full <- simulate(
   n_subjects = 200,
-  shared_sd = 0.1,
   longitudinal = list(
-    # Different dynamics groups:
-    # - Underdamped oscillatory (xi=0.3)
-    # - Critically damped (xi=1.0)
-    # - Overdamped fast decay (xi=1.5)
-    # - Overdamped slow decay (xi=2.5)
-    xi = c(0.3, 1.0, 1.5, 2.5),
-    period = c(3, 5, 4, 8),
-    prob = c(0.35, 0.30, 0.20, 0.15),
+    xi = c(mean = 0.4, sd = 0.05),
+    period = c(mean = 8, sd = 0.3),
     excitation = list(
-      offset = 0.0,
+      offset = 4.0,
       covariates = c(x1 = 0.8, x2 = -0.5)
     ),
     initial = list(
-      offset = -2.0,
-      covariates = c(x1 = 0.5, x2 = -0.3),
-      random_coef = 0.5
+      offset = c(biomarker = 3.8, velocity = -0.1),
+      covariates = list(
+        biomarker = c(x1 = 0.1, x2 = -0.1),
+        velocity = c(x1 = 0.1, x2 = -0.05)
+      )
     ),
-    n_measurements = 15,
-    error_sd = 0.15
+    error_sd = 0.1,
+    n_measurements = 100
   ),
   survival = list(
-    baseline = list(
-      type = "weibull",
-      shape = 1.5,
-      scale = 10
-    ),
-    value = 0.15,
-    slope = 0.10,
-    covariates = c(w1 = -0.7, w2 = 0.8)
+    baseline = list(type = "weibull", shape = 3.0, scale = 23),
+    value = 0.4,      # Effect of biomarker value on hazard
+    slope = 1.5,      # Effect of biomarker velocity on hazard
+    gamma = 1,        # Linear velocity effect
+    covariates = c(w1 = 0.4, w2 = -0.6)
   ),
   covariates = list(
     x1 = list(type = "normal", mean = 0, sd = 1),
-    x2 = list(type = "normal", mean = 0, sd = 0.5),
+    x2 = list(type = "normal", mean = 0, sd = 1),
     w1 = list(type = "normal", mean = 0, sd = 1),
-    w2 = list(type = "binary", prob = 0.4)
+    w2 = list(type = "binary", prob = 0.5)
   ),
-  maxt = 20,
-  seed = 12345
+  maxt = 10,
+  seed = 42
 )
 
-# Analyze the dynamics distribution
-dynamics_df <- sim_full$longitudinal_data[
-  !duplicated(sim_full$longitudinal_data$id),
-  c("id", "xi", "period")
-]
-
-# Visualize different dynamics behaviors
+# Visualize patient-specific dynamics distribution
 library(ggplot2)
-# Select one patient from each dynamics group
-example_ids <- sapply(unique(dynamics_df$xi), function(xi_val) {
-  dynamics_df$id[dynamics_df$xi == xi_val][1]
+
+# Recover original xi and period from dynamics parameters
+mu <- attr(sim_full$random_effects, "mu")
+dynamics_df <- as.data.frame(sim_full$random_effects)
+dynamics_df$omega <- sqrt(-dynamics_df$dyn_value - mu["dyn_value"])
+dynamics_df$xi_implied <- -(dynamics_df$dyn_slope + mu["dyn_slope"]) /
+  (2 * dynamics_df$omega)
+dynamics_df$period_implied <- 2 * pi / dynamics_df$omega
+
+# Distribution of damping ratios
+ggplot(dynamics_df, aes(x = xi_implied)) +
+  geom_histogram(bins = 30, fill = "steelblue", alpha = 0.7) +
+  geom_vline(xintercept = 0.4, color = "red", linetype = "dashed") +
+  labs(title = "Distribution of Patient Damping Ratios",
+       x = "Damping Ratio (xi)", y = "Count") +
+  theme_minimal()
+
+# Joint distribution of xi and period
+ggplot(dynamics_df, aes(x = period_implied, y = xi_implied)) +
+  geom_point(alpha = 0.5) +
+  geom_density_2d(color = "steelblue") +
+  labs(title = "Patient-Specific Dynamics",
+       x = "Period", y = "Damping Ratio (xi)") +
+  theme_minimal()
+
+# Compare trajectories for patients with different dynamics
+# Select patients at 10th, 50th, 90th percentiles of xi
+quantiles <- quantile(dynamics_df$xi_implied, probs = c(0.1, 0.5, 0.9))
+example_ids <- sapply(quantiles, function(q) {
+  which.min(abs(dynamics_df$xi_implied - q))
 })
 
 plot_data <- sim_full$longitudinal_data[
   sim_full$longitudinal_data$id \%in\% example_ids,
 ]
+plot_data$xi_group <- factor(
+  plot_data$id,
+  levels = example_ids,
+  labels = c("Low xi (10\%)", "Median xi (50\%)", "High xi (90\%)")
+)
 
-ggplot(plot_data, aes(x = time, y = biomarker,
-                      group = id, color = factor(xi))) +
-  geom_line() +
-  facet_wrap(~ xi, scales = "free_y",
-            labeller = labeller(xi = function(x) paste("xi =", x))) +
-  labs(title = "Different Dynamics Behaviors",
-       x = "Time", y = "Biomarker",
-       color = "Damping Ratio") +
+ggplot(plot_data, aes(x = time, y = biomarker, color = xi_group)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Biomarker Trajectories by Damping Ratio",
+       x = "Time", y = "Biomarker Value",
+       color = "Patient Group") +
   theme_minimal()
-}
+
+# Kaplan-Meier survival curve
+library(survival)
+km_fit <- survfit(Surv(time, status) ~ 1, data = sim_full$survival_data)
+plot(km_fit, xlab = "Time", ylab = "Survival Probability",
+     main = "Kaplan-Meier Survival Curve")
 }
 \concept{data-simulation}

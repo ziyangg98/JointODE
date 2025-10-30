@@ -1,10 +1,13 @@
 Package: JointODE
 Title: Joint Modeling of Longitudinal and Survival Data Using ODEs
-Version: 0.1.0
+Version: 0.1.1
 Author: Ziyang Gong
 Maintainer: Ziyang Gong <meetziyang@gmail.com>
-Authors@R:
-    person("Ziyang", "Gong", , "meetziyang@gmail.com", role = c("aut", "cre"))
+Authors@R: c(
+    person("Ziyang", "Gong", , "meetziyang@gmail.com", role = c("aut", "cre")),
+    person("Bradley M.", "Bell", role = "cph",
+           comment = "CppAD library author")
+    )
 Description: Implements joint modeling of longitudinal biomarker trajectories and
     time-to-event outcomes using ordinary differential equations (ODEs). The package
     provides tools for simultaneous analysis of biomarker dynamics and survival data,
@@ -21,13 +24,18 @@ Imports:
     parallel,
     deSolve,
     survival,
-    aghq,
-    splines2,
     simsurv,
     future,
     future.apply,
     cli,
-    numDeriv
+    numDeriv,
+    MASS,
+    splines2,
+    mvQuad,
+    Rcpp
+LinkingTo:
+    Rcpp,
+    RcppArmadillo
 Suggests:
     ggplot2,
     knitr,
@@ -40,7 +48,8 @@ Suggests:
     patchwork,
     purrr,
     gridExtra,
-    latex2exp
+    latex2exp,
+    kableExtra
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 Depends:

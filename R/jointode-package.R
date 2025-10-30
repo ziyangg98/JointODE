@@ -1,6 +1,3 @@
-#' @keywords internal
-"_PACKAGE"
-
-## usethis namespace: start
-## usethis namespace: end
+#' @useDynLib JointODE, .registration = TRUE
+#' @importFrom Rcpp sourceCpp
 NULL

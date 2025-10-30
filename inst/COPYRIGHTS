@@ -1,0 +1,36 @@
+CppAD License Information
+=========================
+
+This package includes CppAD (C++ Algorithmic Differentiation) headers.
+
+CppAD is dual-licensed under:
+  - Eclipse Public License 2.0 (EPL-2.0), OR
+  - GNU General Public License version 3 or later (GPL-3.0-or-later)
+
+This package uses CppAD under the EPL-2.0 license.
+
+CppAD Copyright Information:
+----------------------------
+Copyright (C) 2003-2024 Bradley M. Bell
+
+EPL-2.0 License Summary:
+------------------------
+The Eclipse Public License 2.0 is a business-friendly open source license
+that allows:
+  ✓ Commercial use
+  ✓ Modification
+  ✓ Distribution
+  ✓ Patent use
+
+Requirements:
+  ✓ Disclose source (of CppAD portions only)
+  ✓ Include copyright notice
+  ✓ Include license text
+  ✓ State changes (if modified)
+
+Full license text: https://www.eclipse.org/legal/epl-2.0/
+
+CppAD Website: https://coin-or.github.io/CppAD/
+CppAD GitHub:  https://github.com/coin-or/CppAD
+
+For the complete CppAD license, see the files in inst/include/cppad/

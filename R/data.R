@@ -1,0 +1,225 @@
+#' Example Dataset for Joint ODE Model
+#'
+#' A simulated dataset with 200 subjects generated using the Joint ODE
+#' Model framework, demonstrating patient heterogeneity through continuous
+#' distributions of dynamics parameters, with longitudinal biomarker
+#' measurements and survival outcomes.
+#'
+#' @format A list with two components:
+#' \describe{
+#'   \item{data}{A list containing the simulated data:
+#'     \describe{
+#'       \item{longitudinal_data}{Data frame with 17,347 longitudinal
+#'         measurements from 200 subjects:
+#'         \itemize{
+#'           \item id: Patient identifier (1-200)
+#'           \item time: Measurement time
+#'           \item biomarker: True biomarker value (ODE solution)
+#'           \item velocity: First derivative \eqn{dy/dt}
+#'           \item acceleration: Second derivative \eqn{d^2y/dt^2}
+#'           \item observed: Observed biomarker with measurement error
+#'           \item x1, x2: Longitudinal covariates (normal distribution)
+#'         }
+#'       }
+#'       \item{survival_data}{Data frame with survival outcomes (200 patients):
+#'         \itemize{
+#'           \item id: Patient identifier
+#'           \item time: Event or censoring time
+#'           \item status: Event indicator (1=event, 0=censored)
+#'           \item w1, w2: Survival covariates
+#'         }
+#'       }
+#'       \item{state}{Matrix (200 x 2) with subject-specific initial states:
+#'         \itemize{
+#'           \item biomarker: Initial biomarker value at \eqn{t=0}
+#'           \item velocity: Initial velocity \eqn{dy/dt} at \eqn{t=0}
+#'         }
+#'       }
+#'       \item{random_effects}{Matrix (200 x 2) with subject-specific
+#'         random effects for ODE dynamics:
+#'         \itemize{
+#'           \item dyn_value: Random effect for biomarker coefficient
+#'           \item dyn_slope: Random effect for velocity coefficient
+#'         }
+#'         Attributes include \code{mu} (population means) and \code{sigma}
+#'         (2x2 covariance matrix).
+#'       }
+#'     }
+#'   }
+#'   \item{init}{A list containing initial parameter values:
+#'     \describe{
+#'       \item{coefficients}{True parameter values used in simulation:
+#'         \itemize{
+#'           \item baseline: B-spline coefficients for log baseline hazard
+#'           \item longitudinal: Fixed effects for ODE dynamics
+#'             (dyn_const, dyn_value, dyn_slope, covariate effects)
+#'           \item hazard: Association parameters (value, slope) and
+#'             survival covariate effects
+#'           \item measurement_error_sd: Measurement error SD (0.1)
+#'           \item random_effect_sigma: 2x2 covariance matrix for
+#'             random effects (dyn_value, dyn_slope)
+#'         }
+#'       }
+#'       \item{configurations}{Model configuration:
+#'         \itemize{
+#'           \item baseline: B-spline configuration for baseline hazard
+#'           \item gamma: Power parameter for velocity effect (1)
+#'         }
+#'       }
+#'     }
+#'   }
+#' }
+#'
+#' @details
+#' The dataset contains 200 subjects with heterogeneous ODE dynamics.
+#' Subject-specific dynamics are characterized by random effects on
+#' dyn_value and dyn_slope parameters, which correspond to oscillation
+#' frequency and damping in the physical interpretation.
+#'
+#' Population-level dynamics parameters:
+#' \itemize{
+#'   \item Damping ratio: \eqn{\xi \approx 0.4} (mean across subjects)
+#'   \item Period: \eqn{T \approx 6} (mean across subjects)
+#' }
+#'
+#' These physical parameters are internally transformed to ODE coefficients
+#' (dyn_value, dyn_slope) with random effects following a multivariate
+#' normal distribution. The init$coefficients provide true population-level
+#' parameter values suitable for model initialization and validation.
+#'
+#' @source Generated using \code{.create_example_data(n_subjects = 200,
+#'   seed = 123)}
+#' @seealso \code{\link{JointODE}} for model fitting,
+#'   \code{\link{simulate}} for data generation
+#' @concept data-simulation
+#' @examples
+#' # Load the data
+#' data(sim)
+#'
+#' # Examine structure
+#' str(sim, max.level = 2)
+#'
+#' # Access longitudinal data
+#' head(sim$data$longitudinal_data)
+#'
+#' # Summary of survival outcomes
+#' summary(sim$data$survival_data$time)
+#' table(sim$data$survival_data$status)
+#'
+#' # Visualize patient heterogeneity
+#' library(ggplot2)
+#' library(dplyr)
+#'
+#' # Examine population-level parameters
+#' cat("Population mean dynamics:\n")
+#' print(sim$init$coefficients$longitudinal)
+#' cat("\nCovariance matrix:\n")
+#' print(sim$init$coefficients$random_effect_sigma)
+#'
+#' # Compute patient-specific xi and period from random effects
+#' # Note: A small number of patients may have invalid dynamics due to
+#' # the tail behavior of the normal approximation
+#' compute_patient_dynamics <- function(dyn_value, dyn_slope) {
+#'   omega <- sqrt(-dyn_value)
+#'   period <- 2 * pi / omega
+#'   xi <- -dyn_slope / (2 * omega)
+#'   data.frame(xi = xi, period = period)
+#' }
+#'
+#' # Get patient-specific dynamics from random effects
+#' patient_beta <- sweep(
+#'   as.matrix(sim$data$random_effects),
+#'   2,
+#'   sim$init$coefficients$longitudinal,
+#'   "+"
+#' )
+#' patient_params <- compute_patient_dynamics(
+#'   patient_beta[, 1],
+#'   patient_beta[, 2]
+#' )
+#' patient_params$id <- seq_len(nrow(patient_params))
+#'
+#' # Visualize parameter distributions in both spaces side by side
+#' library(gridExtra)
+#'
+#' # Remove patients with invalid dynamics (NaN/Inf from constraint violations)
+#' patient_params_valid <- patient_params[
+#'   is.finite(patient_params$xi) & is.finite(patient_params$period),
+#' ]
+#'
+#' # Left: Physical parameter space (xi vs period)
+#' p_physical <- ggplot(patient_params_valid, aes(x = xi, y = period)) +
+#'   geom_point(alpha = 0.5, color = "#3498DB") +
+#'   geom_density_2d(color = "#2C3E50") +
+#'   labs(
+#'     title = "Physical Parameter Space",
+#'     subtitle = sprintf(
+#'       "%d/%d patients with valid parameters",
+#'       nrow(patient_params_valid),
+#'       nrow(patient_params)
+#'     ),
+#'     x = expression("Damping Ratio ("*xi*")"),
+#'     y = "Period (T)"
+#'   ) +
+#'   theme_minimal()
+#'
+#' # Right: ODE parameter space (beta1 vs beta2)
+#' beta_df <- data.frame(
+#'   beta1 = patient_beta[, 1],
+#'   beta2 = patient_beta[, 2]
+#' )
+#'
+#' p_ode <- ggplot(beta_df, aes(x = beta1, y = beta2)) +
+#'   geom_point(alpha = 0.5, color = "#E74C3C") +
+#'   geom_density_2d(color = "#C0392B") +
+#'   annotate("point",
+#'     x = sim$init$coefficients$longitudinal[1],
+#'     y = sim$init$coefficients$longitudinal[2],
+#'     color = "darkgreen", size = 3, shape = 4, stroke = 2
+#'   ) +
+#'   labs(
+#'     title = "ODE Parameter Space",
+#'     subtitle = "Green cross: population mean",
+#'     x = expression(beta[1]~"(value coefficient)"),
+#'     y = expression(beta[2]~"(slope coefficient)")
+#'   ) +
+#'   theme_minimal()
+#'
+#' # Display side by side
+#' grid.arrange(p_physical, p_ode, ncol = 2)
+#'
+#' # Select example patients across the distribution (only valid ones)
+#' set.seed(123)
+#' example_ids <- sample(patient_params_valid$id,
+#'   min(6, nrow(patient_params_valid)))
+#' plot_data <- sim$data$longitudinal_data %>%
+#'   filter(id %in% example_ids) %>%
+#'   left_join(patient_params_valid, by = "id") %>%
+#'   mutate(label = sprintf("ID %d (xi=%.2f, T=%.1f)", id, xi, period))
+#'
+#' # Plot example trajectories
+#' p2 <- ggplot(plot_data, aes(x = time, y = biomarker)) +
+#'   geom_line(linewidth = 1) +
+#'   geom_point(aes(y = observed), alpha = 0.4, size = 0.8) +
+#'   facet_wrap(~ label, scales = "free_y", ncol = 2) +
+#'   labs(
+#'     title = "Example Patient Trajectories",
+#'     subtitle = "Lines: true values, Points: observed with error",
+#'     x = "Time",
+#'     y = "Biomarker Value"
+#'   ) +
+#'   theme_minimal()
+#' print(p2)
+#'
+#' \dontrun{
+#' # Fit a Joint ODE model using this data
+#' fit <- JointODE(
+#'   longitudinal_formula = observed ~ x1 + x2,
+#'   survival_formula = Surv(time, status) ~ w1 + w2,
+#'   longitudinal_data = sim$data$longitudinal_data,
+#'   survival_data = sim$data$survival_data,
+#'   state = as.matrix(sim$data$state)
+#' )
+#' summary(fit)
+#' }
+"sim"
