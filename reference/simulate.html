@@ -19,7 +19,7 @@ natural period, and excitation amplitude."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">JointODE</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -70,14 +70,14 @@ natural period, and excitation amplitude.</p>
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">simulate</span><span class="op">(</span></span>
-<span>  n_subjects <span class="op">=</span> <span class="fl">200</span>,</span>
-<span>  shared_sd <span class="op">=</span> <span class="fl">0.1</span>,</span>
-<span>  longitudinal <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>xi <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.3</span>, <span class="fl">0.707</span>, <span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span>, period <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">5</span>, <span class="fl">3</span>, <span class="fl">3</span><span class="op">)</span>, prob <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.25</span>,</span>
-<span>    <span class="fl">0.25</span>, <span class="fl">0.25</span>, <span class="fl">0.25</span><span class="op">)</span>, excitation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>offset <span class="op">=</span> <span class="fl">0</span>, covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.8</span>, x2 <span class="op">=</span></span>
-<span>    <span class="op">-</span><span class="fl">0.5</span><span class="op">)</span><span class="op">)</span>, initial <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>offset <span class="op">=</span> <span class="op">-</span><span class="fl">3</span>, covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.1</span>, x2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.1</span><span class="op">)</span>, random_coef</span>
-<span>    <span class="op">=</span> <span class="fl">0.2</span><span class="op">)</span>, error_sd <span class="op">=</span> <span class="fl">0.1</span>, n_measurements <span class="op">=</span> <span class="fl">10</span><span class="op">)</span>,</span>
-<span>  survival <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>baseline <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"weibull"</span>, shape <span class="op">=</span> <span class="fl">1</span>, scale <span class="op">=</span> <span class="fl">8</span><span class="op">)</span>, value <span class="op">=</span> <span class="fl">0.3</span>,</span>
-<span>    slope <span class="op">=</span> <span class="fl">1</span>, covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>w1 <span class="op">=</span> <span class="fl">0.4</span>, w2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.6</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  n_subjects <span class="op">=</span> <span class="fl">500</span>,</span>
+<span>  longitudinal <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>xi <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="fl">0.4</span>, sd <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span>, period <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="fl">6</span>, sd <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span>,</span>
+<span>    excitation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>offset <span class="op">=</span> <span class="fl">0</span>, covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.5</span>, x2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.45</span><span class="op">)</span><span class="op">)</span>, initial <span class="op">=</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>offset <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>biomarker <span class="op">=</span> <span class="op">-</span><span class="fl">0.5</span>, velocity <span class="op">=</span> <span class="op">-</span><span class="fl">0.1</span><span class="op">)</span>, covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>biomarker <span class="op">=</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.08</span>, x2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.06</span><span class="op">)</span>, velocity <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.25</span>, x2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.2</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>, error_sd <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>    n_measurements <span class="op">=</span> <span class="fl">100</span><span class="op">)</span>,</span>
+<span>  survival <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>baseline <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"weibull"</span>, shape <span class="op">=</span> <span class="fl">2</span>, scale <span class="op">=</span> <span class="fl">15</span><span class="op">)</span>, value <span class="op">=</span> <span class="fl">0.8</span>,</span>
+<span>    slope <span class="op">=</span> <span class="fl">2</span>, gamma <span class="op">=</span> <span class="fl">1</span>, covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>w1 <span class="op">=</span> <span class="fl">0.6</span>, w2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.8</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"normal"</span>, mean <span class="op">=</span> <span class="fl">0</span>, sd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>, x2 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span></span>
 <span>    <span class="st">"normal"</span>, mean <span class="op">=</span> <span class="fl">0</span>, sd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>, w1 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"normal"</span>, mean <span class="op">=</span> <span class="fl">0</span>, sd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>, w2 <span class="op">=</span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"binary"</span>, prob <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span><span class="op">)</span>,</span>
@@ -92,31 +92,22 @@ natural period, and excitation amplitude.</p>
 
 <dl><dt id="arg-n-subjects">n_subjects<a class="anchor" aria-label="anchor" href="#arg-n-subjects"></a></dt>
 <dd><p>Integer specifying the number of subjects to simulate
-(default: 200)</p></dd>
-
-
-<dt id="arg-shared-sd">shared_sd<a class="anchor" aria-label="anchor" href="#arg-shared-sd"></a></dt>
-<dd><p>Positive scalar defining the standard deviation of the
-shared random effects, \(\sigma_b\) (default: 0.1)</p></dd>
+(default: 500)</p></dd>
 
 
 <dt id="arg-longitudinal">longitudinal<a class="anchor" aria-label="anchor" href="#arg-longitudinal"></a></dt>
 <dd><p>List specifying the longitudinal sub-model parameters:</p><dl><dt>xi</dt>
 <dd><p>Damping ratio \(\xi\) controlling the oscillation decay.
-Can be a scalar or vector of values for different patient groups.
-Values: \(\xi &lt; 1\) (underdamped), \(\xi = 1\) (critically damped),
-\(\xi &gt; 1\) (overdamped). Default: c(0.3, 0.707, 1.0, 2.0)</p></dd>
+Specified as c(mean = ..., sd = ...) for population mean and
+standard deviation. Values: \(\xi &lt; 1\) (underdamped),
+\(\xi = 1\) (critically damped), \(\xi &gt; 1\) (overdamped).
+Default: c(mean = 0.4, sd = 0.05)</p></dd>
 
 <dt>period</dt>
 <dd><p>Natural period \(T\) of oscillation in time units,
 related to natural frequency as \(\omega = 2\pi/T\).
-Must have same length as xi. Default: c(5, 5, 3, 3)</p></dd>
-
-<dt>prob</dt>
-<dd><p>Optional probability weights for sampling from
-xi/period groups. Must sum to 1 and have same length as xi/period.
-If NULL, uniform probabilities are used.
-Default: c(0.25, 0.25, 0.25, 0.25)</p></dd>
+Specified as c(mean = ..., sd = ...) for population mean and
+standard deviation. Default: c(mean = 6, sd = 1.0)</p></dd>
 
 <dt>excitation</dt>
 <dd><p>List specifying external forcing parameters:</p><dl><dt>offset</dt>
@@ -125,24 +116,28 @@ Default: c(0.25, 0.25, 0.25, 0.25)</p></dd>
 <dt>covariates</dt>
 <dd><p>Named vector of covariate effects
 \(\boldsymbol{\beta}_{exc}\) on excitation
-(default: c(x1 = 0.8, x2 = -0.5))</p></dd>
+(default: c(x1 = 0.5, x2 = -0.45))</p></dd>
 
 
 </dl></dd>
 
 <dt>initial</dt>
 <dd><p>List specifying initial condition parameters:</p><dl><dt>offset</dt>
-<dd><p>Baseline initial biomarker value \(\mu_0\)
-(default: -3.0)</p></dd>
+<dd><p>Named vector with baseline initial values:
+<code>c(biomarker = ..., velocity = ...)</code>
+(default: c(biomarker = -0.5, velocity = -0.05))</p></dd>
 
 <dt>covariates</dt>
-<dd><p>Named vector of covariate effects
-\(\boldsymbol{\beta}_{init}\) on initial biomarker level
-(default: c(x1 = 0.1, x2 = -0.1))</p></dd>
+<dd><p>List with two named vectors for covariate effects:</p><dl><dt>biomarker</dt>
+<dd><p>Covariate effects on initial biomarker
+(default: c(x1 = 0.08, x2 = -0.06))</p></dd>
 
-<dt>random_coef</dt>
-<dd><p>Scaling coefficient \(\psi\) for random effect
-influence on initial conditions (default: 0.2)</p></dd>
+<dt>velocity</dt>
+<dd><p>Covariate effects on initial velocity
+(default: c(x1 = 0.25, x2 = -0.2))</p></dd>
+
+
+</dl></dd>
 
 
 </dl></dd>
@@ -153,7 +148,7 @@ measurement error process (default: 0.1)</p></dd>
 
 <dt>n_measurements</dt>
 <dd><p>Number of longitudinal measurements per subject
-(default: 10)</p></dd>
+(default: 100)</p></dd>
 
 
 </dl></dd>
@@ -167,27 +162,33 @@ measurement error process (default: 0.1)</p></dd>
 
 <dt>shape</dt>
 <dd><p>Weibull shape parameter \(\kappa &gt; 0\)
-(default: 1.0)</p></dd>
+(default: 2.0)</p></dd>
 
 <dt>scale</dt>
 <dd><p>Weibull scale parameter \(\lambda &gt; 0\)
-(default: 8.0)</p></dd>
+(default: 100.0)</p></dd>
 
 
 </dl></dd>
 
 <dt>value</dt>
 <dd><p>Association parameter \(\alpha_1\) linking current
-biomarker value to hazard (default: 0.3)</p></dd>
+biomarker value to hazard (default: 0.8)</p></dd>
 
 <dt>slope</dt>
 <dd><p>Association parameter \(\alpha_2\) linking biomarker
-velocity to hazard (default: 1.0)</p></dd>
+velocity (or its power) to hazard (default: 2.0)</p></dd>
+
+<dt>gamma</dt>
+<dd><p>Power parameter for velocity contribution, where
+\(\gamma = 0\) excludes velocity effect, \(\gamma = 1\) uses
+linear velocity \(\alpha_2\dot{m}_i(t)\), and \(\gamma = 2\)
+uses quadratic velocity \(\alpha_2[\dot{m}_i(t)]^2\) (default: 1)</p></dd>
 
 <dt>covariates</dt>
 <dd><p>Named vector of regression coefficients
 \(\boldsymbol{\phi}\) for survival covariates
-(default: c(w1 = 0.4, w2 = -0.6))</p></dd>
+(default: c(w1 = 0.6, w2 = -0.8))</p></dd>
 
 
 </dl></dd>
@@ -226,7 +227,7 @@ reproducibility (default: 42)</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A list containing three components:</p><dl><dt><code>longitudinal_data</code></dt>
+    <p>A list containing four components:</p><dl><dt><code>longitudinal_data</code></dt>
 <dd><p>Data frame comprising longitudinal
 observations with columns:</p><ul><li><p><code>id</code>: Subject identifier (integer)</p></li>
 <li><p><code>time</code>: Observation time point (numeric)</p></li>
@@ -239,7 +240,7 @@ measurement error, \(y_{ij}\)</p></li>
 <li><p><code>acceleration</code>: Second derivative of the biomarker
 trajectory, \(\ddot{m}_i(t_{ij})\)</p></li>
 <li><p><code>x1</code>, <code>x2</code>:
-Time-invariant covariates</p></li>
+Time-invariant covariates (if specified)</p></li>
 </ul></dd>
 
 <dt><code>survival_data</code></dt>
@@ -248,14 +249,24 @@ with columns:</p><ul><li><p><code>id</code>: Subject identifier</p></li>
 <li><p><code>time</code>: Observed event or censoring time, \(T_i\)</p></li>
 <li><p><code>status</code>: Event indicator, \(\delta_i\)
 (1 = event observed, 0 = censored)</p></li>
-<li><p><code>b</code>: Realized subject-specific random effect, \(b_i\)</p></li>
 <li><p><code>w1</code>, <code>w2</code>:
-Baseline survival covariates</p></li>
+Baseline survival covariates (if specified)</p></li>
 </ul></dd>
 
 <dt><code>state</code></dt>
-<dd><p>An \(n \times 2\) matrix containing initial states
-\([m_i(0), \dot{m}_i(0)]\) for each subject</p></dd>
+<dd><p>An \(n \times 2\) data frame containing
+initial states \([m_i(0), \dot{m}_i(0)]\) for each subject</p></dd>
+
+<dt><code>random_effects</code></dt>
+<dd><p>An \(n \times 2\) matrix containing
+subject-specific random effects (centered at zero) for:</p><ul><li><p><code>dyn_value</code>: Random effect for biomarker level term</p></li>
+<li><p><code>dyn_slope</code>: Random effect for velocity term</p></li>
+</ul><p>The matrix has attributes <code>mu</code> (population mean vector of length 2)
+and <code>sigma</code> (\(2 \times 2\) covariance matrix). These correspond
+to the random effects specified in the formula structure
+<code>(biomarker + velocity | id)</code>. Fixed effects (<code>dyn_const</code>
+and covariate terms) are not included as they have no between-subject
+variability.</p></dd>
 
 
 </dl></div>
@@ -264,6 +275,19 @@ Baseline survival covariates</p></li>
     <p>The simulation framework implements a joint model comprising longitudinal
 and survival sub-models linked through shared random effects and
 trajectory-dependent associations.</p>
+<div class="section">
+<h3 id="default-parameter-design">Default Parameter Design<a class="anchor" aria-label="anchor" href="#default-parameter-design"></a></h3>
+<p>The default parameters are calibrated to achieve the following properties:</p><ul><li><p>Approximately 60\<!-- % censoring rate (40\\% event rate) --></p></li>
+<li><p>Initial biomarker difference between risk groups: ~0.2</p></li>
+<li><p>Final biomarker difference between event and censored groups: ~0.7</p></li>
+<li><p>Damping ratio centered at 0.4 (underdamped oscillations)</p></li>
+<li><p>Significant velocity differences between patients with different
+risk profiles, enabling survival prediction based on trajectory
+dynamics</p></li>
+</ul><p>These settings produce realistic heterogeneity in biomarker trajectories
+while maintaining numerical stability for joint model estimation.</p>
+</div>
+
 <div class="section">
 <h3 id="longitudinal-sub-model">Longitudinal Sub-model<a class="anchor" aria-label="anchor" href="#longitudinal-sub-model"></a></h3>
 <p>The biomarker trajectory \(m_i(t)\) for subject \(i\) follows a damped
@@ -277,8 +301,10 @@ where:</p><ul><li><p>\(\omega = 2\pi/T\) is the natural angular frequency</p></l
 <li><p>\(\mathbf{X}_i\) contains time-invariant covariates</p></li>
 <li><p>\(\boldsymbol{\beta}_{exc}\) represents covariate effects on
 excitation</p></li>
-</ul><p>Initial conditions are specified as:</p><ul><li><p>\(m_i(0) = \mu_0 + \mathbf{X}_i^T\boldsymbol{\beta}_{init} + \psi b_i\)</p></li>
-<li><p>\(\dot{m}_i(0) = 0\) (zero initial velocity)</p></li>
+</ul><p>Initial conditions are specified as:</p><ul><li><p>\(m_i(0) = \mu_{m,0} +
+    \mathbf{X}_i^T\boldsymbol{\beta}_{m,init}\)</p></li>
+<li><p>\(\dot{m}_i(0) = \mu_{v,0} +
+    \mathbf{X}_i^T\boldsymbol{\beta}_{v,init}\)</p></li>
 </ul><p>The observed longitudinal measurements incorporate additive Gaussian noise:
 $$y_{ij} = m_i(t_{ij}) + b_i + \epsilon_{ij}$$
 where \(\epsilon_{ij} \sim \mathcal{N}(0, \sigma_\epsilon^2)\)
@@ -288,158 +314,239 @@ represents independent measurement error.</p>
 <div class="section">
 <h3 id="survival-sub-model">Survival Sub-model<a class="anchor" aria-label="anchor" href="#survival-sub-model"></a></h3>
 <p>The instantaneous hazard function incorporates both current biomarker value
-and velocity:
-$$\lambda_i(t) = \lambda_0(t)\exp(\alpha_1 m_i(t) + \alpha_2\dot{m}_i(t)
- + \mathbf{W}_i^T\boldsymbol{\phi} + b_i)$$
+and velocity (or its power):
+$$\lambda_i(t) = \lambda_0(t)\exp(\alpha_1 m_i(t) +
+  \alpha_2[\dot{m}_i(t)]^\gamma + \mathbf{W}_i^T\boldsymbol{\phi})$$
 where:</p><ul><li><p>\(\lambda_0(t)\) denotes the Weibull baseline hazard:
 \(\lambda_0(t) = (\kappa/\lambda)(t/\lambda)^{\kappa-1}\)</p></li>
 <li><p>\(\alpha_1\) quantifies the association with current biomarker
 value</p></li>
-<li><p>\(\alpha_2\) quantifies the association with biomarker velocity</p></li>
+<li><p>\(\alpha_2\) quantifies the association with biomarker velocity
+(or its power)</p></li>
+<li><p>\(\gamma \in \{0, 1, 2\}\) determines the power of velocity:
+0 (no velocity effect), 1 (linear), or 2 (quadratic)</p></li>
 <li><p>\(\mathbf{W}_i\) contains baseline covariates</p></li>
 <li><p>\(\boldsymbol{\phi}\) represents covariate effects on survival</p></li>
 </ul></div>
 
 <div class="section">
-<h3 id="random-effects-structure">Random Effects Structure<a class="anchor" aria-label="anchor" href="#random-effects-structure"></a></h3>
-<p>Subject-specific random effects \(b_i \sim \mathcal{N}(0, \sigma_b^2)\)
-induce correlation
-between the longitudinal and survival processes through:</p><ul><li><p>Initial biomarker level via \(m_i(0)\)</p></li>
-<li><p>Hazard function via the frailty term</p></li>
-<li><p>Longitudinal observations via additive shift</p></li>
-</ul></div>
+<h3 id="patient-specific-dynamics">Patient-Specific Dynamics<a class="anchor" aria-label="anchor" href="#patient-specific-dynamics"></a></h3>
+<p>The function models patient heterogeneity through continuous distributions
+of dynamics parameters \(\xi_i\) (damping ratio) and \(T_i\) (period):
+$$\xi_i \sim \mathcal{N}(\mu_\xi, \sigma_\xi^2), \quad
+  T_i \sim \mathcal{N}(\mu_T, \sigma_T^2)$$
+These are transformed to ODE parameters via:
+$$\omega_i = 2\pi/T_i, \quad
+  \beta_{1,i} = -\omega_i^2, \quad
+  \beta_{2,i} = -2\xi_i\omega_i$$
+The transformation uses the Delta method to preserve the correct covariance
+structure in the ODE parameter space.</p>
+<p><strong>Random Effects Structure:</strong> Only \(\beta_{1,i}\) (<code>dyn_value</code>)
+and \(\beta_{2,i}\) (<code>dyn_slope</code>) have subject-specific random effects.
+The constant excitation term (<code>dyn_const</code>) and all covariate excitation
+coefficients (<code>dyn_x1</code>, <code>dyn_x2</code>, etc.) are fixed effects that take
+the same population mean value for all subjects, with no between-subject
+variability. This structure corresponds to the formula specification
+<code>observed ~ biomarker + velocity + x1 + x2 + (biomarker + velocity | id)</code>.</p>
+</div>
 
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Example 1: Generate data with heterogeneous patient dynamics</span></span></span>
-<span class="r-in"><span><span class="va">sim_data</span> <span class="op">&lt;-</span> <span class="fu">simulate</span><span class="op">(</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Example 1: Simple simulation with default parameters</span></span></span>
+<span class="r-in"><span><span class="va">sim_basic</span> <span class="op">&lt;-</span> <span class="fu">simulate</span><span class="op">(</span>n_subjects <span class="op">=</span> <span class="fl">50</span>, seed <span class="op">=</span> <span class="fl">123</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Explore the output structure</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">sim_basic</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "longitudinal_data" "survival_data"     "state"            </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4] "random_effects"   </span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sim_basic</span><span class="op">$</span><span class="va">longitudinal_data</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   id time  biomarker    velocity acceleration   observed         x1        x2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1  0.0 -0.5600372 -0.29078261    0.4950795 -0.5607406 -0.5604756 0.2533185</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1  0.1 -0.5866769 -0.24236850    0.4727285 -0.4816559 -0.5604756 0.2533185</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  1  0.2 -0.6085903 -0.19632557    0.4477032 -0.5387563 -0.5604756 0.2533185</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  1  0.3 -0.6260290 -0.15289720    0.4205406 -0.7025991 -0.5604756 0.2533185</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  1  0.4 -0.6392633 -0.11227160    0.3917394 -0.7033609 -0.5604756 0.2533185</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  1  0.5 -0.6485810 -0.07458886    0.3617663 -0.6137664 -0.5604756 0.2533185</span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sim_basic</span><span class="op">$</span><span class="va">survival_data</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   id      time status          w1 w2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1 10.000000      0 -0.71040656  1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  2  6.540180      1  0.25688371  0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  3 10.000000      0 -0.24669188  1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  4 10.000000      0 -0.34754260  1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  5 10.000000      0 -0.95161857  1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  6  6.241667      1 -0.04502772  0</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Check patient-specific dynamics</span></span></span>
+<span class="r-in"><span><span class="co"># Each patient has unique dynamics drawn from population distribution</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sim_basic</span><span class="op">$</span><span class="va">random_effects</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         dyn_value    dyn_slope</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,] -0.004926872 -0.230027933</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,]  0.025789971  0.007625015</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]  0.026933961  0.064858722</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] -0.031166975  0.092013359</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  0.035887409 -0.096655089</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6,] -0.073971668 -0.222344650</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Population parameters (mean and covariance)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">sim_basic</span><span class="op">$</span><span class="va">random_effects</span>, <span class="st">"mu"</span><span class="op">)</span>    <span class="co"># Mean of dynamics distribution</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> dyn_value dyn_slope </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> -1.096623 -0.837758 </span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">sim_basic</span><span class="op">$</span><span class="va">random_effects</span>, <span class="st">"sigma"</span><span class="op">)</span> <span class="co"># Covariance matrix</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>              [,1]         [,2]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,] 0.0013362015 0.0005103914</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] 0.0005103914 0.0440598636</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Example 2: Heterogeneous patient dynamics</span></span></span>
+<span class="r-in"><span><span class="co"># Patients differ in damping ratio (xi) and oscillation period</span></span></span>
+<span class="r-in"><span><span class="va">sim_hetero</span> <span class="op">&lt;-</span> <span class="fu">simulate</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  n_subjects <span class="op">=</span> <span class="fl">100</span>,</span></span>
 <span class="r-in"><span>  longitudinal <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>    xi <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.3</span>, <span class="fl">1.0</span>, <span class="fl">2.0</span><span class="op">)</span>,       <span class="co"># Underdamped, critical, overdamped</span></span></span>
-<span class="r-in"><span>    period <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3</span>, <span class="fl">5</span>, <span class="fl">8</span><span class="op">)</span>,         <span class="co"># Different natural periods</span></span></span>
-<span class="r-in"><span>    prob <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.4</span>, <span class="fl">0.4</span>, <span class="fl">0.2</span><span class="op">)</span>,     <span class="co"># Group probabilities</span></span></span>
+<span class="r-in"><span>    xi <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="fl">0.5</span>, sd <span class="op">=</span> <span class="fl">0.2</span><span class="op">)</span>,      <span class="co"># Mean damping ratio with variation</span></span></span>
+<span class="r-in"><span>    period <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="fl">8</span>, sd <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>,      <span class="co"># Mean period with variation</span></span></span>
 <span class="r-in"><span>    excitation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>      offset <span class="op">=</span> <span class="fl">0</span>,</span></span>
-<span class="r-in"><span>      covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span></span>
+<span class="r-in"><span>      offset <span class="op">=</span> <span class="fl">4.0</span>,                    <span class="co"># Constant external force</span></span></span>
+<span class="r-in"><span>      covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.8</span>, x2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.5</span><span class="op">)</span>  <span class="co"># Covariate effects</span></span></span>
 <span class="r-in"><span>    <span class="op">)</span>,</span></span>
 <span class="r-in"><span>    initial <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>      offset <span class="op">=</span> <span class="op">-</span><span class="fl">1</span>,</span></span>
-<span class="r-in"><span>      covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.2</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>      random_coef <span class="op">=</span> <span class="fl">0.5</span></span></span>
+<span class="r-in"><span>      offset <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>biomarker <span class="op">=</span> <span class="fl">3.8</span>, velocity <span class="op">=</span> <span class="op">-</span><span class="fl">0.1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>      covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>        biomarker <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.1</span>, x2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>        velocity <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.1</span>, x2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.05</span><span class="op">)</span></span></span>
+<span class="r-in"><span>      <span class="op">)</span></span></span>
 <span class="r-in"><span>    <span class="op">)</span>,</span></span>
-<span class="r-in"><span>    n_measurements <span class="op">=</span> <span class="fl">10</span>,</span></span>
-<span class="r-in"><span>    error_sd <span class="op">=</span> <span class="fl">0.1</span></span></span>
-<span class="r-in"><span>  <span class="op">)</span>,</span></span>
-<span class="r-in"><span>  seed <span class="op">=</span> <span class="fl">123</span></span></span>
-<span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in simulate(n_subjects = 100, longitudinal = list(xi = c(0.3, 1,     2), period = c(3, 5, 8), prob = c(0.4, 0.4, 0.2), excitation = list(offset = 0,     covariates = c(x1 = 0.5)), initial = list(offset = -1, covariates = c(x1 = 0.2),     random_coef = 0.5), n_measurements = 10, error_sd = 0.1),     seed = 123):</span> longitudinal parameters must be numeric</span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Examine patient dynamics distribution</span></span></span>
-<span class="r-in"><span><span class="va">dynamics_table</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>  <span class="va">sim_data</span><span class="op">$</span><span class="va">longitudinal_data</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/duplicated.html" class="external-link">duplicated</a></span><span class="op">(</span><span class="va">sim_data</span><span class="op">$</span><span class="va">longitudinal_data</span><span class="op">$</span><span class="va">id</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                             <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"xi"</span>, <span class="st">"period"</span><span class="op">)</span><span class="op">]</span></span></span>
-<span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error:</span> object 'sim_data' not found</span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">dynamics_table</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error:</span> object 'dynamics_table' not found</span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Example 2: Backward compatible - single dynamics for all patients</span></span></span>
-<span class="r-in"><span><span class="va">sim_uniform</span> <span class="op">&lt;-</span> <span class="fu">simulate</span><span class="op">(</span></span></span>
-<span class="r-in"><span>  n_subjects <span class="op">=</span> <span class="fl">50</span>,</span></span>
-<span class="r-in"><span>  longitudinal <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>    xi <span class="op">=</span> <span class="fl">0.707</span>,                  <span class="co"># Single value</span></span></span>
-<span class="r-in"><span>    period <span class="op">=</span> <span class="fl">5</span>,                  <span class="co"># Single value</span></span></span>
-<span class="r-in"><span>    excitation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>      offset <span class="op">=</span> <span class="fl">0</span>,</span></span>
-<span class="r-in"><span>      covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span></span>
-<span class="r-in"><span>    <span class="op">)</span>,</span></span>
-<span class="r-in"><span>    initial <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>      offset <span class="op">=</span> <span class="op">-</span><span class="fl">2</span>,</span></span>
-<span class="r-in"><span>      covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>      random_coef <span class="op">=</span> <span class="fl">0.5</span></span></span>
-<span class="r-in"><span>    <span class="op">)</span>,</span></span>
-<span class="r-in"><span>    n_measurements <span class="op">=</span> <span class="fl">10</span>,</span></span>
-<span class="r-in"><span>    error_sd <span class="op">=</span> <span class="fl">0.15</span></span></span>
-<span class="r-in"><span>  <span class="op">)</span>,</span></span>
-<span class="r-in"><span>  seed <span class="op">=</span> <span class="fl">456</span></span></span>
-<span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in simulate(n_subjects = 50, longitudinal = list(xi = 0.707, period = 5,     excitation = list(offset = 0, covariates = numeric(0)), initial = list(offset = -2,         covariates = numeric(0), random_coef = 0.5), n_measurements = 10,     error_sd = 0.15), seed = 456):</span> longitudinal parameters must be numeric</span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
-<span class="r-in"><span><span class="co"># Example 3: Comprehensive simulation with all features</span></span></span>
-<span class="r-in"><span><span class="va">sim_full</span> <span class="op">&lt;-</span> <span class="fu">simulate</span><span class="op">(</span></span></span>
-<span class="r-in"><span>  n_subjects <span class="op">=</span> <span class="fl">200</span>,</span></span>
-<span class="r-in"><span>  shared_sd <span class="op">=</span> <span class="fl">0.1</span>,</span></span>
-<span class="r-in"><span>  longitudinal <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>    <span class="co"># Different dynamics groups:</span></span></span>
-<span class="r-in"><span>    <span class="co"># - Underdamped oscillatory (xi=0.3)</span></span></span>
-<span class="r-in"><span>    <span class="co"># - Critically damped (xi=1.0)</span></span></span>
-<span class="r-in"><span>    <span class="co"># - Overdamped fast decay (xi=1.5)</span></span></span>
-<span class="r-in"><span>    <span class="co"># - Overdamped slow decay (xi=2.5)</span></span></span>
-<span class="r-in"><span>    xi <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.3</span>, <span class="fl">1.0</span>, <span class="fl">1.5</span>, <span class="fl">2.5</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>    period <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3</span>, <span class="fl">5</span>, <span class="fl">4</span>, <span class="fl">8</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>    prob <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.35</span>, <span class="fl">0.30</span>, <span class="fl">0.20</span>, <span class="fl">0.15</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>    excitation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>      offset <span class="op">=</span> <span class="fl">0.0</span>,</span></span>
-<span class="r-in"><span>      covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.8</span>, x2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.5</span><span class="op">)</span></span></span>
-<span class="r-in"><span>    <span class="op">)</span>,</span></span>
-<span class="r-in"><span>    initial <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>      offset <span class="op">=</span> <span class="op">-</span><span class="fl">2.0</span>,</span></span>
-<span class="r-in"><span>      covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.5</span>, x2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.3</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>      random_coef <span class="op">=</span> <span class="fl">0.5</span></span></span>
-<span class="r-in"><span>    <span class="op">)</span>,</span></span>
-<span class="r-in"><span>    n_measurements <span class="op">=</span> <span class="fl">15</span>,</span></span>
-<span class="r-in"><span>    error_sd <span class="op">=</span> <span class="fl">0.15</span></span></span>
-<span class="r-in"><span>  <span class="op">)</span>,</span></span>
-<span class="r-in"><span>  survival <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>    baseline <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>      type <span class="op">=</span> <span class="st">"weibull"</span>,</span></span>
-<span class="r-in"><span>      shape <span class="op">=</span> <span class="fl">1.5</span>,</span></span>
-<span class="r-in"><span>      scale <span class="op">=</span> <span class="fl">10</span></span></span>
-<span class="r-in"><span>    <span class="op">)</span>,</span></span>
-<span class="r-in"><span>    value <span class="op">=</span> <span class="fl">0.15</span>,</span></span>
-<span class="r-in"><span>    slope <span class="op">=</span> <span class="fl">0.10</span>,</span></span>
-<span class="r-in"><span>    covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>w1 <span class="op">=</span> <span class="op">-</span><span class="fl">0.7</span>, w2 <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span></span></span>
+<span class="r-in"><span>    error_sd <span class="op">=</span> <span class="fl">0.1</span>,</span></span>
+<span class="r-in"><span>    n_measurements <span class="op">=</span> <span class="fl">100</span></span></span>
 <span class="r-in"><span>  <span class="op">)</span>,</span></span>
 <span class="r-in"><span>  covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>    x1 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"normal"</span>, mean <span class="op">=</span> <span class="fl">0</span>, sd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>    x2 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"normal"</span>, mean <span class="op">=</span> <span class="fl">0</span>, sd <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    x2 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"normal"</span>, mean <span class="op">=</span> <span class="fl">0</span>, sd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>    w1 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"normal"</span>, mean <span class="op">=</span> <span class="fl">0</span>, sd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>    w2 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"binary"</span>, prob <span class="op">=</span> <span class="fl">0.4</span><span class="op">)</span></span></span>
+<span class="r-in"><span>    w2 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"binary"</span>, prob <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="op">)</span>,</span></span>
-<span class="r-in"><span>  maxt <span class="op">=</span> <span class="fl">20</span>,</span></span>
-<span class="r-in"><span>  seed <span class="op">=</span> <span class="fl">12345</span></span></span>
+<span class="r-in"><span>  seed <span class="op">=</span> <span class="fl">456</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Analyze the dynamics distribution</span></span></span>
-<span class="r-in"><span><span class="va">dynamics_df</span> <span class="op">&lt;-</span> <span class="va">sim_full</span><span class="op">$</span><span class="va">longitudinal_data</span><span class="op">[</span></span></span>
-<span class="r-in"><span>  <span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/duplicated.html" class="external-link">duplicated</a></span><span class="op">(</span><span class="va">sim_full</span><span class="op">$</span><span class="va">longitudinal_data</span><span class="op">$</span><span class="va">id</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"id"</span>, <span class="st">"xi"</span>, <span class="st">"period"</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">]</span></span></span>
+<span class="r-in"><span><span class="co"># Example 3: Nearly uniform dynamics (low variability)</span></span></span>
+<span class="r-in"><span><span class="co"># Useful for testing when patient heterogeneity should be minimal</span></span></span>
+<span class="r-in"><span><span class="va">sim_uniform</span> <span class="op">&lt;-</span> <span class="fu">simulate</span><span class="op">(</span></span></span>
+<span class="r-in"><span>  n_subjects <span class="op">=</span> <span class="fl">50</span>,</span></span>
+<span class="r-in"><span>  longitudinal <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    xi <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="fl">0.707</span>, sd <span class="op">=</span> <span class="fl">0.01</span><span class="op">)</span>,    <span class="co"># Very small variation</span></span></span>
+<span class="r-in"><span>    period <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="fl">5</span>, sd <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span>,     <span class="co"># Very small variation</span></span></span>
+<span class="r-in"><span>    excitation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>offset <span class="op">=</span> <span class="fl">0</span>, covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    initial <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>      offset <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>biomarker <span class="op">=</span> <span class="op">-</span><span class="fl">2</span>, velocity <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>      covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>biomarker <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span>, velocity <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span>    <span class="op">)</span>,</span></span>
+<span class="r-in"><span>    error_sd <span class="op">=</span> <span class="fl">0.15</span>,</span></span>
+<span class="r-in"><span>    n_measurements <span class="op">=</span> <span class="fl">50</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span>,</span></span>
+<span class="r-in"><span>  seed <span class="op">=</span> <span class="fl">789</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Visualize different dynamics behaviors</span></span></span>
+<span class="r-in"><span><span class="co"># Verify low variability - all patients should have similar dynamics</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/apply.html" class="external-link">apply</a></span><span class="op">(</span><span class="va">sim_uniform</span><span class="op">$</span><span class="va">random_effects</span>, <span class="fl">2</span>, <span class="va">sd</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  dyn_value  dyn_slope </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 0.07220340 0.04453099 </span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Example 4: Comprehensive simulation with survival outcomes</span></span></span>
+<span class="r-in"><span><span class="va">sim_full</span> <span class="op">&lt;-</span> <span class="fu">simulate</span><span class="op">(</span></span></span>
+<span class="r-in"><span>  n_subjects <span class="op">=</span> <span class="fl">200</span>,</span></span>
+<span class="r-in"><span>  longitudinal <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    xi <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="fl">0.4</span>, sd <span class="op">=</span> <span class="fl">0.05</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    period <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="fl">8</span>, sd <span class="op">=</span> <span class="fl">0.3</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    excitation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>      offset <span class="op">=</span> <span class="fl">4.0</span>,</span></span>
+<span class="r-in"><span>      covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.8</span>, x2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.5</span><span class="op">)</span></span></span>
+<span class="r-in"><span>    <span class="op">)</span>,</span></span>
+<span class="r-in"><span>    initial <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>      offset <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>biomarker <span class="op">=</span> <span class="fl">3.8</span>, velocity <span class="op">=</span> <span class="op">-</span><span class="fl">0.1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>      covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>        biomarker <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.1</span>, x2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>        velocity <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fl">0.1</span>, x2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.05</span><span class="op">)</span></span></span>
+<span class="r-in"><span>      <span class="op">)</span></span></span>
+<span class="r-in"><span>    <span class="op">)</span>,</span></span>
+<span class="r-in"><span>    error_sd <span class="op">=</span> <span class="fl">0.1</span>,</span></span>
+<span class="r-in"><span>    n_measurements <span class="op">=</span> <span class="fl">100</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span>,</span></span>
+<span class="r-in"><span>  survival <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    baseline <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"weibull"</span>, shape <span class="op">=</span> <span class="fl">3.0</span>, scale <span class="op">=</span> <span class="fl">23</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    value <span class="op">=</span> <span class="fl">0.4</span>,      <span class="co"># Effect of biomarker value on hazard</span></span></span>
+<span class="r-in"><span>    slope <span class="op">=</span> <span class="fl">1.5</span>,      <span class="co"># Effect of biomarker velocity on hazard</span></span></span>
+<span class="r-in"><span>    gamma <span class="op">=</span> <span class="fl">1</span>,        <span class="co"># Linear velocity effect</span></span></span>
+<span class="r-in"><span>    covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>w1 <span class="op">=</span> <span class="fl">0.4</span>, w2 <span class="op">=</span> <span class="op">-</span><span class="fl">0.6</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span>,</span></span>
+<span class="r-in"><span>  covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    x1 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"normal"</span>, mean <span class="op">=</span> <span class="fl">0</span>, sd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    x2 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"normal"</span>, mean <span class="op">=</span> <span class="fl">0</span>, sd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    w1 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"normal"</span>, mean <span class="op">=</span> <span class="fl">0</span>, sd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    w2 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"binary"</span>, prob <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span>,</span></span>
+<span class="r-in"><span>  maxt <span class="op">=</span> <span class="fl">10</span>,</span></span>
+<span class="r-in"><span>  seed <span class="op">=</span> <span class="fl">42</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Visualize patient-specific dynamics distribution</span></span></span>
 <span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="co"># Select one patient from each dynamics group</span></span></span>
-<span class="r-in"><span><span class="va">example_ids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">sapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">dynamics_df</span><span class="op">$</span><span class="va">xi</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">xi_val</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span>  <span class="va">dynamics_df</span><span class="op">$</span><span class="va">id</span><span class="op">[</span><span class="va">dynamics_df</span><span class="op">$</span><span class="va">xi</span> <span class="op">==</span> <span class="va">xi_val</span><span class="op">]</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Recover original xi and period from dynamics parameters</span></span></span>
+<span class="r-in"><span><span class="va">mu</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">sim_full</span><span class="op">$</span><span class="va">random_effects</span>, <span class="st">"mu"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">dynamics_df</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="va">sim_full</span><span class="op">$</span><span class="va">random_effects</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">dynamics_df</span><span class="op">$</span><span class="va">omega</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="op">-</span><span class="va">dynamics_df</span><span class="op">$</span><span class="va">dyn_value</span> <span class="op">-</span> <span class="va">mu</span><span class="op">[</span><span class="st">"dyn_value"</span><span class="op">]</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">dynamics_df</span><span class="op">$</span><span class="va">xi_implied</span> <span class="op">&lt;-</span> <span class="op">-</span><span class="op">(</span><span class="va">dynamics_df</span><span class="op">$</span><span class="va">dyn_slope</span> <span class="op">+</span> <span class="va">mu</span><span class="op">[</span><span class="st">"dyn_slope"</span><span class="op">]</span><span class="op">)</span> <span class="op">/</span></span></span>
+<span class="r-in"><span>  <span class="op">(</span><span class="fl">2</span> <span class="op">*</span> <span class="va">dynamics_df</span><span class="op">$</span><span class="va">omega</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">dynamics_df</span><span class="op">$</span><span class="va">period_implied</span> <span class="op">&lt;-</span> <span class="fl">2</span> <span class="op">*</span> <span class="va">pi</span> <span class="op">/</span> <span class="va">dynamics_df</span><span class="op">$</span><span class="va">omega</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Distribution of damping ratios</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">dynamics_df</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">xi_implied</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_histogram.html" class="external-link">geom_histogram</a></span><span class="op">(</span>bins <span class="op">=</span> <span class="fl">30</span>, fill <span class="op">=</span> <span class="st">"steelblue"</span>, alpha <span class="op">=</span> <span class="fl">0.7</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_abline.html" class="external-link">geom_vline</a></span><span class="op">(</span>xintercept <span class="op">=</span> <span class="fl">0.4</span>, color <span class="op">=</span> <span class="st">"red"</span>, linetype <span class="op">=</span> <span class="st">"dashed"</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>title <span class="op">=</span> <span class="st">"Distribution of Patient Damping Ratios"</span>,</span></span>
+<span class="r-in"><span>       x <span class="op">=</span> <span class="st">"Damping Ratio (xi)"</span>, y <span class="op">=</span> <span class="st">"Count"</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_minimal</a></span><span class="op">(</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="simulate-1.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Joint distribution of xi and period</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">dynamics_df</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period_implied</span>, y <span class="op">=</span> <span class="va">xi_implied</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span>alpha <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_density_2d.html" class="external-link">geom_density_2d</a></span><span class="op">(</span>color <span class="op">=</span> <span class="st">"steelblue"</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>title <span class="op">=</span> <span class="st">"Patient-Specific Dynamics"</span>,</span></span>
+<span class="r-in"><span>       x <span class="op">=</span> <span class="st">"Period"</span>, y <span class="op">=</span> <span class="st">"Damping Ratio (xi)"</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_minimal</a></span><span class="op">(</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="simulate-2.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Compare trajectories for patients with different dynamics</span></span></span>
+<span class="r-in"><span><span class="co"># Select patients at 10th, 50th, 90th percentiles of xi</span></span></span>
+<span class="r-in"><span><span class="va">quantiles</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/quantile.html" class="external-link">quantile</a></span><span class="op">(</span><span class="va">dynamics_df</span><span class="op">$</span><span class="va">xi_implied</span>, probs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.1</span>, <span class="fl">0.5</span>, <span class="fl">0.9</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">example_ids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">sapply</a></span><span class="op">(</span><span class="va">quantiles</span>, <span class="kw">function</span><span class="op">(</span><span class="va">q</span><span class="op">)</span> <span class="op">{</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/which.min.html" class="external-link">which.min</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">dynamics_df</span><span class="op">$</span><span class="va">xi_implied</span> <span class="op">-</span> <span class="va">q</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="va">plot_data</span> <span class="op">&lt;-</span> <span class="va">sim_full</span><span class="op">$</span><span class="va">longitudinal_data</span><span class="op">[</span></span></span>
 <span class="r-in"><span>  <span class="va">sim_full</span><span class="op">$</span><span class="va">longitudinal_data</span><span class="op">$</span><span class="va">id</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="va">example_ids</span>,</span></span>
 <span class="r-in"><span><span class="op">]</span></span></span>
+<span class="r-in"><span><span class="va">plot_data</span><span class="op">$</span><span class="va">xi_group</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="va">plot_data</span><span class="op">$</span><span class="va">id</span>,</span></span>
+<span class="r-in"><span>  levels <span class="op">=</span> <span class="va">example_ids</span>,</span></span>
+<span class="r-in"><span>  labels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Low xi (10%)"</span>, <span class="st">"Median xi (50%)"</span>, <span class="st">"High xi (90%)"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">plot_data</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">biomarker</span>,</span></span>
-<span class="r-in"><span>                      group <span class="op">=</span> <span class="va">id</span>, color <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">xi</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="op">~</span> <span class="va">xi</span>, scales <span class="op">=</span> <span class="st">"free_y"</span>,</span></span>
-<span class="r-in"><span>            labeller <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labeller.html" class="external-link">labeller</a></span><span class="op">(</span>xi <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"xi ="</span>, <span class="va">x</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>title <span class="op">=</span> <span class="st">"Different Dynamics Behaviors"</span>,</span></span>
-<span class="r-in"><span>       x <span class="op">=</span> <span class="st">"Time"</span>, y <span class="op">=</span> <span class="st">"Biomarker"</span>,</span></span>
-<span class="r-in"><span>       color <span class="op">=</span> <span class="st">"Damping Ratio"</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">plot_data</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">biomarker</span>, color <span class="op">=</span> <span class="va">xi_group</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span>linewidth <span class="op">=</span> <span class="fl">1</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>title <span class="op">=</span> <span class="st">"Biomarker Trajectories by Damping Ratio"</span>,</span></span>
+<span class="r-in"><span>       x <span class="op">=</span> <span class="st">"Time"</span>, y <span class="op">=</span> <span class="st">"Biomarker Value"</span>,</span></span>
+<span class="r-in"><span>       color <span class="op">=</span> <span class="st">"Patient Group"</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_minimal</a></span><span class="op">(</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
+<span class="r-plt img"><img src="simulate-3.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Kaplan-Meier survival curve</span></span></span>
+<span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/therneau/survival" class="external-link">survival</a></span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">km_fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/survival/man/survfit.html" class="external-link">survfit</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/pkg/survival/man/Surv.html" class="external-link">Surv</a></span><span class="op">(</span><span class="va">time</span>, <span class="va">status</span><span class="op">)</span> <span class="op">~</span> <span class="fl">1</span>, data <span class="op">=</span> <span class="va">sim_full</span><span class="op">$</span><span class="va">survival_data</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">km_fit</span>, xlab <span class="op">=</span> <span class="st">"Time"</span>, ylab <span class="op">=</span> <span class="st">"Survival Probability"</span>,</span></span>
+<span class="r-in"><span>     main <span class="op">=</span> <span class="st">"Kaplan-Meier Survival Curve"</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="simulate-4.png" alt="" width="700" height="433"></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
