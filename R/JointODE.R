@@ -680,3 +680,134 @@ print.JointODE <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
   )
   invisible(x)
 }
+
+#' Predict Method for JointODE Objects
+#'
+#' @description
+#' Computes predicted biomarker trajectories, velocities, and accelerations
+#' for subjects based on the fitted joint ODE model. Predictions incorporate
+#' both fixed effects and subject-specific random effects.
+#'
+#' @param object An object of class \code{JointODE}
+#' @param newdata Optional data frame with new subjects. If NULL, uses the
+#'   training data from the model fit.
+#' @param times Optional time points for prediction. Can be:
+#'   \itemize{
+#'     \item A numeric vector for the same times across all subjects
+#'     \item A named list with subject-specific time vectors
+#'     \item NULL to use observation times from the data (default)
+#'   }
+#' @param parallel Logical flag for parallel computation (default: FALSE)
+#' @param n_cores Number of cores for parallel processing. If 0, automatically
+#'   detects available cores (default: 0)
+#' @param ... Additional arguments (currently unused)
+#'
+#' @return A data.frame with columns:
+#'   \describe{
+#'     \item{\code{id}}{Subject identifier}
+#'     \item{\code{time}}{Time points for predictions}
+#'     \item{\code{cumhaz}}{Predicted cumulative hazard at each time point}
+#'     \item{\code{survival}}{Predicted survival probability, computed as
+#'       \eqn{S(t) = \exp(-\text{cumhaz})}}
+#'     \item{\code{biomarker}}{Predicted biomarker values}
+#'     \item{\code{velocity}}{Predicted velocity (first derivative)}
+#'     \item{\code{acceleration}}{Predicted acceleration (second derivative)}
+#'   }
+#'
+#' @concept model-prediction
+#' @export
+predict.JointODE <- function(
+  object,
+  newdata = NULL,
+  times = NULL,
+  parallel = FALSE,
+  n_cores = 0,
+  ...
+) {
+  if (!is.null(newdata)) {
+    stop("newdata not yet supported")
+  }
+
+  parameters <- object$parameters
+  data_list <- object$data
+
+  # Handle both old (matrix) and new (list) random effects format
+  random_effects <- if (is.list(object$random_effects) &&
+                        !is.null(object$random_effects$estimates)) {
+    object$random_effects$estimates
+  } else {
+    object$random_effects
+  }
+
+  # Prepare prediction data for all subjects
+  pred_data_list <- lapply(seq_along(data_list), function(i) {
+    subj <- data_list[[i]]
+    subj_id <- names(data_list)[i]
+
+    pred_times <- if (!is.null(times)) {
+      time_vec <- if (is.list(times)) {
+        if (!is.null(times[[subj_id]])) {
+          times[[subj_id]]
+        } else {
+          subj$longitudinal$times
+        }
+      } else {
+        times
+      }
+      sort(unique(time_vec))
+    } else {
+      subj$longitudinal$times
+    }
+
+    if (length(pred_times) == 0) {
+      return(NULL)
+    }
+
+    list(
+      id = subj$id,
+      time = subj$time,
+      status = subj$status,
+      covariates = subj$covariates,
+      initial_state = subj$initial_state,
+      longitudinal = list(
+        times = pred_times,
+        measurements = rep(0, length(pred_times)),
+        covariates = list(
+          fixed = subj$longitudinal$covariates$fixed,
+          random = subj$longitudinal$covariates$random
+        )
+      )
+    )
+  })
+
+  # Remove NULL entries
+  valid_idx <- !sapply(pred_data_list, is.null)
+  pred_data_list <- pred_data_list[valid_idx]
+  valid_random_effects <- random_effects[valid_idx, , drop = FALSE]
+  valid_ids <- names(data_list)[valid_idx]
+
+  # Solve ODE for all subjects at once
+  ode_solutions <- .solve_batch_ode_cppad(
+    data_list = pred_data_list,
+    random_effects = valid_random_effects,
+    parameters = parameters
+  )
+
+  # Combine results
+  results <- lapply(seq_along(ode_solutions), function(i) {
+    data.frame(
+      id = valid_ids[i],
+      time = ode_solutions[[i]]$times,
+      cumhaz = ode_solutions[[i]]$cum_hazard,
+      survival = exp(-ode_solutions[[i]]$cum_hazard),
+      biomarker = ode_solutions[[i]]$biomarker,
+      velocity = ode_solutions[[i]]$velocity,
+      acceleration = ode_solutions[[i]]$acceleration,
+      stringsAsFactors = FALSE
+    )
+  })
+
+  result_df <- do.call(rbind, results)
+  rownames(result_df) <- NULL
+  result_df
+}

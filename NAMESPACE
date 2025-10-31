@@ -2,6 +2,7 @@
 
 S3method(coef,JointODE)
 S3method(logLik,JointODE)
+S3method(predict,JointODE)
 S3method(predict,MarginalODE)
 S3method(print,JointODE)
 S3method(print,adjoint)
