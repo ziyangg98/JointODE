@@ -111,32 +111,32 @@ summary(fit)
 #> Number of Subjects: 200
 #>
 #>        AIC        BIC     logLik
-#> -30993.374 -30901.021  15524.687
+#> -30994.014 -30901.661  15525.007
 #>
 #> Coefficients:
 #> Longitudinal Process: Second-Order ODE Model
 #>               Estimate Std. Error  z value Pr(>|z|)
-#> biomarker   -1.0960873  0.0058436 -187.570   <2e-16 ***
-#> velocity    -0.8554664  0.0162565  -52.623   <2e-16 ***
-#> (Intercept)  0.0007733  0.0014363    0.538     0.59
-#> x1           0.5472104  0.0030429  179.830   <2e-16 ***
-#> x2          -0.4926277  0.0028715 -171.558   <2e-16 ***
+#> biomarker   -1.0967768  0.0058437 -187.685   <2e-16 ***
+#> velocity    -0.8517084  0.0162302  -52.477   <2e-16 ***
+#> (Intercept)  0.0007915  0.0014368    0.551    0.582
+#> x1           0.5471043  0.0030429  179.797   <2e-16 ***
+#> x2          -0.4925065  0.0028715 -171.515   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> ODE System Characteristics:
 #>                    Estimate Std. Error z value Pr(>|z|)
-#> T (period)          6.00146    0.01600  375.14   <2e-16 ***
-#> xi (damping ratio)  0.40856    0.00754   54.19   <2e-16 ***
+#> T (period)         5.999579   0.015983  375.37   <2e-16 ***
+#> xi (damping ratio) 0.406632   0.007524   54.04   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Survival Process: Proportional Hazards Model
 #>         Estimate Std. Error z value Pr(>|z|)
 #> alpha_1   0.7229     0.1886   3.833 0.000127 ***
-#> alpha_2   2.0048     0.7790   2.573 0.010070 *
+#> alpha_2   2.0056     0.7790   2.575 0.010038 *
 #> w1        0.6870     0.1245   5.518 3.43e-08 ***
-#> w2       -1.3419     0.2860  -4.692 2.71e-06 ***
+#> w2       -1.3418     0.2860  -4.692 2.71e-06 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
@@ -147,12 +147,12 @@ summary(fit)
 #> Measurement Error SD: 0.099867
 #> Random Effect Covariance Matrix:
 #>          [,1]     [,2]
-#> [1,] 0.001591 0.002166
-#> [2,] 0.002166 0.041917
+#> [1,] 0.001594 0.002178
+#> [2,] 0.002178 0.041715
 #>
 #> Model Diagnostics:
 #> C-index (Concordance): 0.673
-#> Convergence: EM algorithm converged after 15 iterations
+#> Convergence: EM algorithm converged after 35 iterations
 ```
 
 The formula specifies: - **ODE terms**: `biomarker` and `velocity` are

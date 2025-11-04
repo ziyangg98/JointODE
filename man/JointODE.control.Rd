@@ -6,7 +6,7 @@
 \usage{
 JointODE.control(
   maxit = 200,
-  atol = 0.001,
+  atol = 1e-04,
   rtol = 1e-05,
   verbose = FALSE,
   parallel = FALSE,
@@ -22,7 +22,7 @@ JointODE.control(
 \item{atol}{Absolute tolerance for parameter convergence. The EM algorithm
 converges when the maximum absolute change in any parameter (including
 variance parameters) is less than this value:
-max(|theta_new - theta_old|) < atol (default: 5e-4)}
+max(|theta_new - theta_old|) < atol (default: 1e-4)}
 
 \item{rtol}{Relative tolerance for log-likelihood convergence. The EM
 algorithm converges when the relative change in log-likelihood is less
@@ -57,7 +57,7 @@ process a list to fill in missing values with defaults.
 control <- JointODE.control()
 
 # Custom settings for faster exploration
-control <- JointODE.control(maxit = 30, atol = 1e-3, rtol = 1e-3)
+control <- JointODE.control(maxit = 30, atol = 1e-4, rtol = 1e-4)
 
 # Verbose output for debugging
 control <- JointODE.control(verbose = TRUE)

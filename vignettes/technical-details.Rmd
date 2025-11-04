@@ -170,25 +170,13 @@ where $N = \sum_{i=1}^n n_i$ and $\tilde{w}_{ik}$ are the subject-specific norma
 
 ## Inference
 
-### Standard Errors via Louis' Method
+### Standard Errors via SEM
 
-Standard errors for model parameters are computed using **Louis' method**, which decomposes the observed information matrix into complete-data and missing information components:
+Standard errors are computed using the **Supplemented EM (SEM) algorithm**. Let $M(\boldsymbol{\theta})$ denote the EM operator mapping $\boldsymbol{\theta}$ to $\boldsymbol{\theta}^{(t+1)}$. At convergence $M(\hat{\boldsymbol{\theta}}) = \hat{\boldsymbol{\theta}}$, the observed information matrix is:
 
-$$\mathcal{I}(\boldsymbol{\theta}) = \mathcal{I}_c(\boldsymbol{\theta}) - \mathcal{I}_m(\boldsymbol{\theta})$$
+$$\mathcal{I}(\hat{\boldsymbol{\theta}}) = \mathcal{I}_c(\hat{\boldsymbol{\theta}}) \left[\mathbf{I} - \mathbf{D}M(\hat{\boldsymbol{\theta}})^{\top}\right]^{-1}$$
 
-**Complete-data information** is the negative Hessian of $Q(\boldsymbol{\theta})$:
-
-$$\mathcal{I}_c(\boldsymbol{\theta}) = -\nabla^2 Q(\boldsymbol{\theta}) = -\sum_{i=1}^n \sum_{k=1}^{K_i} w_{ik} \nabla^2 \ell_i(\mathbf{b}_{ik}; \boldsymbol{\theta})$$
-
-**Missing information** captures the variability of the complete-data score with respect to the posterior distribution of random effects:
-
-$$\mathcal{I}_m(\boldsymbol{\theta}) = \sum_{i=1}^n \text{Var}_{\mathbf{b}_i | \mathcal{O}_i}\left[\nabla \ell_i(\mathbf{b}_i; \boldsymbol{\theta})\right]$$
-
-Using the quadrature approximation, the missing information for subject $i$ is:
-
-$$\mathcal{I}_{m,i}(\boldsymbol{\theta}) = \sum_{k=1}^{K_i} w_{ik} \mathbf{S}_{ik} \mathbf{S}_{ik}^{\top} - \bar{\mathbf{S}}_i \bar{\mathbf{S}}_i^{\top}$$
-
-where $\mathbf{S}_{ik} = \nabla \ell_i(\mathbf{b}_{ik}; \boldsymbol{\theta})$ is the complete-data score at quadrature node $k$, and $\bar{\mathbf{S}}_i = \sum_{k=1}^{K_i} w_{ik} \mathbf{S}_{ik}$ is the weighted mean score.
+where $\mathcal{I}_c(\boldsymbol{\theta}) = -\nabla^2 Q(\boldsymbol{\theta})$ is the complete-data information, and $\mathbf{D}M(\hat{\boldsymbol{\theta}})$ is the Jacobian of the EM mapping computed numerically via finite differences. The variance-covariance matrix is $\text{Var}(\hat{\boldsymbol{\theta}}) = \mathcal{I}(\hat{\boldsymbol{\theta}})^{-1}$.
 
 ### Dynamic Parameters
 

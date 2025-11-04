@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cppad/cppad.hpp>
-#include <cppad/utility/runge_45.hpp>
 #include <vector>
 
 using namespace Rcpp;
