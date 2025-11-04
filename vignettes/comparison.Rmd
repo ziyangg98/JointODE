@@ -317,7 +317,7 @@ This section provides R code for fitting the comparison models using the `sim` d
 
 ### Data Preparation
 
-```{r model-implementation}
+```{r model-implementation, eval=FALSE}
 # Prepare data format for JSM package
 jsm_data <- dataPreprocess(
   long = sim$data$longitudinal_data %>% rename(ID = id),
@@ -337,6 +337,21 @@ jsm_data <- dataPreprocess(
     ID, obstime, observed, biomarker, velocity, acceleration,
     x1, x2, w1, w2, start, stop, event
   )
+
+# --------------------------------------------
+# Model 1: JointODE
+#--------------------------------------------
+longitudinal_data <- sim$data$longitudinal_data[
+  , c("id", "time", "observed", "x1", "x2")
+]
+fit <- JointODE(
+  longitudinal_formula = observed ~ biomarker + velocity + x1 + x2 +
+    (biomarker + velocity | id),
+  survival_formula = Surv(time, status) ~ w1 + w2,
+  longitudinal_data = longitudinal_data,
+  survival_data = sim$data$survival_data,
+  state = as.matrix(sim$data$state)
+)
 
 #--------------------------------------------
 # Model 2: Traditional Joint Model (JSM)
