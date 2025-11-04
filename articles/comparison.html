@@ -303,6 +303,21 @@ the <code>sim</code> dataset.</p>
 <span>    <span class="va">x1</span>, <span class="va">x2</span>, <span class="va">w1</span>, <span class="va">w2</span>, <span class="va">start</span>, <span class="va">stop</span>, <span class="va">event</span></span>
 <span>  <span class="op">)</span></span>
 <span></span>
+<span><span class="co"># --------------------------------------------</span></span>
+<span><span class="co"># Model 1: JointODE</span></span>
+<span><span class="co">#--------------------------------------------</span></span>
+<span><span class="va">longitudinal_data</span> <span class="op">&lt;-</span> <span class="va">sim</span><span class="op">$</span><span class="va">data</span><span class="op">$</span><span class="va">longitudinal_data</span><span class="op">[</span></span>
+<span>  , <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"id"</span>, <span class="st">"time"</span>, <span class="st">"observed"</span>, <span class="st">"x1"</span>, <span class="st">"x2"</span><span class="op">)</span></span>
+<span><span class="op">]</span></span>
+<span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/JointODE.html">JointODE</a></span><span class="op">(</span></span>
+<span>  longitudinal_formula <span class="op">=</span> <span class="va">observed</span> <span class="op">~</span> <span class="va">biomarker</span> <span class="op">+</span> <span class="va">velocity</span> <span class="op">+</span> <span class="va">x1</span> <span class="op">+</span> <span class="va">x2</span> <span class="op">+</span></span>
+<span>    <span class="op">(</span><span class="va">biomarker</span> <span class="op">+</span> <span class="va">velocity</span> <span class="op">|</span> <span class="va">id</span><span class="op">)</span>,</span>
+<span>  survival_formula <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/pkg/survival/man/Surv.html" class="external-link">Surv</a></span><span class="op">(</span><span class="va">time</span>, <span class="va">status</span><span class="op">)</span> <span class="op">~</span> <span class="va">w1</span> <span class="op">+</span> <span class="va">w2</span>,</span>
+<span>  longitudinal_data <span class="op">=</span> <span class="va">longitudinal_data</span>,</span>
+<span>  survival_data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">data</span><span class="op">$</span><span class="va">survival_data</span>,</span>
+<span>  state <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">sim</span><span class="op">$</span><span class="va">data</span><span class="op">$</span><span class="va">state</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span></span>
 <span><span class="co">#--------------------------------------------</span></span>
 <span><span class="co"># Model 2: Traditional Joint Model (JSM)</span></span>
 <span><span class="co">#--------------------------------------------</span></span>
@@ -326,86 +341,8 @@ the <code>sim</code> dataset.</p>
 <span>  data <span class="op">=</span> <span class="va">jsm_data</span>,</span>
 <span>  timeVarY <span class="op">=</span> <span class="st">"obstime"</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt; Running jmodelTM(), may take some time to finish.</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit_jsm</span><span class="op">)</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Call:</span></span>
-<span><span class="co">#&gt; jmodelTM(fitLME = fit_lme, fitCOX = fit_cox, data = jsm_data, </span></span>
-<span><span class="co">#&gt;     timeVarY = "obstime") </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Data Descriptives:</span></span>
-<span><span class="co">#&gt; Longitudinal Process     Survival Process</span></span>
-<span><span class="co">#&gt; Number of Observations: 17350    Number of Events: 61 (30.5%)</span></span>
-<span><span class="co">#&gt; Number of Groups: 200 </span></span>
-<span><span class="co">#&gt;       AIC       BIC  logLik</span></span>
-<span><span class="co">#&gt;  -26377.6 -26301.74 13211.8</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Coefficients:</span></span>
-<span><span class="co">#&gt; Longitudinal Process: Linear mixed-effects model</span></span>
-<span><span class="co">#&gt;                                                      Estimate     StdErr</span></span>
-<span><span class="co">#&gt; (Intercept)                                        -0.5495484  0.0046777</span></span>
-<span><span class="co">#&gt; x1                                                  0.0374771  0.0048252</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1     0.1336705  0.0080203</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2     0.9827604  0.0056276</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3     0.2714365  0.0079623</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4     0.6593548  0.0067972</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5     0.5274467  0.0071195</span></span>
-<span><span class="co">#&gt; x2                                                 -0.0197927  0.0049656</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))1  0.4709302  0.0082757</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))2  0.7118344  0.0058165</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))3  0.2314254  0.0081830</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))4  0.5904711  0.0069970</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))5  0.4288224  0.0073917</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1:x2 -0.3916342  0.0085176</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2:x2 -0.6507863  0.0059480</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3:x2 -0.2527886  0.0083878</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4:x2 -0.5216500  0.0071064</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5:x2 -0.4031163  0.0075044</span></span>
-<span><span class="co">#&gt;                                                      z.value   p.value    </span></span>
-<span><span class="co">#&gt; (Intercept)                                        -117.4835 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; x1                                                    7.7669 8.044e-15 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1      16.6666 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2     174.6322 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3      34.0900 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4      97.0034 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5      74.0845 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; x2                                                   -3.9860 6.721e-05 ***</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))1   56.9054 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))2  122.3822 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))3   28.2811 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))4   84.3888 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; x1:bs(obstime, df = 5, Boundary.knots = c(0, 10))5   58.0138 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))1:x2  -45.9792 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))2:x2 -109.4118 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))3:x2  -30.1378 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))4:x2  -73.4058 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; bs(obstime, df = 5, Boundary.knots = c(0, 10))5:x2  -53.7173 &lt; 2.2e-16 ***</span></span>
-<span><span class="co">#&gt; ---</span></span>
-<span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Survival Process: Proportional hazards model with unspecified baseline hazard function</span></span>
-<span><span class="co">#&gt;          Estimate   StdErr z.value   p.value    </span></span>
-<span><span class="co">#&gt; w1        0.67275  0.12449  5.4040 6.518e-08 ***</span></span>
-<span><span class="co">#&gt; w2       -1.34183  0.28488 -4.7101 2.476e-06 ***</span></span>
-<span><span class="co">#&gt; observed  0.72682  0.18397  3.9507 7.794e-05 ***</span></span>
-<span><span class="co">#&gt; ---</span></span>
-<span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Variance Components:</span></span>
-<span><span class="co">#&gt;              StdDev</span></span>
-<span><span class="co">#&gt; Random   0.02695929</span></span>
-<span><span class="co">#&gt; Residual 0.10961656</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Integration: (Adaptive Gauss-Hermite Quadrature)</span></span>
-<span><span class="co">#&gt; quadrature points: 9 </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; StdErr Estimation:</span></span>
-<span><span class="co">#&gt; method: profile Fisher score with Richardson extrapolation</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Optimization:</span></span>
-<span><span class="co">#&gt; convergence: success</span></span>
-<span><span class="co">#&gt; iterations: 4</span></span>
 <span></span>
 <span><span class="co">#--------------------------------------------</span></span>
 <span><span class="co"># Model 3: Time-varying Cox (Oracle - Theoretical Benchmark)</span></span>
@@ -415,34 +352,7 @@ the <code>sim</code> dataset.</p>
 <span>    <span class="fu"><a href="https://rdrr.io/pkg/survival/man/cluster.html" class="external-link">cluster</a></span><span class="op">(</span><span class="va">ID</span><span class="op">)</span>,</span>
 <span>  data <span class="op">=</span> <span class="va">jsm_data</span></span>
 <span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit_oracle</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Call:</span></span>
-<span><span class="co">#&gt; coxph(formula = Surv(start, stop, event) ~ biomarker + velocity + </span></span>
-<span><span class="co">#&gt;     w1 + w2, data = jsm_data, cluster = ID)</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;   n= 17350, number of events= 61 </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;              coef exp(coef) se(coef) robust se      z Pr(&gt;|z|)    </span></span>
-<span><span class="co">#&gt; biomarker  0.6831    1.9800   0.1878    0.1727  3.956 7.62e-05 ***</span></span>
-<span><span class="co">#&gt; velocity   1.7701    5.8715   0.9761    0.8355  2.119   0.0341 *  </span></span>
-<span><span class="co">#&gt; w1         0.6722    1.9585   0.1239    0.1137  5.909 3.43e-09 ***</span></span>
-<span><span class="co">#&gt; w2        -1.3300    0.2645   0.2855    0.2838 -4.687 2.78e-06 ***</span></span>
-<span><span class="co">#&gt; ---</span></span>
-<span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;           exp(coef) exp(-coef) lower .95 upper .95</span></span>
-<span><span class="co">#&gt; biomarker    1.9800     0.5050    1.4115    2.7774</span></span>
-<span><span class="co">#&gt; velocity     5.8715     0.1703    1.1417   30.1956</span></span>
-<span><span class="co">#&gt; w1           1.9585     0.5106    1.5671    2.4476</span></span>
-<span><span class="co">#&gt; w2           0.2645     3.7812    0.1516    0.4613</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Concordance= 0.75  (se = 0.033 )</span></span>
-<span><span class="co">#&gt; Likelihood ratio test= 56.01  on 4 df,   p=2e-11</span></span>
-<span><span class="co">#&gt; Wald test            = 51.1  on 4 df,   p=2e-10</span></span>
-<span><span class="co">#&gt; Score (logrank) test = 56.04  on 4 df,   p=2e-11,   Robust = 32.53  p=1e-06</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;   (Note: the likelihood ratio and score tests assume independence of</span></span>
-<span><span class="co">#&gt;      observations within a cluster, the Wald and robust score tests do not).</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit_oracle</span><span class="op">)</span></span></code></pre></div>
 </div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
