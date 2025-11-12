@@ -1,7 +1,7 @@
 #include <RcppArmadillo.h>
 #include <cppad/cppad.hpp>
 #include <algorithm>
-#include "utils.hpp"
+#include "utils.h"
 
 // [[Rcpp::depends(RcppArmadillo)]]
 

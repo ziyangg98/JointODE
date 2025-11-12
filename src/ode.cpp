@@ -1,6 +1,6 @@
 #include <RcppArmadillo.h>
 
-#include "utils.hpp"
+#include "utils.h"
 
 // [[Rcpp::depends(RcppArmadillo)]]
 
