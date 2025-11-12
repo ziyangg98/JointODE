@@ -32,20 +32,22 @@ Imports:
     MASS,
     splines2,
     mvQuad,
-    Rcpp
+    Rcpp,
+    ggplot2,
+    patchwork,
+    dplyr,
+    tidyr,
+    magrittr,
+    viridisLite
 LinkingTo:
     Rcpp,
     RcppArmadillo
 Suggests:
-    ggplot2,
     knitr,
     rmarkdown,
     testthat (>= 3.0.0),
-    dplyr,
     JSM,
     nlme,
-    tidyr,
-    patchwork,
     purrr,
     gridExtra,
     latex2exp,

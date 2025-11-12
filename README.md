@@ -73,11 +73,6 @@ Here’s a basic example using the included simulated dataset:
 
 ``` r
 library(JointODE)
-#>
-#> Attaching package: 'JointODE'
-#> The following object is masked from 'package:stats':
-#>
-#>     simulate
 library(survival)
 
 # Load example dataset (200 subjects with longitudinal and survival data)
@@ -93,9 +88,8 @@ fit <- JointODE(
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = longitudinal_data,
   survival_data = sim$data$survival_data,
-  state = as.matrix(sim$data$state)
+  control = list(atol = 1e-3, verbose = 3)
 )
-
 # Model summary
 summary(fit)
 #>
@@ -103,7 +97,8 @@ summary(fit)
 #> JointODE(longitudinal_formula = observed ~ biomarker + velocity +
 #>     x1 + x2 + (biomarker + velocity | id), survival_formula = Surv(time,
 #>     status) ~ w1 + w2, longitudinal_data = longitudinal_data,
-#>     survival_data = sim$data$survival_data, state = as.matrix(sim$data$state))
+#>     survival_data = sim$data$survival_data, control = list(atol = 0.001,
+#>         verbose = 3))
 #>
 #> Data Descriptives:
 #> Longitudinal Process            Survival Process
@@ -111,51 +106,61 @@ summary(fit)
 #> Number of Subjects: 200
 #>
 #>        AIC        BIC     logLik
-#> -30994.014 -30901.661  15525.007
+#> -31459.585 -31367.232  15757.792
 #>
 #> Coefficients:
 #> Longitudinal Process: Second-Order ODE Model
 #>               Estimate Std. Error  z value Pr(>|z|)
-#> biomarker   -1.0967768  0.0058437 -187.685   <2e-16 ***
-#> velocity    -0.8517084  0.0162302  -52.477   <2e-16 ***
-#> (Intercept)  0.0007915  0.0014368    0.551    0.582
-#> x1           0.5471043  0.0030429  179.797   <2e-16 ***
-#> x2          -0.4925065  0.0028715 -171.515   <2e-16 ***
+#> biomarker   -1.091e+00  5.662e-03 -192.618   <2e-16 ***
+#> velocity    -8.568e-01  1.502e-02  -57.054   <2e-16 ***
+#> (Intercept) -2.312e-05  1.390e-03   -0.017    0.987
+#> x1           5.443e-01  2.969e-03  183.302   <2e-16 ***
+#> x2          -4.901e-01  2.795e-03 -175.340   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> ODE System Characteristics:
 #>                    Estimate Std. Error z value Pr(>|z|)
-#> T (period)         5.999579   0.015983  375.37   <2e-16 ***
-#> xi (damping ratio) 0.406632   0.007524   54.04   <2e-16 ***
+#> T (period)         6.016586   0.015618  385.24   <2e-16 ***
+#> xi (damping ratio) 0.410243   0.006966   58.89   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Survival Process: Proportional Hazards Model
 #>         Estimate Std. Error z value Pr(>|z|)
-#> alpha_1   0.7229     0.1886   3.833 0.000127 ***
-#> alpha_2   2.0056     0.7790   2.575 0.010038 *
-#> w1        0.6870     0.1245   5.518 3.43e-08 ***
-#> w2       -1.3418     0.2860  -4.692 2.71e-06 ***
+#> alpha_1   0.7241     0.1880   3.852 0.000117 ***
+#> alpha_2   1.8300     0.7721   2.370 0.017785 *
+#> w1        0.6862     0.1245   5.512 3.55e-08 ***
+#> w2       -1.3431     0.2859  -4.697 2.64e-06 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Baseline Hazard: B-spline with 3 basis functions
-#> (Coefficients range: [-4.946, -1.937] )
+#> (Coefficients range: [-4.816, -2.023] )
 #>
 #> Variance Components:
-#> Measurement Error SD: 0.099867
+#> Measurement Error SD: 0.098718
 #> Random Effect Covariance Matrix:
 #>          [,1]     [,2]
-#> [1,] 0.001594 0.002178
-#> [2,] 0.002178 0.041715
+#> [1,] 0.001380 0.001859
+#> [2,] 0.001859 0.034803
 #>
 #> Model Diagnostics:
-#> C-index (Concordance): 0.673
-#> Convergence: EM algorithm converged after 35 iterations
+#> C-index (Concordance): 0.667
+#> Convergence: EM algorithm converged after 26 iterations
+
+# Plot results
+plot(fit)
+#> `geom_smooth()` using formula = 'y ~ x'
+#> `geom_smooth()` using formula = 'y ~ x'
+#> `geom_smooth()` using formula = 'y ~ x'
 ```
 
-The formula specifies: - **ODE terms**: `biomarker` and `velocity` are
+<img src="man/figures/README-output-1.png" width="100%" />
+
+The formula specifies:
+
+- **ODE terms**: `biomarker` and `velocity` are
 the state variables (value and slope) in the ODE - **Covariates**: `x1`
 and `x2` are external variables affecting the dynamics - **Random
 effects**: `(biomarker + velocity | id)` allows subject-specific

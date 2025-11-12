@@ -179,7 +179,9 @@
 #' )
 #'
 #' # Fit with custom control parameters using JointODE.control()
-#' control <- JointODE.control(maxit = 200, atol = 1e-4, rtol = 1e-6, verbose = TRUE)
+#' control <- JointODE.control(
+#'   maxit = 200, atol = 1e-4, rtol = 1e-6, verbose = TRUE
+#' )
 #' fit2 <- JointODE(
 #'   longitudinal_formula = observed ~ x1 + x2,
 #'   survival_formula = Surv(event_time, event) ~ x1 + x2,
@@ -203,6 +205,7 @@
 #'
 #' @concept model-fitting
 #' @export
+# nolint next: object_name_linter
 JointODE <- function(
   longitudinal_formula,
   survival_formula,
@@ -242,6 +245,9 @@ JointODE <- function(
     survival_data = survival_data,
     state = state
   )
+
+  # Determine if we need to optimize initial states
+  has_state <- !is.null(state)
 
   # Process control settings
   if (is.null(control)) {
@@ -289,8 +295,32 @@ JointODE <- function(
   converged <- FALSE
 
   for (em_iter in seq_len(control$maxit)) {
+    if (!has_state) {
+      opt_results <- .parallel_apply(
+        seq_along(data_list),
+        function(i) {
+          .estimate_state(
+            data_list[[i]]$initial_state,
+            data_list[[i]],
+            curr$random_effects[i, ],
+            curr$parameters
+          )
+        },
+        control$parallel,
+        control$n_cores
+      )
+      for (i in seq_along(data_list)) {
+        data_list[[i]]$initial_state <- opt_results[[i]]$state
+      }
+    }
+
     # EM step
-    curr <- .em_step(data_list, curr$parameters, curr$random_effects, control)
+    curr <- .em_step(
+      data_list,
+      curr$parameters,
+      curr$random_effects,
+      control
+    )
 
     # Track progress and check convergence
     status <- .track(em_iter, curr, prev, control)
@@ -732,8 +762,10 @@ predict.JointODE <- function(
   data_list <- object$data
 
   # Handle both old (matrix) and new (list) random effects format
-  random_effects <- if (is.list(object$random_effects) &&
-                        !is.null(object$random_effects$estimates)) {
+  random_effects <- if (
+    is.list(object$random_effects) &&
+      !is.null(object$random_effects$estimates)
+  ) {
     object$random_effects$estimates
   } else {
     object$random_effects
@@ -763,9 +795,61 @@ predict.JointODE <- function(
       return(NULL)
     }
 
+    # Extend longitudinal covariates to match pred_times
+    # Use last observation carried forward (LOCF) for times beyond observed data
+    orig_times <- subj$longitudinal$times
+
+    extend_covariates_matrix <- function(cov_mat, orig_times, pred_times) {
+      if (is.null(cov_mat) || length(cov_mat) == 0) {
+        # Return empty matrix with correct dimensions
+        if (is.matrix(cov_mat)) {
+          return(matrix(numeric(0), nrow = length(pred_times), ncol = 0))
+        } else {
+          return(cov_mat) # Keep original structure if not a matrix
+        }
+      }
+
+      # For each pred_time, find the corresponding row in cov_mat using LOCF
+      indices <- sapply(pred_times, function(t) {
+        if (t <= max(orig_times)) {
+          # Find the closest time <= t
+          max(which(orig_times <= t))
+        } else {
+          # Use last observation
+          length(orig_times)
+        }
+      })
+
+      # Extract rows based on indices
+      if (is.matrix(cov_mat)) {
+        cov_mat[indices, , drop = FALSE]
+      } else {
+        # If it's a vector, return as vector
+        cov_mat[indices]
+      }
+    }
+
+    extended_fixed <- extend_covariates_matrix(
+      subj$longitudinal$covariates$fixed,
+      orig_times,
+      pred_times
+    )
+
+    extended_random <- extend_covariates_matrix(
+      subj$longitudinal$covariates$random,
+      orig_times,
+      pred_times
+    )
+
+    extended_time <- if (!is.null(times)) {
+      max(pred_times)
+    } else {
+      subj$time
+    }
+
     list(
       id = subj$id,
-      time = subj$time,
+      time = extended_time,
       status = subj$status,
       covariates = subj$covariates,
       initial_state = subj$initial_state,
@@ -773,8 +857,8 @@ predict.JointODE <- function(
         times = pred_times,
         measurements = rep(0, length(pred_times)),
         covariates = list(
-          fixed = subj$longitudinal$covariates$fixed,
-          random = subj$longitudinal$covariates$random
+          fixed = extended_fixed,
+          random = extended_random
         )
       )
     )

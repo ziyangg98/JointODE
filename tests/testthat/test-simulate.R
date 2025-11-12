@@ -40,7 +40,6 @@
 #
 # Random Effects Structure:
 #   - Only dyn_value and dyn_slope have random effects (2×2 covariance)
-#   - Formula: observed ~ biomarker + velocity + x + (biomarker + velocity | id)
 #   - Rationale: subject-specific frequency and damping
 #
 # Model Equations:

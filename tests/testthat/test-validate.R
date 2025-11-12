@@ -452,7 +452,10 @@ test_that(".validate checks status values", {
       spline_baseline = list(),
       init = NULL
     ),
-    "Invalid status values in 'status': 2\\. Must be 0 \\(censored\\) or 1 \\(event\\)"
+    paste0(
+      "Invalid status values in 'status': 2\\. ",
+      "Must be 0 \\(censored\\) or 1 \\(event\\)"
+    )
   )
 })
 

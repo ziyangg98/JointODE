@@ -369,10 +369,71 @@
   parameters
 }
 
+# State Optimization ===========================================================
+
+#' Compute state log-likelihood and derivatives
+#'
+#' @noRd
+.compute_state_objective <- function(
+  initial_state,
+  data,
+  random_effect,
+  parameters
+) {
+  result <- .compute_state_loglik_cppad(
+    initial_state = initial_state,
+    data = data,
+    random_effect = random_effect,
+    parameters = parameters,
+    gradient = TRUE,
+    hessian = TRUE
+  )
+
+  # Return negative for minimization
+  value <- -as.numeric(result)
+  attr(value, "gradient") <- -as.vector(attr(result, "gradient"))
+  attr(value, "hessian") <- -as.matrix(attr(result, "hessian"))
+  value
+}
+
+#' Estimate initial state
+#'
+#' @noRd
+.estimate_state <- function(
+  initial_guess,
+  data,
+  random_effect,
+  parameters,
+  max_iter = 50,
+  tol = 1e-6
+) {
+  objective <- function(state) {
+    .compute_state_objective(state, data, random_effect, parameters)
+  }
+
+  fit <- suppressWarnings(
+    nlm(
+      f = objective,
+      p = initial_guess,
+      iterlim = max_iter,
+      gradtol = tol,
+      hessian = FALSE,
+      check.analyticals = FALSE
+    )
+  )
+
+  list(
+    state = fit$estimate,
+    converged = fit$code <= 2,
+    iterations = fit$iterations
+  )
+}
+
 # EM Algorithm =================================================================
 
 #' @noRd
 .em_step <- function(data_list, parameters, random_effects, control) {
+  # E-step: Compute posteriors
   posteriors <- .compute_posteriors(
     data_list,
     parameters,
@@ -381,13 +442,14 @@
     control$n_cores,
     control$quad_level
   )
+
+  # Update random effects from posterior
   n_subjects <- length(data_list)
   posterior_moments <- lapply(seq_len(n_subjects), function(i) {
     .compute_posterior_moments(
       list(nodes = posteriors$nodes[[i]], weights = posteriors$weights[[i]])
     )
   })
-
   random_effects <- t(sapply(posterior_moments, `[[`, "mean"))
 
   random_effect_sigma <- Reduce(
@@ -624,6 +686,7 @@
   bic <- -2 * loglik + n_params * log(n_subjects)
 
   ode_solutions <- .solve_batch_ode_cppad(data_list, random_effects, parameters)
+  # nolint start: object_usage_linter
   risk_scores <- vapply(
     ode_solutions,
     function(x) tail(x$log_hazard, 1),
@@ -632,10 +695,12 @@
   event_times <- vapply(data_list, `[[`, numeric(1), "time")
   event_status <- vapply(data_list, `[[`, numeric(1), "status")
 
+  # Compute concordance index (C-index) for model discrimination
   cindex <- survival::concordance(
     Surv(event_times, event_status) ~ risk_scores,
     reverse = TRUE
   )$concordance
+  # nolint end
 
   if (control$verbose > 0) {
     cli::cli_alert_info(sprintf("C-index (concordance): %.3f", cindex))

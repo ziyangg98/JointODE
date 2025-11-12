@@ -147,13 +147,46 @@ NULL
   )
   hessian_neglogpost <- -attr(result_at_mode, "hessian")
 
+  # Compute Cholesky factor for AGHQ
+  # If direct solve fails, try regularization to ensure positive definiteness
   chol_factor <- tryCatch(
-    t(chol(solve(hessian_neglogpost))),
+    {
+      t(chol(solve(hessian_neglogpost)))
+    },
     error = function(e) {
-      stop(sprintf(
-        "Failed to compute Cholesky decomposition in AGHQ: %s",
-        e$message
-      ))
+      # Fallback 1: Add small diagonal regularization
+      tryCatch(
+        {
+          diag_reg <- mean(diag(hessian_neglogpost)) * 1e-6
+          regularized_hess <- hessian_neglogpost +
+            diag(diag_reg, nrow(hessian_neglogpost))
+          t(chol(solve(regularized_hess)))
+        },
+        error = function(e2) {
+          # Fallback 2: Use eigenvalue decomposition for more stable inverse
+          tryCatch(
+            {
+              eig <- eigen(hessian_neglogpost, symmetric = TRUE)
+              # Threshold small eigenvalues
+              eig$values[eig$values < max(eig$values) * 1e-10] <- max(
+                eig$values
+              ) *
+                1e-10
+              hess_inv <- eig$vectors %*%
+                diag(1 / eig$values) %*%
+                t(eig$vectors)
+              t(chol(hess_inv))
+            },
+            error = function(e3) {
+              # Last resort: use identity scaled by Hessian trace
+              warning(
+                "Cholesky decomposition failed, using diagonal approximation"
+              )
+              diag(1 / sqrt(diag(hessian_neglogpost)))
+            }
+          )
+        }
+      )
     }
   )
 
@@ -185,8 +218,9 @@ NULL
   })
 
   # Compute Jacobian factor for coordinate transformation
-  # When transforming from standard GHN points z to posterior space theta = m + L*z
-  # where L = chol(solve(H)), the weights need to be multiplied by |det(L)|
+  # When transforming from standard GHN points z to posterior space
+  # theta = m + L*z, where L = chol(solve(H)), the weights need to
+  # be multiplied by |det(L)|
   jacobian <- sqrt(det(solve(hessian_neglogpost)))
 
   log_weights <- log(quad_weights) + log(jacobian) + logpost_at_nodes

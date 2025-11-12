@@ -68,7 +68,7 @@
         longitudinal_data,
         time,
         id,
-        as.matrix(state),
+        state,
         control_opts
       )
     },
@@ -330,7 +330,6 @@
 
   # Parse formulas once
   parsed_long <- .parse_longitudinal_formula(longitudinal_formula)
-  parsed_surv <- .parse_survival_formula(survival_formula)
 
   # Build formulas and matrices
   fixed_formula <- .build_formula(
@@ -366,7 +365,6 @@
   event_times <- surv_response[, 1]
 
   # Extract dimensions
-  n_longitudinal_fixed <- ncol(long_fixed_matrix)
   n_longitudinal_random <- ncol(long_random_matrix)
 
   has_surv_covs <- length(all.vars(survival_formula[[3]])) > 0 &&
@@ -376,12 +374,6 @@
   } else {
     NULL
   }
-
-  # Calculate biomarker/velocity fixed effects count
-  n_biomarker_velocity_fixed <- sum(
-    parsed_long$biomarker$fixed,
-    parsed_long$velocity$fixed
-  )
 
   # Configure splines
   spline_baseline_config <- .get_spline_config(

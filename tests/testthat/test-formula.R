@@ -55,7 +55,8 @@ test_that("parse formula with reserved words in fixed effects", {
   expect_true(result$velocity$fixed)
   expect_false(result$biomarker$random)
   expect_false(result$velocity$random)
-  expect_equal(result$fixed_terms, c("(Intercept)", "x")) # Reserved words excluded
+  # Reserved words excluded
+  expect_equal(result$fixed_terms, c("(Intercept)", "x"))
 })
 
 

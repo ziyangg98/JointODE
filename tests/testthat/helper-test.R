@@ -16,6 +16,7 @@ compare_gradient_component <- function(
   rel_error <- max(abs((analytical - numerical) / (abs(numerical) + 1e-10)))
 
   # expect_lt is from testthat package (loaded in test environment)
+  # nolint next: object_usage_linter
   expect_lt(rel_error, tolerance, label = paste0(name, " gradient"))
 }
 
@@ -24,15 +25,14 @@ compare_gradient_component <- function(
 #' @return List with data, parameters, and n_subjects
 load_test_data <- function(n_subjects = NULL) {
   # sim is loaded from package data (data/sim.rda)
+  # nolint start: object_usage_linter
   # Process data using sim dataset
   data_processed <- .process(
     longitudinal_formula = observed ~ x1 + x2,
     survival_formula = Surv(time, status) ~ w1 + w2,
     longitudinal_data = sim$data$longitudinal_data,
     survival_data = sim$data$survival_data,
-    state = NULL,
-    id = "id",
-    time = "time"
+    state = NULL
   )
 
   parameters <- sim$init
@@ -43,6 +43,7 @@ load_test_data <- function(n_subjects = NULL) {
     data_processed <- data_processed[1:n_subjects]
     random_effects <- sim$data$random_effects[1:n_subjects, , drop = FALSE]
   }
+  # nolint end
 
   list(
     data = data_processed,

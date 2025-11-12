@@ -10,9 +10,10 @@ using namespace Rcpp;
 using namespace arma;
 
 // [[Rcpp::export(.compute_logpost_cppad)]]
-NumericVector compute_logpost_cppad(const NumericVector &random_effect,
-                                    const List &data, const List &parameters,
-                                    bool gradient = true, bool hessian = false) {
+NumericVector compute_logpost_cppad(const NumericVector& random_effect,
+                                    const List& data, const List& parameters,
+                                    bool gradient = true,
+                                    bool hessian = false) {
   const int n_random_effects = random_effect.size();
 
   ADvector ad_random_effects(n_random_effects);
@@ -41,8 +42,9 @@ NumericVector compute_logpost_cppad(const NumericVector &random_effect,
 
   BSplineWorkspace workspace;
   compute_bspline_basis(0.0, params.spline_degree, params.spline_knots,
-                        params.spline_boundary, workspace.basis, workspace.knots,
-                        workspace.work1, workspace.work2, false);
+                        params.spline_boundary, workspace.basis,
+                        workspace.knots, workspace.work1, workspace.work2,
+                        false);
 
   const std::vector<double> times =
       build_times(params.subject.longitudinal_times, params.subject.event_time);
@@ -89,7 +91,8 @@ NumericVector compute_logpost_cppad(const NumericVector &random_effect,
   std::vector<ADdouble> inv_sigma_b_times_b(n_random_effects, ADdouble(0.0));
   for (int i = 0; i < n_random_effects; i++) {
     for (int j = 0; j < n_random_effects; j++) {
-      inv_sigma_b_times_b[i] += ADdouble(inv_sigma_b(i, j)) * ad_random_effects[j];
+      inv_sigma_b_times_b[i] +=
+          ADdouble(inv_sigma_b(i, j)) * ad_random_effects[j];
     }
   }
   ADdouble quadratic_form(0.0);

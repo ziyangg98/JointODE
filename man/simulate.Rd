@@ -244,13 +244,15 @@ These are transformed to ODE parameters via:
 The transformation uses the Delta method to preserve the correct covariance
 structure in the ODE parameter space.
 
-\strong{Random Effects Structure:} Only \eqn{\beta_{1,i}} (\code{dyn_value})
-and \eqn{\beta_{2,i}} (\code{dyn_slope}) have subject-specific random effects.
-The constant excitation term (\code{dyn_const}) and all covariate excitation
-coefficients (\code{dyn_x1}, \code{dyn_x2}, etc.) are fixed effects that take
-the same population mean value for all subjects, with no between-subject
-variability. This structure corresponds to the formula specification
-\code{observed ~ biomarker + velocity + x1 + x2 + (biomarker + velocity | id)}.
+\strong{Random Effects Structure:} Only \eqn{\beta_{1,i}}
+(\code{dyn_value}) and \eqn{\beta_{2,i}} (\code{dyn_slope}) have
+subject-specific random effects. The constant excitation term
+(\code{dyn_const}) and all covariate excitation coefficients
+(\code{dyn_x1}, \code{dyn_x2}, etc.) are fixed effects that take
+the same population mean value for all subjects, with no
+between-subject variability. This structure corresponds to the
+formula specification \code{observed ~ biomarker + velocity + x1 +
+x2 + (biomarker + velocity | id)}.
 }
 }
 \examples{

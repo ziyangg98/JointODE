@@ -21,11 +21,15 @@
 #'   If 0, uses all available cores (default: 0)
 #' @param quad_level Integer; quadrature level for numerical integration
 #'   (default: 4)
+#' @param n_early Integer; number of early time points to use for quadratic
+#'   fitting when estimating initial states. Using 15 points balances capturing
+#'   initial curvature while avoiding overfitting (default: 15)
 #' @param .list Optional list of control parameters to process
 #' @param ... Additional control parameters
 #'
 #' @return A list of control parameters with all defaults filled in
 #'
+#' @concept model-fitting
 #' @keywords internal
 #' @export
 #'
@@ -47,6 +51,7 @@
 #' control <- JointODE.control(.list = my_list)
 #'
 #' @seealso \code{\link{JointODE}}
+# nolint next: object_name_linter
 JointODE.control <- function(
   maxit = 200,
   atol = 1e-4,
@@ -55,6 +60,7 @@ JointODE.control <- function(
   parallel = FALSE,
   n_cores = 0,
   quad_level = 4,
+  n_early = 15,
   .list = NULL,
   ...
 ) {
@@ -66,7 +72,8 @@ JointODE.control <- function(
     verbose = verbose,
     parallel = parallel,
     n_cores = n_cores,
-    quad_level = quad_level
+    quad_level = quad_level,
+    n_early = n_early
   )
 
   # If a list is provided, merge with defaults
@@ -119,6 +126,9 @@ JointODE.control <- function(
   }
   if (!is.numeric(control$quad_level) || control$quad_level < 1) {
     stop("quad_level must be a positive integer")
+  }
+  if (!is.numeric(control$n_early) || control$n_early < 4) {
+    stop("n_early must be an integer >= 4")
   }
 
   control

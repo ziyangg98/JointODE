@@ -9,6 +9,10 @@
     .Call(`_JointODE_solve_marginal_ode_cppad`, theta, initial, times, covariates)
 }
 
+.compute_marginal_state_loglik <- function(initial_state, subject_data, theta, gradient = TRUE, hessian = FALSE) {
+    .Call(`_JointODE_compute_marginal_state_loglik`, initial_state, subject_data, theta, gradient, hessian)
+}
+
 .compute_objective_cppad <- function(params, data_list, random_effects, parameters, weights = NULL, gradient = TRUE, hessian = FALSE) {
     .Call(`_JointODE_compute_objective_cppad`, params, data_list, random_effects, parameters, weights, gradient, hessian)
 }
@@ -19,4 +23,8 @@
 
 .compute_logpost_cppad <- function(random_effect, data, parameters, gradient = TRUE, hessian = FALSE) {
     .Call(`_JointODE_compute_logpost_cppad`, random_effect, data, parameters, gradient, hessian)
+}
+
+.compute_state_loglik_cppad <- function(initial_state, data, random_effect, parameters, gradient = TRUE, hessian = FALSE) {
+    .Call(`_JointODE_compute_state_loglik_cppad`, initial_state, data, random_effect, parameters, gradient, hessian)
 }

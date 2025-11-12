@@ -318,3 +318,81 @@ List solve_marginal_ode_cppad(
     Named("acceleration") = acceleration
   );
 }
+
+// ============================================================================
+// Initial State Optimization (模仿 initial.cpp)
+// ============================================================================
+
+// [[Rcpp::export(.compute_marginal_state_loglik)]]
+NumericVector compute_marginal_state_loglik(
+    const NumericVector& initial_state,
+    const List& subject_data,
+    const NumericVector& theta,
+    bool gradient = true,
+    bool hessian = false) {
+
+  if (initial_state.size() != 2) {
+    stop("initial_state must have length 2");
+  }
+
+  // Setup AD tape for initial_state
+  ADvector ad_initial_state(2);
+  std::copy(initial_state.begin(), initial_state.end(), ad_initial_state.begin());
+  CppAD::Independent(ad_initial_state);
+
+  // Setup ODE parameters (fixed theta)
+  MarginalODEParams<ADdouble> ode_params;
+  ode_params.theta.resize(theta.size());
+  for (int i = 0; i < theta.size(); i++) {
+    ode_params.theta[i] = ADdouble(theta[i]);
+  }
+
+  fill_marginal_subject_data(ode_params, subject_data);
+
+  NumericVector response = subject_data["response"];
+  const int n_obs = response.size();
+
+  if (n_obs == 0) {
+    stop("subject must have at least one observation");
+  }
+
+  // Initial conditions from AD variable
+  std::vector<ADdouble> y0(2);
+  y0[0] = ad_initial_state[0];
+  y0[1] = ad_initial_state[1];
+
+  // Solve ODE with AD initial state
+  const std::vector<std::vector<ADdouble>> solution =
+      solve_marginal_ode(y0, ode_params.times, ode_params);
+
+  // Compute SSE (sum of squared errors)
+  ADdouble sse(0.0);
+  for (int t = 0; t < n_obs; t++) {
+    ADdouble residual = ADdouble(response[t]) - solution[t][0];
+    sse += residual * residual;
+  }
+
+  // Create tape
+  CppAD::ADFun<double> tape;
+  tape.Dependent(ad_initial_state, ADvector{sse});
+  tape.optimize();
+
+  // Evaluate
+  std::vector<double> x(initial_state.begin(), initial_state.end());
+  std::vector<double> y = tape.Forward(0, x);
+
+  NumericVector result(1);
+  result[0] = y[0];
+
+  if (gradient || hessian) {
+    std::vector<double> grad = tape.Reverse(1, std::vector<double>(1, 1.0));
+    if (gradient) {
+      result.attr("gradient") = wrap(grad);
+    }
+    if (hessian) {
+      result.attr("hessian") = wrap(tape.Hessian(x, 0));
+    }
+  }
+
+  return result;
+}

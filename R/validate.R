@@ -614,7 +614,10 @@
         !all(c("fixed", "random") %in% names(init$configurations$biomarker))
       ) {
         stop(
-          "init$configurations$biomarker: must have 'fixed' and 'random' fields",
+          paste0(
+            "init$configurations$biomarker: ",
+            "must have 'fixed' and 'random' fields"
+          ),
           call. = FALSE
         )
       }

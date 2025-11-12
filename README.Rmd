@@ -79,14 +79,20 @@ fit <- JointODE(
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = longitudinal_data,
   survival_data = sim$data$survival_data,
-  state = as.matrix(sim$data$state)
+  control = list(atol = 1e-3, verbose = 3)
 )
+```
 
+```{r output}
 # Model summary
 summary(fit)
+
+# Plot results
+plot(fit)
 ```
 
 The formula specifies:
+
 - **ODE terms**: `biomarker` and `velocity` are the state variables (value and slope) in the ODE
 - **Covariates**: `x1` and `x2` are external variables affecting the dynamics
 - **Random effects**: `(biomarker + velocity | id)` allows subject-specific coefficients on the ODE value and slope terms

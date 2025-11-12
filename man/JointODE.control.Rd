@@ -12,6 +12,7 @@ JointODE.control(
   parallel = FALSE,
   n_cores = 0,
   quad_level = 4,
+  n_early = 15,
   .list = NULL,
   ...
 )
@@ -39,6 +40,10 @@ If 0, uses all available cores (default: 0)}
 
 \item{quad_level}{Integer; quadrature level for numerical integration
 (default: 4)}
+
+\item{n_early}{Integer; number of early time points to use for quadratic
+fitting when estimating initial states. Using 15 points balances capturing
+initial curvature while avoiding overfitting (default: 15)}
 
 \item{.list}{Optional list of control parameters to process}
 
@@ -73,4 +78,5 @@ control <- JointODE.control(.list = my_list)
 \seealso{
 \code{\link{JointODE}}
 }
+\concept{model-fitting}
 \keyword{internal}

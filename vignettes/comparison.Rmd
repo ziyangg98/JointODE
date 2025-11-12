@@ -159,11 +159,17 @@ patient_params_valid <- patient_params[
 
 # Add survival status
 long_data_surv <- long_data %>%
-  left_join(surv_data %>% select(id, status), by = "id") %>%
-  mutate(event_status = factor(status,
-    levels = c(0, 1),
-    labels = c("Censored", "Event")
-  ))
+  left_join(
+    surv_data %>% select(id, status),
+    by = "id"
+  ) %>%
+  mutate(
+    event_status = factor(
+      status,
+      levels = c(0, 1),
+      labels = c("Censored", "Event")
+    )
+  )
 ```
 
 ```{r viz-combined, fig.width=10, fig.height=12, echo=FALSE}
@@ -193,13 +199,16 @@ avg_velocity <- velocity_data %>%
 # Panel A: Average biomarker + spaghetti (merged)
 p_biomarker <- ggplot() +
   geom_line(
-    data = long_data_surv, aes(x = time, y = observed, group = id, color = event_status),
+    data = long_data_surv,
+    aes(x = time, y = observed, group = id, color = event_status),
     alpha = 0.15, linewidth = 0.15
   ) +
   geom_ribbon(
     data = avg_trajectories,
     aes(
-      x = time, ymin = mean_obs - 1.96 * se_obs, ymax = mean_obs + 1.96 * se_obs,
+      x = time,
+      ymin = mean_obs - 1.96 * se_obs,
+      ymax = mean_obs + 1.96 * se_obs,
       fill = event_status
     ), alpha = 0.2, color = NA
   ) +
@@ -208,8 +217,14 @@ p_biomarker <- ggplot() +
     aes(x = time, y = mean_obs, color = event_status, weight = n_obs),
     method = "loess", span = 0.3, se = FALSE, linewidth = 1.2
   ) +
-  scale_color_manual(values = c("Censored" = "#2E86AB", "Event" = "#E63946"), name = "Status") +
-  scale_fill_manual(values = c("Censored" = "#2E86AB", "Event" = "#E63946"), name = "Status") +
+  scale_color_manual(
+    values = c("Censored" = "#2E86AB", "Event" = "#E63946"),
+    name = "Status"
+  ) +
+  scale_fill_manual(
+    values = c("Censored" = "#2E86AB", "Event" = "#E63946"),
+    name = "Status"
+  ) +
   coord_cartesian(ylim = c(-1.5, 1.5)) +
   theme_minimal(base_size = 9) +
   theme(legend.position = "top") +
@@ -220,14 +235,17 @@ p_velocity <- ggplot(
   avg_velocity,
   aes(x = time, y = mean_vel, color = event_status, fill = event_status)
 ) +
-  geom_ribbon(aes(ymin = mean_vel - 1.96 * se_vel, ymax = mean_vel + 1.96 * se_vel),
+  geom_ribbon(
+    aes(ymin = mean_vel - 1.96 * se_vel, ymax = mean_vel + 1.96 * se_vel),
     alpha = 0.15, color = NA
   ) +
   geom_smooth(aes(weight = n_obs),
     method = "loess", span = 0.3,
     se = FALSE, linewidth = 1.2
   ) +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.4) +
+  geom_hline(
+    yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.4
+  ) +
   scale_color_manual(values = c("Censored" = "#2E86AB", "Event" = "#E63946")) +
   scale_fill_manual(values = c("Censored" = "#2E86AB", "Event" = "#E63946")) +
   coord_cartesian(ylim = c(-0.5, 0.5)) +
@@ -237,7 +255,9 @@ p_velocity <- ggplot(
 
 # Panel C: Phase portraits (4 example patients)
 set.seed(42)
-example_ids <- sample(patient_params_valid$id, min(4, nrow(patient_params_valid)))
+example_ids <- sample(
+  patient_params_valid$id, min(4, nrow(patient_params_valid))
+)
 plot_data <- long_data %>%
   filter(id %in% example_ids) %>%
   left_join(patient_params_valid, by = "id") %>%

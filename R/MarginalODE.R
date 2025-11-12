@@ -1,7 +1,65 @@
 # Marginal ODE Utility Functions
 
-#' @importFrom stats na.omit nlm setNames
+#' @importFrom stats na.omit nlm setNames smooth.spline predict
 NULL
+
+# ===== Initial State Optimization Functions =====
+
+#' Compute marginal initial state objective and derivatives
+#'
+#' @noRd
+.marginal_state_objective <- function(
+  initial_state,
+  subject_data,
+  theta
+) {
+  # nolint next: object_usage_linter
+  result <- .compute_marginal_state_loglik(
+    initial_state = initial_state,
+    subject_data = subject_data,
+    theta = theta,
+    gradient = TRUE,
+    hessian = TRUE
+  )
+
+  # Return SSE for minimization (no negation needed, already SSE)
+  value <- as.numeric(result)
+  attr(value, "gradient") <- as.vector(attr(result, "gradient"))
+  attr(value, "hessian") <- as.matrix(attr(result, "hessian"))
+  value
+}
+
+#' Optimize marginal initial state
+#'
+#' @noRd
+.estimate_marginal_state <- function(
+  initial_guess,
+  subject_data,
+  theta,
+  max_iter = 50,
+  tol = 1e-6
+) {
+  objective <- function(state) {
+    .marginal_state_objective(state, subject_data, theta)
+  }
+
+  fit <- suppressWarnings(
+    nlm(
+      f = objective,
+      p = initial_guess,
+      iterlim = max_iter,
+      gradtol = tol,
+      hessian = FALSE,
+      check.analyticals = FALSE
+    )
+  )
+
+  list(
+    state = fit$estimate,
+    converged = fit$code <= 2,
+    iterations = fit$iterations
+  )
+}
 
 #' Marginal Second-Order ODE Parameter Estimation
 #'
@@ -68,6 +126,7 @@ NULL
 #' }
 #'
 #' @export
+# nolint next: object_name_linter
 MarginalODE <- function(
   formula,
   data,
@@ -76,7 +135,7 @@ MarginalODE <- function(
   state = NULL,
   control = list()
 ) {
-  data_list <- .process_long(formula, data, time, id, state)
+  data_list <- .process_long(formula, data, time, id, state, control)
 
   control <- if (is.null(control)) {
     JointODE.control()
@@ -86,7 +145,7 @@ MarginalODE <- function(
     stop("control must be a list or NULL")
   }
 
-  n_subjects <- attr(data_list, "n_subjects")
+  n_subjects <- attr(data_list, "n_subjects")  # nolint: object_usage_linter
   n_covariates <- attr(data_list, "n_covariates")
   covariate_names <- attr(data_list, "covariate_names")
   n_params <- 2 + n_covariates
@@ -101,26 +160,107 @@ MarginalODE <- function(
     if (n_covariates > 0) {
       cli::cli_text("Covariates: {paste(covariate_names, collapse = ', ')}")
     }
+    if (is.null(state)) {
+      cli::cli_text("Initial state: Will be estimated iteratively")
+    } else {
+      cli::cli_text("Initial state: Provided by user")
+    }
     cli::cli_text("")
   }
 
-  # Objective function with gradient and Hessian for nlm
-  nlm_func <- function(theta) {
-    .compute_marginal_objective_cppad(
-      theta,
-      data_list,
-      gradient = TRUE,
-      hessian = TRUE
+  # Check if we need iterative optimization
+  estimate_initial_state <- is.null(state)
+
+  if (estimate_initial_state) {
+    # Alternating optimization: iterate between optimizing states and parameters
+    if (control$verbose > 0) {
+      cli::cli_alert_info("Starting iterative optimization")
+    }
+
+    theta <- rep(0, n_params)
+    max_iter <- control$maxit
+    tol <- control$atol
+
+    for (iter in 1:max_iter) {
+      # Step 1: Optimize all initial states in parallel
+      opt_results <- .parallel_apply(
+        seq_along(data_list),
+        function(i) {
+          suppressWarnings(.estimate_marginal_state(
+            data_list[[i]]$initial,
+            data_list[[i]],
+            theta
+          ))
+        },
+        control$parallel,
+        control$n_cores
+      )
+      for (i in seq_along(data_list)) {
+        data_list[[i]]$initial <- opt_results[[i]]$state
+      }
+
+      # Step 2: Optimize theta given initial states
+      res_theta <- suppressWarnings(nlm(
+        function(theta) {
+          .compute_marginal_objective_cppad(theta, data_list, TRUE, TRUE)
+        },
+        theta,
+        print.level = if (control$verbose > 1) 2 else 0,
+        hessian = FALSE,
+        check.analyticals = FALSE
+      ))
+
+      theta_change <- max(abs(res_theta$estimate - theta))
+      theta <- res_theta$estimate
+
+      if (control$verbose > 1) {
+        cli::cli_alert_info(
+          "Iteration {iter}: theta change = {round(theta_change, 6)}"
+        )
+      }
+
+      if (theta_change < tol) {
+        if (control$verbose > 0) {
+          cli::cli_alert_success("Converged in {iter} iterations")
+        }
+        break
+      }
+    }
+
+    if (iter == max_iter && theta_change >= tol && control$verbose > 0) {
+      cli::cli_alert_warning("Did not converge in {max_iter} iterations")
+    }
+
+    res <- list(
+      estimate = theta,
+      code = if (theta_change < tol) 1 else 4,
+      iterations = iter,
+      minimum = as.numeric(.compute_marginal_objective_cppad(
+        theta,
+        data_list,
+        FALSE,
+        FALSE
+      ))
+    )
+  } else {
+    # Direct optimization with provided initial states
+    nlm_func <- function(theta) {
+      .compute_marginal_objective_cppad(
+        theta,
+        data_list,
+        gradient = TRUE,
+        hessian = TRUE
+      )
+    }
+
+    res <- nlm(
+      nlm_func,
+      rep(0, n_params),
+      print.level = if (control$verbose > 1) 2 else 0,
+      hessian = FALSE,
+      check.analyticals = FALSE
     )
   }
-
-  res <- nlm(
-    nlm_func,
-    rep(0, n_params),
-    print.level = if (control$verbose > 1) 2 else 0,
-    hessian = FALSE,
-    check.analyticals = FALSE
-  )
 
   if (control$verbose > 0) {
     if (res$code <= 2) {
@@ -173,25 +313,38 @@ MarginalODE <- function(
   residual_sd <- sqrt(res$minimum / (n_obs - n_params))
   loglik <- -0.5 * n_obs * (log(2 * pi) + log(res$minimum / n_obs) + 1)
 
-  structure(
-    list(
-      parameters = setNames(res$estimate, param_names),
-      measurement_error_sd = residual_sd,
-      logLik = loglik,
-      AIC = 2 * n_params - 2 * loglik,
-      BIC = log(n_obs) * n_params - 2 * loglik,
-      convergence = list(
-        converged = res$code <= 2,
-        iterations = res$iterations,
-        message = if (res$code <= 2) "converged" else paste("code", res$code)
-      ),
-      vcov = vcov_matrix,
-      data = data_list,
-      control = control,
-      call = match.call()
+  # Extract optimized initial states if estimated
+  initial_states <- if (estimate_initial_state) {
+    mat <- do.call(rbind, lapply(data_list, function(s) s$initial))
+    rownames(mat) <- names(data_list)
+    colnames(mat) <- c("m0", "v0")
+    mat
+  } else {
+    NULL
+  }
+
+  result <- list(
+    parameters = setNames(res$estimate, param_names),
+    measurement_error_sd = residual_sd,
+    logLik = loglik,
+    AIC = 2 * n_params - 2 * loglik,
+    BIC = log(n_obs) * n_params - 2 * loglik,
+    convergence = list(
+      converged = res$code <= 2,
+      iterations = res$iterations,
+      message = if (res$code <= 2) "converged" else paste("code", res$code)
     ),
-    class = "MarginalODE"
+    vcov = vcov_matrix,
+    data = data_list,
+    control = control,
+    call = match.call()
   )
+
+  if (!is.null(initial_states)) {
+    result$initial_states <- initial_states
+  }
+
+  structure(result, class = "MarginalODE")
 }
 
 
@@ -342,7 +495,6 @@ predict.MarginalODE <- function(
   }
 
   theta <- object$parameters
-  control <- object$control
   data_list <- object$data
 
   compute_pred <- function(i) {
@@ -405,7 +557,7 @@ predict.MarginalODE <- function(
 
 #' @importFrom stats model.frame model.matrix model.response
 #' @noRd
-.process_long <- function(formula, data, time, id, state) {
+.process_long <- function(formula, data, time, id, state, control) {
   if (is.matrix(data)) {
     data <- as.data.frame(data)
   }
@@ -418,7 +570,7 @@ predict.MarginalODE <- function(
   # Extract response and covariates using model.frame
   mf <- model.frame(formula, data = data, na.action = na.omit)
   y <- model.response(mf)
-  X <- model.matrix(formula, data = mf)
+  X <- model.matrix(formula, data = mf)  # nolint: object_name_linter
 
   stopifnot(
     "Formula must include a response variable" = !is.null(y)
@@ -465,11 +617,7 @@ predict.MarginalODE <- function(
     initial_state <- if (!is.null(state)) {
       c(state[i, 1], state[i, 2])
     } else {
-      dt <- if (length(y_subj) > 1) t_subj[2] - t_subj[1] else 0
-      c(
-        y_subj[1],
-        if (abs(dt) > .Machine$double.eps) (y_subj[2] - y_subj[1]) / dt else 0
-      )
+      c(0, 0)
     }
 
     list(

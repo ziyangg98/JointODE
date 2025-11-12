@@ -200,7 +200,9 @@ fit1 <- JointODE(
 )
 
 # Fit with custom control parameters using JointODE.control()
-control <- JointODE.control(maxit = 200, atol = 1e-4, rtol = 1e-6, verbose = TRUE)
+control <- JointODE.control(
+  maxit = 200, atol = 1e-4, rtol = 1e-6, verbose = TRUE
+)
 fit2 <- JointODE(
   longitudinal_formula = observed ~ x1 + x2,
   survival_formula = Surv(event_time, event) ~ x1 + x2,
