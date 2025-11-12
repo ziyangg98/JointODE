@@ -1,0 +1,102 @@
+# Control Parameters for JointODE
+
+Construct control parameters for the JointODE optimization algorithm.
+This function can be called with no arguments to get defaults, or can
+process a list to fill in missing values with defaults.
+
+## Usage
+
+``` r
+JointODE.control(
+  maxit = 200,
+  atol = 1e-04,
+  rtol = 1e-05,
+  verbose = FALSE,
+  parallel = FALSE,
+  n_cores = 0,
+  quad_level = 4,
+  n_early = 15,
+  .list = NULL,
+  ...
+)
+```
+
+## Arguments
+
+- maxit:
+
+  Maximum number of EM iterations (default: 200)
+
+- atol:
+
+  Absolute tolerance for parameter convergence. The EM algorithm
+  converges when the maximum absolute change in any parameter (including
+  variance parameters) is less than this value: max(\|theta_new -
+  theta_old\|) \< atol (default: 1e-4)
+
+- rtol:
+
+  Relative tolerance for log-likelihood convergence. The EM algorithm
+  converges when the relative change in log-likelihood is less than this
+  value: \|L_new - L_old\| / (\|L_new\| + epsilon) \< rtol, where
+  epsilon = 1e-8 prevents division by zero (default: 1e-5)
+
+- verbose:
+
+  Logical or numeric; controls verbosity level. FALSE/0 for silent,
+  TRUE/1 for basic progress, 2 for detailed output (default: FALSE)
+
+- parallel:
+
+  Logical; whether to use parallel computation (default: FALSE)
+
+- n_cores:
+
+  Integer; number of cores to use for parallel computation. If 0, uses
+  all available cores (default: 0)
+
+- quad_level:
+
+  Integer; quadrature level for numerical integration (default: 4)
+
+- n_early:
+
+  Integer; number of early time points to use for quadratic fitting when
+  estimating initial states. Using 15 points balances capturing initial
+  curvature while avoiding overfitting (default: 15)
+
+- .list:
+
+  Optional list of control parameters to process
+
+- ...:
+
+  Additional control parameters
+
+## Value
+
+A list of control parameters with all defaults filled in
+
+## See also
+
+[`JointODE`](http://gongziyang.com/JointODE/reference/JointODE.md)
+
+## Examples
+
+``` r
+# Default settings
+control <- JointODE.control()
+
+# Custom settings for faster exploration
+control <- JointODE.control(maxit = 30, atol = 1e-4, rtol = 1e-4)
+
+# Verbose output for debugging
+control <- JointODE.control(verbose = TRUE)
+
+# Parallel computation
+control <- JointODE.control(parallel = TRUE, n_cores = 4)
+
+# Process an existing list
+my_list <- list(maxit = 200)
+control <- JointODE.control(.list = my_list)
+```

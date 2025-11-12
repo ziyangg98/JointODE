@@ -65,6 +65,7 @@ process a list to fill in missing values with defaults.</p>
 <span>  parallel <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  n_cores <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  quad_level <span class="op">=</span> <span class="fl">4</span>,</span>
+<span>  n_early <span class="op">=</span> <span class="fl">15</span>,</span>
 <span>  .list <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -109,6 +110,12 @@ If 0, uses all available cores (default: 0)</p></dd>
 <dt id="arg-quad-level">quad_level<a class="anchor" aria-label="anchor" href="#arg-quad-level"></a></dt>
 <dd><p>Integer; quadrature level for numerical integration
 (default: 4)</p></dd>
+
+
+<dt id="arg-n-early">n_early<a class="anchor" aria-label="anchor" href="#arg-n-early"></a></dt>
+<dd><p>Integer; number of early time points to use for quadratic
+fitting when estimating initial states. Using 15 points balances capturing
+initial curvature while avoiding overfitting (default: 15)</p></dd>
 
 
 <dt id="arg--list">.list<a class="anchor" aria-label="anchor" href="#arg--list"></a></dt>
@@ -157,7 +164,7 @@ If 0, uses all available cores (default: 0)</p></dd>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.3.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
 </div>
 
     </footer></div>

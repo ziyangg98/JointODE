@@ -341,13 +341,15 @@ $$\omega_i = 2\pi/T_i, \quad
   \beta_{2,i} = -2\xi_i\omega_i$$
 The transformation uses the Delta method to preserve the correct covariance
 structure in the ODE parameter space.</p>
-<p><strong>Random Effects Structure:</strong> Only \(\beta_{1,i}\) (<code>dyn_value</code>)
-and \(\beta_{2,i}\) (<code>dyn_slope</code>) have subject-specific random effects.
-The constant excitation term (<code>dyn_const</code>) and all covariate excitation
-coefficients (<code>dyn_x1</code>, <code>dyn_x2</code>, etc.) are fixed effects that take
-the same population mean value for all subjects, with no between-subject
-variability. This structure corresponds to the formula specification
-<code>observed ~ biomarker + velocity + x1 + x2 + (biomarker + velocity | id)</code>.</p>
+<p><strong>Random Effects Structure:</strong> Only \(\beta_{1,i}\)
+(<code>dyn_value</code>) and \(\beta_{2,i}\) (<code>dyn_slope</code>) have
+subject-specific random effects. The constant excitation term
+(<code>dyn_const</code>) and all covariate excitation coefficients
+(<code>dyn_x1</code>, <code>dyn_x2</code>, etc.) are fixed effects that take
+the same population mean value for all subjects, with no
+between-subject variability. This structure corresponds to the
+formula specification <code>observed ~ biomarker + velocity + x1 +
+x2 + (biomarker + velocity | id)</code>.</p>
 </div>
 
     </div>
@@ -558,7 +560,7 @@ variability. This structure corresponds to the formula specification
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.3.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
 </div>
 
     </footer></div>
