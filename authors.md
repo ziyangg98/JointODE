@@ -10,7 +10,7 @@
 ## Citation
 
 Source:
-[`DESCRIPTION`](https://github.com/ziyangg98/JointODE/blob/main/DESCRIPTION)
+[`DESCRIPTION`](https://github.com/ziyangg98/JointODE/blob/v0.1.2/DESCRIPTION)
 
 Gong Z (2025). *JointODE: Joint Modeling of Longitudinal and Survival
 Data Using ODEs*. R package version 0.1.2,
