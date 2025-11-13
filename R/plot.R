@@ -4,6 +4,7 @@ utils::globalVariables(c(
   "id",
   "biomarker",
   "velocity",
+  "acceleration",
   "time",
   "survival",
   "group",
@@ -25,18 +26,24 @@ utils::globalVariables(c(
 #'   \itemize{
 #'     \item \code{"overview"}: Panel of 4 key plots (survival, biomarker,
 #'       velocity, phase space)
-#'     \item \code{"trajectories"}: Longitudinal biomarker trajectories.
+#'     \item \code{"trajectory_biomarker"}: Longitudinal biomarker trajectories.
 #'       Can show individual curves or group averages based on \code{by}
-#'     \item \code{"phase"}: Phase space plots (biomarker vs velocity).
+#'     \item \code{"trajectory_velocity"}: Longitudinal velocity trajectories.
 #'       Can show individual curves or group averages based on \code{by}
+#'     \item \code{"phase_biomarker_velocity"}: Phase space plots
+#'       (biomarker vs velocity). Can show individual curves or group
+#'       averages based on \code{by}
+#'     \item \code{"phase_velocity_acceleration"}: Phase space plots
+#'       (velocity vs acceleration). Can show individual curves or group
+#'       averages based on \code{by}
 #'     \item \code{"survival"}: Survival probability curves.
 #'       Can be stratified by \code{by} variable
-#'     \item \code{"residuals"}: Residuals vs fitted values
-#'     \item \code{"residuals_time"}: Residuals vs time
-#'     \item \code{"qq"}: Normal Q-Q plot of residuals
-#'     \item \code{"random_effects"}: Random effects distribution
-#'     \item \code{"association"}: Association between biomarker features
-#'       and hazard
+#'     \item \code{"diagnostic_residuals"}: Residuals vs fitted values
+#'     \item \code{"diagnostic_residuals_time"}: Residuals vs time
+#'     \item \code{"diagnostic_qq"}: Normal Q-Q plot of residuals
+#'     \item \code{"diagnostic_random_effects"}: Random effects distribution
+#'     \item \code{"diagnostic_association"}: Association between
+#'       biomarker features and hazard
 #'   }
 #' @param subject_ids Character or numeric vector of subject IDs to plot.
 #'   If \code{NULL}, displays all subjects.
@@ -134,23 +141,29 @@ utils::globalVariables(c(
 #' plot(fit, type = "overview")
 #'
 #' # Individual trajectory plots
-#' plot(fit, type = "biomarker")  # Shows all subjects
-#' plot(fit, type = "biomarker", subject_ids = c("1", "2", "3"))
+#' plot(fit, type = "trajectory_biomarker")  # Shows all subjects
+#' plot(fit, type = "trajectory_biomarker", subject_ids = c("1", "2", "3"))
+#' plot(fit, type = "trajectory_velocity")  # Velocity trajectories
+#'
+#' # Phase space plots
+#' plot(fit, type = "phase_biomarker_velocity")
+#' plot(fit, type = "phase_velocity_acceleration")
 #'
 #' # Group-stratified plots by survival covariates
 #' plot(fit, type = "survival", by = "w1")  # Continuous variable (auto-grouped)
-#' plot(fit, type = "biomarker", by = "w2")
-#' plot(fit, type = "velocity", by = "w2")
-#' plot(fit, type = "phase", by = "w1")
+#' plot(fit, type = "trajectory_biomarker", by = "w2")
+#' plot(fit, type = "trajectory_velocity", by = "w2")
+#' plot(fit, type = "phase_biomarker_velocity", by = "w1")
 #'
 #' # Stratify survival by biomarker/velocity
 #' plot(fit, type = "survival", by = "biomarker")
 #' plot(fit, type = "survival", by = "velocity")
 #'
 #' # Diagnostic plots
-#' plot(fit, type = "residuals")
-#' plot(fit, type = "qq")
-#' plot(fit, type = "random_effects")
+#' plot(fit, type = "diagnostic_residuals")
+#' plot(fit, type = "diagnostic_residuals_time")
+#' plot(fit, type = "diagnostic_qq")
+#' plot(fit, type = "diagnostic_random_effects")
 #'
 #' # Customize colors
 #' plot(fit, type = "survival", cols = c("red", "blue", "green"))
@@ -166,14 +179,16 @@ plot.JointODE <- function(
   x,
   type = c(
     "overview",
-    "biomarker",
-    "velocity",
-    "phase",
+    "trajectory_biomarker",
+    "trajectory_velocity",
+    "phase_biomarker_velocity",
+    "phase_velocity_acceleration",
     "survival",
-    "residuals",
-    "residuals_time",
-    "qq",
-    "random_effects"
+    "diagnostic_residuals",
+    "diagnostic_residuals_time",
+    "diagnostic_qq",
+    "diagnostic_random_effects",
+    "diagnostic_association"
   ),
   subject_ids = NULL,
   show_observed = TRUE,
@@ -197,7 +212,7 @@ plot.JointODE <- function(
       span = span,
       ...
     ),
-    biomarker = .plot_biomarker(
+    trajectory_biomarker = .plot_biomarker(
       x,
       subject_ids = subject_ids,
       show_observed = show_observed,
@@ -208,7 +223,7 @@ plot.JointODE <- function(
       span = span,
       ...
     ),
-    velocity = .plot_velocity(
+    trajectory_velocity = .plot_velocity(
       x,
       subject_ids = subject_ids,
       show_observed = FALSE,
@@ -219,7 +234,17 @@ plot.JointODE <- function(
       span = span,
       ...
     ),
-    phase = .plot_phase(
+    phase_biomarker_velocity = .plot_phase(
+      x,
+      subject_ids = subject_ids,
+      show_individual = show_individual,
+      by = by,
+      times = NULL,
+      cols = cols,
+      span = span,
+      ...
+    ),
+    phase_velocity_acceleration = .plot_vel_acc(
       x,
       subject_ids = subject_ids,
       show_individual = show_individual,
@@ -239,27 +264,31 @@ plot.JointODE <- function(
       span = span,
       ...
     ),
-    residuals = .plot_residuals_vs_fitted(
+    diagnostic_residuals = .plot_residuals_vs_fitted(
       x,
       cols = cols,
       span = span,
       ...
     ),
-    residuals_time = .plot_residuals_vs_time(
+    diagnostic_residuals_time = .plot_residuals_vs_time(
       x,
       cols = cols,
       span = span,
       ...
     ),
-    qq = .plot_qq(
+    diagnostic_qq = .plot_qq(
       x,
       cols = cols,
       ...
     ),
-    random_effects = .plot_random_effects(
+    diagnostic_random_effects = .plot_random_effects(
       x,
       cols = cols,
       ...
+    ),
+    diagnostic_association = stop(
+      "Association plot not yet implemented. ",
+      "This plot type is reserved for future functionality."
     )
   )
 
@@ -556,6 +585,39 @@ plot.JointODE <- function(
   return(p)
 }
 
+# Build grouped velocity-acceleration plot (no smoothing, uses geom_path)
+.build_grouped_vel_acc_plot <- function(
+  pred_data,
+  group_means,
+  group_colors,
+  group_name,
+  show_individual = TRUE
+) {
+  p <- ggplot()
+
+  if (show_individual) {
+    p <- p +
+      geom_path(
+        data = pred_data,
+        aes(x = velocity, y = acceleration, group = id, color = group),
+        alpha = 0.1,
+        linewidth = 0.3
+      )
+  }
+
+  p <- p +
+    geom_path(
+      data = group_means,
+      aes(x = velocity, y = acceleration, color = group),
+      linewidth = 1.5
+    ) +
+    scale_color_manual(values = group_colors, name = group_name) +
+    labs(x = "Velocity", y = "Acceleration") +
+    .theme_grouped()
+
+  return(p)
+}
+
 # Build overlay phase space plot with individual curves and mean
 .build_overlay_phase_plot <- function(
   data,
@@ -612,6 +674,70 @@ plot.JointODE <- function(
   }
 
   p <- p + labs(x = "Biomarker", y = "Velocity") + .theme_simple()
+
+  if (show_individual) {
+    p <- p + theme(legend.position = "bottom")
+  }
+
+  p
+}
+
+# Build overlay velocity-acceleration plot with individual curves and mean
+.build_overlay_vel_acc_plot <- function(
+  data,
+  show_individual = TRUE
+) {
+  p <- ggplot()
+
+  if (show_individual) {
+    p <- p +
+      geom_path(
+        data = data,
+        aes(x = velocity, y = acceleration, group = id, color = "Individual"),
+        alpha = 0.15,
+        linewidth = 0.4
+      )
+
+    # Calculate mean velocity-acceleration trajectory
+    mean_data <- data %>%
+      group_by(time) %>%
+      summarise(
+        velocity = mean(velocity, na.rm = TRUE),
+        acceleration = mean(acceleration, na.rm = TRUE),
+        .groups = "drop"
+      )
+
+    p <- p +
+      geom_path(
+        data = mean_data,
+        aes(x = velocity, y = acceleration, color = "Mean"),
+        linewidth = 1.2
+      ) +
+      scale_color_manual(
+        name = NULL,
+        values = c("Individual" = "gray60", "Mean" = "#2E86AB"),
+        breaks = c("Mean", "Individual")
+      )
+  } else {
+    # Only show mean velocity-acceleration trajectory
+    mean_data <- data %>%
+      group_by(time) %>%
+      summarise(
+        velocity = mean(velocity, na.rm = TRUE),
+        acceleration = mean(acceleration, na.rm = TRUE),
+        .groups = "drop"
+      )
+
+    p <- p +
+      geom_path(
+        data = mean_data,
+        aes(x = velocity, y = acceleration),
+        color = "#2E86AB",
+        linewidth = 1.2
+      )
+  }
+
+  p <- p + labs(x = "Velocity", y = "Acceleration") + .theme_simple()
 
   if (show_individual) {
     p <- p + theme(legend.position = "bottom")
@@ -921,6 +1047,14 @@ plot.JointODE <- function(
         velocity = mean(velocity, na.rm = TRUE),
         .groups = "drop"
       )
+  } else if (type == "velocity_acceleration") {
+    group_means <- pred_data %>%
+      group_by(group, time) %>%
+      summarise(
+        velocity = mean(velocity, na.rm = TRUE),
+        acceleration = mean(acceleration, na.rm = TRUE),
+        .groups = "drop"
+      )
   } else if (type == "survival") {
     group_means <- pred_data %>%
       group_by(group, time) %>%
@@ -1227,6 +1361,94 @@ plot.JointODE <- function(
 
   # Build plot
   .build_grouped_phase_plot(
+    pred_data = grouped$pred_data,
+    group_means = group_means,
+    group_colors = grouped$group_colors,
+    group_name = by,
+    show_individual = show_individual
+  )
+}
+
+
+# ==============================================================================
+# 6. VELOCITY-ACCELERATION PHASE SPACE PLOTS
+# ==============================================================================
+
+.plot_vel_acc <- function(
+  x,
+  subject_ids = NULL,
+  show_individual = TRUE,
+  by = NULL,
+  times = NULL,
+  cols = NULL,
+  span = 0.75,
+  ...
+) {
+  if (!is.null(by)) {
+    return(.plot_vel_acc_grouped(
+      x,
+      by = by,
+      show_individual = show_individual,
+      times = times,
+      cols = cols,
+      span = span,
+      ...
+    ))
+  }
+
+  # Remember if user explicitly specified subject_ids
+  user_specified_subjects <- !is.null(subject_ids)
+
+  # Get predictions
+  times <- .get_time_grid(x, times)
+  pred_data <- predict(x, times = times)
+
+  # Select subjects
+  subject_ids <- .select_subjects(x, subject_ids)
+  pred_data <- pred_data[pred_data$id %in% subject_ids, ]
+
+  # If user specified subjects explicitly, use faceting for detailed view
+  if (user_specified_subjects) {
+    return(
+      ggplot(pred_data, aes(x = velocity, y = acceleration, group = id)) +
+        geom_path(color = "#2E86AB", linewidth = 0.8) +
+        facet_wrap(~id, scales = "free") +
+        labs(x = "Velocity", y = "Acceleration") +
+        .theme_faceted()
+    )
+  }
+
+  # If showing all subjects, use overlay with mean trajectory
+  .build_overlay_vel_acc_plot(
+    data = pred_data,
+    show_individual = show_individual
+  )
+}
+
+.plot_vel_acc_grouped <- function(
+  x,
+  by,
+  show_individual = TRUE,
+  times = NULL,
+  cols = NULL,
+  span = 0.75,
+  ...
+) {
+  # Prepare grouped data
+  grouped <- .prepare_grouped_data(x, by, times)
+  if (!is.null(cols)) {
+    grouped$group_colors <- .setup_group_colors(grouped$groups, cols)
+  }
+
+  # Calculate group means
+  group_means <- .calculate_group_means(
+    grouped$pred_data,
+    grouped$groups,
+    type = "velocity_acceleration"
+  )
+
+  # Build plot
+  .build_grouped_vel_acc_plot(
     pred_data = grouped$pred_data,
     group_means = group_means,
     group_colors = grouped$group_colors,
