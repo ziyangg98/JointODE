@@ -47,7 +47,7 @@ ggplot2 for modern, publication-ready graphics."></head><body>
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Plot Method for JointODE Objects</h1>
-      <small class="dont-index">Source: <a href="https://github.com/ziyangg98/JointODE/blob/v0.1.2/R/plot.R" class="external-link"><code>R/plot.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/ziyangg98/JointODE/blob/main/R/plot.R" class="external-link"><code>R/plot.R</code></a></small>
       <div class="d-none name"><code>plot.JointODE.Rd</code></div>
     </div>
 
@@ -63,8 +63,10 @@ ggplot2 for modern, publication-ready graphics.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="co"># S3 method for class 'JointODE'</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span></span>
 <span>  <span class="va">x</span>,</span>
-<span>  type <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"overview"</span>, <span class="st">"biomarker"</span>, <span class="st">"velocity"</span>, <span class="st">"phase"</span>, <span class="st">"survival"</span>, <span class="st">"residuals"</span>,</span>
-<span>    <span class="st">"residuals_time"</span>, <span class="st">"qq"</span>, <span class="st">"random_effects"</span><span class="op">)</span>,</span>
+<span>  type <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"overview"</span>, <span class="st">"trajectory_biomarker"</span>, <span class="st">"trajectory_velocity"</span>,</span>
+<span>    <span class="st">"phase_biomarker_velocity"</span>, <span class="st">"phase_velocity_acceleration"</span>, <span class="st">"survival"</span>,</span>
+<span>    <span class="st">"diagnostic_residuals"</span>, <span class="st">"diagnostic_residuals_time"</span>, <span class="st">"diagnostic_qq"</span>,</span>
+<span>    <span class="st">"diagnostic_random_effects"</span>, <span class="st">"diagnostic_association"</span><span class="op">)</span>,</span>
 <span>  subject_ids <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  show_observed <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  show_individual <span class="op">=</span> <span class="cn">TRUE</span>,</span>
@@ -87,18 +89,24 @@ ggplot2 for modern, publication-ready graphics.</p>
 <dt id="arg-type">type<a class="anchor" aria-label="anchor" href="#arg-type"></a></dt>
 <dd><p>Character string specifying the plot type:</p><ul><li><p><code>"overview"</code>: Panel of 4 key plots (survival, biomarker,
 velocity, phase space)</p></li>
-<li><p><code>"trajectories"</code>: Longitudinal biomarker trajectories.
+<li><p><code>"trajectory_biomarker"</code>: Longitudinal biomarker trajectories.
 Can show individual curves or group averages based on <code>by</code></p></li>
-<li><p><code>"phase"</code>: Phase space plots (biomarker vs velocity).
+<li><p><code>"trajectory_velocity"</code>: Longitudinal velocity trajectories.
 Can show individual curves or group averages based on <code>by</code></p></li>
+<li><p><code>"phase_biomarker_velocity"</code>: Phase space plots
+(biomarker vs velocity). Can show individual curves or group
+averages based on <code>by</code></p></li>
+<li><p><code>"phase_velocity_acceleration"</code>: Phase space plots
+(velocity vs acceleration). Can show individual curves or group
+averages based on <code>by</code></p></li>
 <li><p><code>"survival"</code>: Survival probability curves.
 Can be stratified by <code>by</code> variable</p></li>
-<li><p><code>"residuals"</code>: Residuals vs fitted values</p></li>
-<li><p><code>"residuals_time"</code>: Residuals vs time</p></li>
-<li><p><code>"qq"</code>: Normal Q-Q plot of residuals</p></li>
-<li><p><code>"random_effects"</code>: Random effects distribution</p></li>
-<li><p><code>"association"</code>: Association between biomarker features
-and hazard</p></li>
+<li><p><code>"diagnostic_residuals"</code>: Residuals vs fitted values</p></li>
+<li><p><code>"diagnostic_residuals_time"</code>: Residuals vs time</p></li>
+<li><p><code>"diagnostic_qq"</code>: Normal Q-Q plot of residuals</p></li>
+<li><p><code>"diagnostic_random_effects"</code>: Random effects distribution</p></li>
+<li><p><code>"diagnostic_association"</code>: Association between
+biomarker features and hazard</p></li>
 </ul></dd>
 
 
@@ -207,23 +215,29 @@ slope) relate to hazard ratios.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"overview"</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Individual trajectory plots</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"biomarker"</span><span class="op">)</span>  <span class="co"># Shows all subjects</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"biomarker"</span>, subject_ids <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"1"</span>, <span class="st">"2"</span>, <span class="st">"3"</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"trajectory_biomarker"</span><span class="op">)</span>  <span class="co"># Shows all subjects</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"trajectory_biomarker"</span>, subject_ids <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"1"</span>, <span class="st">"2"</span>, <span class="st">"3"</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"trajectory_velocity"</span><span class="op">)</span>  <span class="co"># Velocity trajectories</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Phase space plots</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"phase_biomarker_velocity"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"phase_velocity_acceleration"</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Group-stratified plots by survival covariates</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"survival"</span>, by <span class="op">=</span> <span class="st">"w1"</span><span class="op">)</span>  <span class="co"># Continuous variable (auto-grouped)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"biomarker"</span>, by <span class="op">=</span> <span class="st">"w2"</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"velocity"</span>, by <span class="op">=</span> <span class="st">"w2"</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"phase"</span>, by <span class="op">=</span> <span class="st">"w1"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"trajectory_biomarker"</span>, by <span class="op">=</span> <span class="st">"w2"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"trajectory_velocity"</span>, by <span class="op">=</span> <span class="st">"w2"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"phase_biomarker_velocity"</span>, by <span class="op">=</span> <span class="st">"w1"</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Stratify survival by biomarker/velocity</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"survival"</span>, by <span class="op">=</span> <span class="st">"biomarker"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"survival"</span>, by <span class="op">=</span> <span class="st">"velocity"</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Diagnostic plots</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"residuals"</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"qq"</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"random_effects"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"diagnostic_residuals"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"diagnostic_residuals_time"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"diagnostic_qq"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"diagnostic_random_effects"</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Customize colors</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"survival"</span>, cols <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"red"</span>, <span class="st">"blue"</span>, <span class="st">"green"</span><span class="op">)</span><span class="op">)</span></span></span>

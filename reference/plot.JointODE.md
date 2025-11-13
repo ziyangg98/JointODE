@@ -11,8 +11,10 @@ using ggplot2 for modern, publication-ready graphics.
 # S3 method for class 'JointODE'
 plot(
   x,
-  type = c("overview", "biomarker", "velocity", "phase", "survival", "residuals",
-    "residuals_time", "qq", "random_effects"),
+  type = c("overview", "trajectory_biomarker", "trajectory_velocity",
+    "phase_biomarker_velocity", "phase_velocity_acceleration", "survival",
+    "diagnostic_residuals", "diagnostic_residuals_time", "diagnostic_qq",
+    "diagnostic_random_effects", "diagnostic_association"),
   subject_ids = NULL,
   show_observed = TRUE,
   show_individual = TRUE,
@@ -37,24 +39,33 @@ plot(
   - `"overview"`: Panel of 4 key plots (survival, biomarker, velocity,
     phase space)
 
-  - `"trajectories"`: Longitudinal biomarker trajectories. Can show
-    individual curves or group averages based on `by`
+  - `"trajectory_biomarker"`: Longitudinal biomarker trajectories. Can
+    show individual curves or group averages based on `by`
 
-  - `"phase"`: Phase space plots (biomarker vs velocity). Can show
-    individual curves or group averages based on `by`
+  - `"trajectory_velocity"`: Longitudinal velocity trajectories. Can
+    show individual curves or group averages based on `by`
+
+  - `"phase_biomarker_velocity"`: Phase space plots (biomarker vs
+    velocity). Can show individual curves or group averages based on
+    `by`
+
+  - `"phase_velocity_acceleration"`: Phase space plots (velocity vs
+    acceleration). Can show individual curves or group averages based on
+    `by`
 
   - `"survival"`: Survival probability curves. Can be stratified by `by`
     variable
 
-  - `"residuals"`: Residuals vs fitted values
+  - `"diagnostic_residuals"`: Residuals vs fitted values
 
-  - `"residuals_time"`: Residuals vs time
+  - `"diagnostic_residuals_time"`: Residuals vs time
 
-  - `"qq"`: Normal Q-Q plot of residuals
+  - `"diagnostic_qq"`: Normal Q-Q plot of residuals
 
-  - `"random_effects"`: Random effects distribution
+  - `"diagnostic_random_effects"`: Random effects distribution
 
-  - `"association"`: Association between biomarker features and hazard
+  - `"diagnostic_association"`: Association between biomarker features
+    and hazard
 
 - subject_ids:
 
@@ -164,23 +175,29 @@ plot(fit)
 plot(fit, type = "overview")
 
 # Individual trajectory plots
-plot(fit, type = "biomarker")  # Shows all subjects
-plot(fit, type = "biomarker", subject_ids = c("1", "2", "3"))
+plot(fit, type = "trajectory_biomarker")  # Shows all subjects
+plot(fit, type = "trajectory_biomarker", subject_ids = c("1", "2", "3"))
+plot(fit, type = "trajectory_velocity")  # Velocity trajectories
+
+# Phase space plots
+plot(fit, type = "phase_biomarker_velocity")
+plot(fit, type = "phase_velocity_acceleration")
 
 # Group-stratified plots by survival covariates
 plot(fit, type = "survival", by = "w1")  # Continuous variable (auto-grouped)
-plot(fit, type = "biomarker", by = "w2")
-plot(fit, type = "velocity", by = "w2")
-plot(fit, type = "phase", by = "w1")
+plot(fit, type = "trajectory_biomarker", by = "w2")
+plot(fit, type = "trajectory_velocity", by = "w2")
+plot(fit, type = "phase_biomarker_velocity", by = "w1")
 
 # Stratify survival by biomarker/velocity
 plot(fit, type = "survival", by = "biomarker")
 plot(fit, type = "survival", by = "velocity")
 
 # Diagnostic plots
-plot(fit, type = "residuals")
-plot(fit, type = "qq")
-plot(fit, type = "random_effects")
+plot(fit, type = "diagnostic_residuals")
+plot(fit, type = "diagnostic_residuals_time")
+plot(fit, type = "diagnostic_qq")
+plot(fit, type = "diagnostic_random_effects")
 
 # Customize colors
 plot(fit, type = "survival", cols = c("red", "blue", "green"))
