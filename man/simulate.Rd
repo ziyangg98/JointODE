@@ -257,7 +257,7 @@ x2 + (biomarker + velocity | id)}.
 }
 \examples{
 # Example 1: Simple simulation with default parameters
-sim_basic <- simulate(n_subjects = 50, seed = 123)
+sim_basic <- simulate(n_subjects = 20, seed = 123)
 
 # Explore the output structure
 names(sim_basic)
@@ -275,7 +275,7 @@ attr(sim_basic$random_effects, "sigma") # Covariance matrix
 # Example 2: Heterogeneous patient dynamics
 # Patients differ in damping ratio (xi) and oscillation period
 sim_hetero <- simulate(
-  n_subjects = 100,
+  n_subjects = 20,
   longitudinal = list(
     xi = c(mean = 0.5, sd = 0.2),      # Mean damping ratio with variation
     period = c(mean = 8, sd = 2),      # Mean period with variation
@@ -291,7 +291,7 @@ sim_hetero <- simulate(
       )
     ),
     error_sd = 0.1,
-    n_measurements = 100
+    n_measurements = 10
   ),
   covariates = list(
     x1 = list(type = "normal", mean = 0, sd = 1),
@@ -305,7 +305,7 @@ sim_hetero <- simulate(
 # Example 3: Nearly uniform dynamics (low variability)
 # Useful for testing when patient heterogeneity should be minimal
 sim_uniform <- simulate(
-  n_subjects = 50,
+  n_subjects = 20,
   longitudinal = list(
     xi = c(mean = 0.707, sd = 0.01),    # Very small variation
     period = c(mean = 5, sd = 0.1),     # Very small variation
@@ -315,7 +315,7 @@ sim_uniform <- simulate(
       covariates = list(biomarker = numeric(0), velocity = numeric(0))
     ),
     error_sd = 0.15,
-    n_measurements = 50
+    n_measurements = 20
   ),
   seed = 789
 )
@@ -323,9 +323,10 @@ sim_uniform <- simulate(
 # Verify low variability - all patients should have similar dynamics
 apply(sim_uniform$random_effects, 2, sd)
 
+\donttest{
 # Example 4: Comprehensive simulation with survival outcomes
 sim_full <- simulate(
-  n_subjects = 200,
+  n_subjects = 30,
   longitudinal = list(
     xi = c(mean = 0.4, sd = 0.05),
     period = c(mean = 8, sd = 0.3),
@@ -341,7 +342,7 @@ sim_full <- simulate(
       )
     ),
     error_sd = 0.1,
-    n_measurements = 100
+    n_measurements = 20
   ),
   survival = list(
     baseline = list(type = "weibull", shape = 3.0, scale = 23),
@@ -415,5 +416,6 @@ library(survival)
 km_fit <- survfit(Surv(time, status) ~ 1, data = sim_full$survival_data)
 plot(km_fit, xlab = "Time", ylab = "Survival Probability",
      main = "Kaplan-Meier Survival Curve")
+}
 }
 \concept{data-simulation}
