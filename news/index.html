@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">JointODE</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -44,7 +44,88 @@
       <small>Source: <a href="https://github.com/ziyangg98/JointODE/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
-  </main></div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.1.2" id="jointode-012">JointODE 0.1.2<a class="anchor" aria-label="anchor" href="#jointode-012"></a></h2>
+<div class="section level3">
+<h3 id="major-features-0-1-2">Major Features<a class="anchor" aria-label="anchor" href="#major-features-0-1-2"></a></h3>
+<ul><li>
+<strong>Comprehensive Visualization System</strong>: Implemented complete plotting framework with <code><a href="../reference/plot.JointODE.html">plot.JointODE()</a></code> method
+<ul><li>Model diagnostics: overview panels, biomarker/velocity trajectories, phase space diagrams</li>
+<li>Survival analysis: Kaplan-Meier curves, hazard contributions</li>
+<li>Residual diagnostics: standardized residuals, Q-Q plots</li>
+<li>All plots built with ggplot2 for publication-ready graphics</li>
+</ul></li>
+<li>
+<strong>Initial State Optimization</strong>: Added iterative optimization for estimating initial biomarker and velocity values
+<ul><li>Uses CppAD automatic differentiation for efficient gradient computation</li>
+<li>Improves model convergence and parameter estimation accuracy</li>
+<li>Available in both <code><a href="../reference/JointODE.html">JointODE()</a></code> and <code><a href="../reference/MarginalODE.html">MarginalODE()</a></code> functions</li>
+</ul></li>
+<li>
+<strong>Enhanced Prediction</strong>: Extended <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> method with improved covariate handling via LOCF (Last Observation Carried Forward)</li>
+</ul></div>
+<div class="section level3">
+<h3 id="package-quality-improvements-0-1-2">Package Quality Improvements<a class="anchor" aria-label="anchor" href="#package-quality-improvements-0-1-2"></a></h3>
+<ul><li>Fixed R CMD check warnings for CRAN compliance
+<ul><li>Renamed <code>src/utils.hpp</code> to <code>src/utils.h</code> following R package conventions</li>
+<li>Added <code>.covrignore</code> to exclude third-party libraries from test coverage</li>
+</ul></li>
+<li>Optimized documentation examples (72s → 1.5s, ~98% improvement)</li>
+<li>Fixed NEWS.md format for proper changelog display</li>
+</ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.1.1" id="jointode-011">JointODE 0.1.1<a class="anchor" aria-label="anchor" href="#jointode-011"></a></h2>
+<ul><li>Implemented subject-specific random effects on ODE acceleration parameters to account for population heterogeneity</li>
+<li>Added Laplace approximation for efficient posterior computation of random effects</li>
+<li>Integrated AGHQ (Adaptive Gauss-Hermite Quadrature) for accurate numerical integration</li>
+<li>Implemented CppAD automatic differentiation for efficient gradient computation</li>
+</ul></div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.1.0" id="jointode-010">JointODE 0.1.0<a class="anchor" aria-label="anchor" href="#jointode-010"></a></h2>
+<ul><li>Joint modeling of longitudinal biomarkers and survival outcomes using ODEs</li>
+<li>Second-order differential equation formulation for biomarker dynamics</li>
+<li>EM algorithm for parameter estimation</li>
+<li>Parallel processing support for improved computational efficiency</li>
+</ul><hr><div class="section level3">
+<h3 id="development-roadmap-0-1-0">Development Roadmap<a class="anchor" aria-label="anchor" href="#development-roadmap-0-1-0"></a></h3>
+</div>
+<div class="section level3">
+<h3 id="version-planned---q2-0-1-0">Version 0.2.0 (Planned - Q2 2025)<a class="anchor" aria-label="anchor" href="#version-planned---q2-0-1-0"></a></h3>
+<div class="section level4">
+<h4 id="subgroup-heterogeneity-0-1-0">Subgroup Heterogeneity<a class="anchor" aria-label="anchor" href="#subgroup-heterogeneity-0-1-0"></a></h4>
+<ul><li>
+<code>JointODE_group()</code>: Latent subgroup modeling</li>
+<li>Group-specific ODE parameters (κ_g, γ_g)</li>
+<li>Model selection via ICL and entropy criteria</li>
+<li>K-means initialization with stability analysis</li>
+</ul></div>
+</div>
+<div class="section level3">
+<h3 id="version-planned---q4-0-1-0">Version 0.3.0 (Planned - Q4 2025)<a class="anchor" aria-label="anchor" href="#version-planned---q4-0-1-0"></a></h3>
+<div class="section level4">
+<h4 id="multiple-biomarkers-0-1-0">Multiple Biomarkers<a class="anchor" aria-label="anchor" href="#multiple-biomarkers-0-1-0"></a></h4>
+<ul><li>
+<code>JointODE_multi()</code>: Multi-marker joint modeling</li>
+<li>
+<code>select_biomarkers()</code>: SIP-based variable selection</li>
+<li>Adaptive LASSO and group penalties</li>
+<li>Rcpp integration for performance</li>
+</ul></div>
+</div>
+<div class="section level3">
+<h3 id="version-planned---q4-0-1-0-1">Version 0.4.0 (Planned - Q4 2026)<a class="anchor" aria-label="anchor" href="#version-planned---q4-0-1-0-1"></a></h3>
+<div class="section level4">
+<h4 id="machine-learning-0-1-0">Machine Learning<a class="anchor" aria-label="anchor" href="#machine-learning-0-1-0"></a></h4>
+<ul><li>
+<code>JointODE_nn()</code>: Neural ODE backend</li>
+<li>Python bridge via reticulate</li>
+<li>Cloud deployment tools</li>
+</ul></div>
+</div>
+</div>
+  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
+    </nav></aside></div>
 
 
     <footer><div class="pkgdown-footer-left">

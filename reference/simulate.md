@@ -338,7 +338,7 @@ variability. This structure corresponds to the formula specification
 
 ``` r
 # Example 1: Simple simulation with default parameters
-sim_basic <- simulate(n_subjects = 50, seed = 123)
+sim_basic <- simulate(n_subjects = 20, seed = 123)
 
 # Explore the output structure
 names(sim_basic)
@@ -346,31 +346,31 @@ names(sim_basic)
 #> [4] "random_effects"   
 head(sim_basic$longitudinal_data)
 #>   id time  biomarker    velocity acceleration   observed         x1        x2
-#> 1  1  0.0 -0.5600372 -0.29078261    0.4950795 -0.5607406 -0.5604756 0.2533185
-#> 2  1  0.1 -0.5866769 -0.24236850    0.4727285 -0.4816559 -0.5604756 0.2533185
-#> 3  1  0.2 -0.6085903 -0.19632557    0.4477032 -0.5387563 -0.5604756 0.2533185
-#> 4  1  0.3 -0.6260290 -0.15289720    0.4205406 -0.7025991 -0.5604756 0.2533185
-#> 5  1  0.4 -0.6392633 -0.11227160    0.3917394 -0.7033609 -0.5604756 0.2533185
-#> 6  1  0.5 -0.6485810 -0.07458886    0.3617663 -0.6137664 -0.5604756 0.2533185
+#> 1  1  0.0 -0.4807686 -0.02655417    0.7898386 -0.4237065 -0.5604756 -1.067824
+#> 2  1  0.1 -0.4795949  0.04883328    0.7176135 -0.5187984 -0.5604756 -1.067824
+#> 3  1  0.2 -0.4712454  0.11692671    0.6441097 -0.4164648 -0.5604756 -1.067824
+#> 4  1  0.3 -0.4564552  0.17764388    0.5702384 -0.5333797 -0.5604756 -1.067824
+#> 5  1  0.4 -0.4359621  0.23098982    0.4968312 -0.3048338 -0.5604756 -1.067824
+#> 6  1  0.5 -0.4104998  0.27704976    0.4246403 -0.4184387 -0.5604756 -1.067824
 head(sim_basic$survival_data)
-#>   id      time status          w1 w2
-#> 1  1 10.000000      0 -0.71040656  1
-#> 2  2  6.540180      1  0.25688371  0
-#> 3  3 10.000000      0 -0.24669188  1
-#> 4  4 10.000000      0 -0.34754260  1
-#> 5  5 10.000000      0 -0.95161857  1
-#> 6  6  6.241667      1 -0.04502772  0
+#>   id      time status         w1 w2
+#> 1  1  3.677542      1 -0.6947070  1
+#> 2  2 10.000000      0 -0.2079173  0
+#> 3  3 10.000000      0 -1.2653964  0
+#> 4  4  2.485635      1  2.1689560  0
+#> 5  5 10.000000      0  1.2079620  0
+#> 6  6 10.000000      0 -1.1231086  1
 
 # Check patient-specific dynamics
 # Each patient has unique dynamics drawn from population distribution
 head(sim_basic$random_effects)
-#>         dyn_value    dyn_slope
-#> [1,] -0.004926872 -0.230027933
-#> [2,]  0.025789971  0.007625015
-#> [3,]  0.026933961  0.064858722
-#> [4,] -0.031166975  0.092013359
-#> [5,]  0.035887409 -0.096655089
-#> [6,] -0.073971668 -0.222344650
+#>         dyn_value  dyn_slope
+#> [1,] -0.037462229 -0.1026366
+#> [2,] -0.025788552 -0.4844648
+#> [3,] -0.006184456  0.2112125
+#> [4,]  0.021120355 -0.1491376
+#> [5,] -0.051345273 -0.1438230
+#> [6,]  0.024461609  0.2150100
 
 # Population parameters (mean and covariance)
 attr(sim_basic$random_effects, "mu")    # Mean of dynamics distribution
@@ -384,7 +384,7 @@ attr(sim_basic$random_effects, "sigma") # Covariance matrix
 # Example 2: Heterogeneous patient dynamics
 # Patients differ in damping ratio (xi) and oscillation period
 sim_hetero <- simulate(
-  n_subjects = 100,
+  n_subjects = 20,
   longitudinal = list(
     xi = c(mean = 0.5, sd = 0.2),      # Mean damping ratio with variation
     period = c(mean = 8, sd = 2),      # Mean period with variation
@@ -400,7 +400,7 @@ sim_hetero <- simulate(
       )
     ),
     error_sd = 0.1,
-    n_measurements = 100
+    n_measurements = 10
   ),
   covariates = list(
     x1 = list(type = "normal", mean = 0, sd = 1),
@@ -414,7 +414,7 @@ sim_hetero <- simulate(
 # Example 3: Nearly uniform dynamics (low variability)
 # Useful for testing when patient heterogeneity should be minimal
 sim_uniform <- simulate(
-  n_subjects = 50,
+  n_subjects = 20,
   longitudinal = list(
     xi = c(mean = 0.707, sd = 0.01),    # Very small variation
     period = c(mean = 5, sd = 0.1),     # Very small variation
@@ -424,7 +424,7 @@ sim_uniform <- simulate(
       covariates = list(biomarker = numeric(0), velocity = numeric(0))
     ),
     error_sd = 0.15,
-    n_measurements = 50
+    n_measurements = 20
   ),
   seed = 789
 )
@@ -432,11 +432,12 @@ sim_uniform <- simulate(
 # Verify low variability - all patients should have similar dynamics
 apply(sim_uniform$random_effects, 2, sd)
 #>  dyn_value  dyn_slope 
-#> 0.07220340 0.04453099 
+#> 0.06639935 0.04269099 
 
+# \donttest{
 # Example 4: Comprehensive simulation with survival outcomes
 sim_full <- simulate(
-  n_subjects = 200,
+  n_subjects = 30,
   longitudinal = list(
     xi = c(mean = 0.4, sd = 0.05),
     period = c(mean = 8, sd = 0.3),
@@ -452,7 +453,7 @@ sim_full <- simulate(
       )
     ),
     error_sd = 0.1,
-    n_measurements = 100
+    n_measurements = 20
   ),
   survival = list(
     baseline = list(type = "weibull", shape = 3.0, scale = 23),
@@ -529,4 +530,6 @@ library(survival)
 km_fit <- survfit(Surv(time, status) ~ 1, data = sim_full$survival_data)
 plot(km_fit, xlab = "Time", ylab = "Survival Probability",
      main = "Kaplan-Meier Survival Curve")
+
+# }
 ```

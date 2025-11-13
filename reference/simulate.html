@@ -19,7 +19,7 @@ natural period, and excitation amplitude."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">JointODE</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -357,7 +357,7 @@ x2 + (biomarker + velocity | id)</code>.</p>
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Example 1: Simple simulation with default parameters</span></span></span>
-<span class="r-in"><span><span class="va">sim_basic</span> <span class="op">&lt;-</span> <span class="fu">simulate</span><span class="op">(</span>n_subjects <span class="op">=</span> <span class="fl">50</span>, seed <span class="op">=</span> <span class="fl">123</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">sim_basic</span> <span class="op">&lt;-</span> <span class="fu">simulate</span><span class="op">(</span>n_subjects <span class="op">=</span> <span class="fl">20</span>, seed <span class="op">=</span> <span class="fl">123</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Explore the output structure</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">sim_basic</span><span class="op">)</span></span></span>
@@ -365,31 +365,31 @@ x2 + (biomarker + velocity | id)</code>.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [4] "random_effects"   </span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sim_basic</span><span class="op">$</span><span class="va">longitudinal_data</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   id time  biomarker    velocity acceleration   observed         x1        x2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1  0.0 -0.5600372 -0.29078261    0.4950795 -0.5607406 -0.5604756 0.2533185</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1  0.1 -0.5866769 -0.24236850    0.4727285 -0.4816559 -0.5604756 0.2533185</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  1  0.2 -0.6085903 -0.19632557    0.4477032 -0.5387563 -0.5604756 0.2533185</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  1  0.3 -0.6260290 -0.15289720    0.4205406 -0.7025991 -0.5604756 0.2533185</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  1  0.4 -0.6392633 -0.11227160    0.3917394 -0.7033609 -0.5604756 0.2533185</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  1  0.5 -0.6485810 -0.07458886    0.3617663 -0.6137664 -0.5604756 0.2533185</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1  0.0 -0.4807686 -0.02655417    0.7898386 -0.4237065 -0.5604756 -1.067824</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1  0.1 -0.4795949  0.04883328    0.7176135 -0.5187984 -0.5604756 -1.067824</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  1  0.2 -0.4712454  0.11692671    0.6441097 -0.4164648 -0.5604756 -1.067824</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  1  0.3 -0.4564552  0.17764388    0.5702384 -0.5333797 -0.5604756 -1.067824</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  1  0.4 -0.4359621  0.23098982    0.4968312 -0.3048338 -0.5604756 -1.067824</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  1  0.5 -0.4104998  0.27704976    0.4246403 -0.4184387 -0.5604756 -1.067824</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sim_basic</span><span class="op">$</span><span class="va">survival_data</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   id      time status          w1 w2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1 10.000000      0 -0.71040656  1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  2  6.540180      1  0.25688371  0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  3 10.000000      0 -0.24669188  1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  4 10.000000      0 -0.34754260  1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  5 10.000000      0 -0.95161857  1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  6  6.241667      1 -0.04502772  0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   id      time status         w1 w2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1  3.677542      1 -0.6947070  1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  2 10.000000      0 -0.2079173  0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  3 10.000000      0 -1.2653964  0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  4  2.485635      1  2.1689560  0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  5 10.000000      0  1.2079620  0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  6 10.000000      0 -1.1231086  1</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Check patient-specific dynamics</span></span></span>
 <span class="r-in"><span><span class="co"># Each patient has unique dynamics drawn from population distribution</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sim_basic</span><span class="op">$</span><span class="va">random_effects</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         dyn_value    dyn_slope</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1,] -0.004926872 -0.230027933</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [2,]  0.025789971  0.007625015</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [3,]  0.026933961  0.064858722</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] -0.031166975  0.092013359</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  0.035887409 -0.096655089</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [6,] -0.073971668 -0.222344650</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         dyn_value  dyn_slope</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,] -0.037462229 -0.1026366</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] -0.025788552 -0.4844648</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,] -0.006184456  0.2112125</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,]  0.021120355 -0.1491376</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,] -0.051345273 -0.1438230</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  0.024461609  0.2150100</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Population parameters (mean and covariance)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">sim_basic</span><span class="op">$</span><span class="va">random_effects</span>, <span class="st">"mu"</span><span class="op">)</span>    <span class="co"># Mean of dynamics distribution</span></span></span>
@@ -403,7 +403,7 @@ x2 + (biomarker + velocity | id)</code>.</p>
 <span class="r-in"><span><span class="co"># Example 2: Heterogeneous patient dynamics</span></span></span>
 <span class="r-in"><span><span class="co"># Patients differ in damping ratio (xi) and oscillation period</span></span></span>
 <span class="r-in"><span><span class="va">sim_hetero</span> <span class="op">&lt;-</span> <span class="fu">simulate</span><span class="op">(</span></span></span>
-<span class="r-in"><span>  n_subjects <span class="op">=</span> <span class="fl">100</span>,</span></span>
+<span class="r-in"><span>  n_subjects <span class="op">=</span> <span class="fl">20</span>,</span></span>
 <span class="r-in"><span>  longitudinal <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>    xi <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="fl">0.5</span>, sd <span class="op">=</span> <span class="fl">0.2</span><span class="op">)</span>,      <span class="co"># Mean damping ratio with variation</span></span></span>
 <span class="r-in"><span>    period <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="fl">8</span>, sd <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>,      <span class="co"># Mean period with variation</span></span></span>
@@ -419,7 +419,7 @@ x2 + (biomarker + velocity | id)</code>.</p>
 <span class="r-in"><span>      <span class="op">)</span></span></span>
 <span class="r-in"><span>    <span class="op">)</span>,</span></span>
 <span class="r-in"><span>    error_sd <span class="op">=</span> <span class="fl">0.1</span>,</span></span>
-<span class="r-in"><span>    n_measurements <span class="op">=</span> <span class="fl">100</span></span></span>
+<span class="r-in"><span>    n_measurements <span class="op">=</span> <span class="fl">10</span></span></span>
 <span class="r-in"><span>  <span class="op">)</span>,</span></span>
 <span class="r-in"><span>  covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>    x1 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"normal"</span>, mean <span class="op">=</span> <span class="fl">0</span>, sd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
@@ -433,7 +433,7 @@ x2 + (biomarker + velocity | id)</code>.</p>
 <span class="r-in"><span><span class="co"># Example 3: Nearly uniform dynamics (low variability)</span></span></span>
 <span class="r-in"><span><span class="co"># Useful for testing when patient heterogeneity should be minimal</span></span></span>
 <span class="r-in"><span><span class="va">sim_uniform</span> <span class="op">&lt;-</span> <span class="fu">simulate</span><span class="op">(</span></span></span>
-<span class="r-in"><span>  n_subjects <span class="op">=</span> <span class="fl">50</span>,</span></span>
+<span class="r-in"><span>  n_subjects <span class="op">=</span> <span class="fl">20</span>,</span></span>
 <span class="r-in"><span>  longitudinal <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>    xi <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="fl">0.707</span>, sd <span class="op">=</span> <span class="fl">0.01</span><span class="op">)</span>,    <span class="co"># Very small variation</span></span></span>
 <span class="r-in"><span>    period <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="fl">5</span>, sd <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span>,     <span class="co"># Very small variation</span></span></span>
@@ -443,7 +443,7 @@ x2 + (biomarker + velocity | id)</code>.</p>
 <span class="r-in"><span>      covariates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>biomarker <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span>, velocity <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span>    <span class="op">)</span>,</span></span>
 <span class="r-in"><span>    error_sd <span class="op">=</span> <span class="fl">0.15</span>,</span></span>
-<span class="r-in"><span>    n_measurements <span class="op">=</span> <span class="fl">50</span></span></span>
+<span class="r-in"><span>    n_measurements <span class="op">=</span> <span class="fl">20</span></span></span>
 <span class="r-in"><span>  <span class="op">)</span>,</span></span>
 <span class="r-in"><span>  seed <span class="op">=</span> <span class="fl">789</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
@@ -451,11 +451,12 @@ x2 + (biomarker + velocity | id)</code>.</p>
 <span class="r-in"><span><span class="co"># Verify low variability - all patients should have similar dynamics</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/apply.html" class="external-link">apply</a></span><span class="op">(</span><span class="va">sim_uniform</span><span class="op">$</span><span class="va">random_effects</span>, <span class="fl">2</span>, <span class="va">sd</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  dyn_value  dyn_slope </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 0.07220340 0.04453099 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 0.06639935 0.04269099 </span>
 <span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="co"># Example 4: Comprehensive simulation with survival outcomes</span></span></span>
 <span class="r-in"><span><span class="va">sim_full</span> <span class="op">&lt;-</span> <span class="fu">simulate</span><span class="op">(</span></span></span>
-<span class="r-in"><span>  n_subjects <span class="op">=</span> <span class="fl">200</span>,</span></span>
+<span class="r-in"><span>  n_subjects <span class="op">=</span> <span class="fl">30</span>,</span></span>
 <span class="r-in"><span>  longitudinal <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>    xi <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="fl">0.4</span>, sd <span class="op">=</span> <span class="fl">0.05</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>    period <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>mean <span class="op">=</span> <span class="fl">8</span>, sd <span class="op">=</span> <span class="fl">0.3</span><span class="op">)</span>,</span></span>
@@ -471,7 +472,7 @@ x2 + (biomarker + velocity | id)</code>.</p>
 <span class="r-in"><span>      <span class="op">)</span></span></span>
 <span class="r-in"><span>    <span class="op">)</span>,</span></span>
 <span class="r-in"><span>    error_sd <span class="op">=</span> <span class="fl">0.1</span>,</span></span>
-<span class="r-in"><span>    n_measurements <span class="op">=</span> <span class="fl">100</span></span></span>
+<span class="r-in"><span>    n_measurements <span class="op">=</span> <span class="fl">20</span></span></span>
 <span class="r-in"><span>  <span class="op">)</span>,</span></span>
 <span class="r-in"><span>  survival <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>    baseline <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>type <span class="op">=</span> <span class="st">"weibull"</span>, shape <span class="op">=</span> <span class="fl">3.0</span>, scale <span class="op">=</span> <span class="fl">23</span><span class="op">)</span>,</span></span>
@@ -549,6 +550,7 @@ x2 + (biomarker + velocity | id)</code>.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">km_fit</span>, xlab <span class="op">=</span> <span class="st">"Time"</span>, ylab <span class="op">=</span> <span class="st">"Survival Probability"</span>,</span></span>
 <span class="r-in"><span>     main <span class="op">=</span> <span class="st">"Kaplan-Meier Survival Curve"</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="simulate-4.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
