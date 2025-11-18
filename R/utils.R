@@ -29,6 +29,17 @@
   )
 }
 
+#' @noRd
+.format_matrix <- function(mat) {
+  if (!is.matrix(mat) || !length(mat)) {
+    return("[]")
+  }
+  rows <- apply(mat, 1, function(row) {
+    paste(sprintf("%.3f", row), collapse = ", ")
+  })
+  paste0("[", paste(paste0("[", rows, "]"), collapse = ", "), "]")
+}
+
 # Parallel Computing ===========================================================
 
 #' @importFrom parallel detectCores
@@ -271,13 +282,12 @@
   posteriors,
   parameters,
   random_effects,
-  control,
-  verbose = 0
+  control
 ) {
   theta <- .coef_to_vector(parameters)
   n_coef <- length(theta)
 
-  if (verbose > 0) {
+  if (control$verbose > 0) {
     cli::cli_alert_info("Computing SEM vcov...")
   }
 
@@ -315,7 +325,7 @@
   info_observed_inv <- info_complete_inv %*% solve(diag(n_coef) - t(dm_matrix))
 
   asymmetry <- max(abs(info_observed_inv - t(info_observed_inv)))
-  if (verbose > 0 && asymmetry > 1e-4) {
+  if (control$verbose > 0 && asymmetry > 1e-4) {
     cli::cli_alert_warning(sprintf(
       "Vcov matrix asymmetry: %.2e (numerical instability detected)",
       asymmetry
@@ -324,7 +334,7 @@
   vcov_sym <- (info_observed_inv + t(info_observed_inv)) / 2
 
   eigenvalues <- eigen(vcov_sym, symmetric = TRUE, only.values = TRUE)$values
-  if (any(eigenvalues <= 0) && verbose > 0) {
+  if (any(eigenvalues <= 0) && control$verbose > 0) {
     n_neg <- sum(eigenvalues <= 0)
     min_eigen <- min(eigenvalues)
     cli::cli_alert_warning(sprintf(
@@ -336,7 +346,7 @@
   }
 
   diag_ratio <- diag(vcov_sym) / diag(info_complete_inv)
-  if (any(diag_ratio < 1 - 1e-6) && verbose > 0) {
+  if (any(diag_ratio < 1 - 1e-6) && control$verbose > 0) {
     n_violate <- sum(diag_ratio < 1 - 1e-6)
     min_ratio <- min(diag_ratio)
     cli::cli_alert_warning(sprintf(
@@ -404,12 +414,14 @@
   data,
   random_effect,
   parameters,
-  max_iter = 50,
+  max_iter = 100,
   tol = 1e-6
 ) {
   objective <- function(state) {
     .compute_state_objective(state, data, random_effect, parameters)
   }
+
+  obj_initial <- objective(initial_guess)
 
   fit <- suppressWarnings(
     nlm(
@@ -425,7 +437,8 @@
   list(
     state = fit$estimate,
     converged = fit$code <= 2,
-    iterations = fit$iterations
+    iterations = fit$iterations,
+    obj_change = fit$minimum - obj_initial
   )
 }
 
@@ -445,18 +458,25 @@
 
   # Update random effects from posterior
   n_subjects <- length(data_list)
-  posterior_moments <- lapply(seq_len(n_subjects), function(i) {
-    .compute_posterior_moments(
-      list(nodes = posteriors$nodes[[i]], weights = posteriors$weights[[i]])
-    )
-  })
+  posterior_moments <- .parallel_apply(
+    seq_len(n_subjects),
+    function(i) {
+      .compute_posterior_moments(
+        list(nodes = posteriors$nodes[[i]], weights = posteriors$weights[[i]])
+      )
+    },
+    parallel = control$parallel,
+    n_cores = control$n_cores
+  )
   random_effects <- t(sapply(posterior_moments, `[[`, "mean"))
 
-  random_effect_sigma <- Reduce(
-    `+`,
+  all_second_moments <- simplify2array(
     lapply(posterior_moments, `[[`, "second_moment")
   )
-  random_effect_sigma <- random_effect_sigma / n_subjects
+  random_effect_sigma <- apply(
+    all_second_moments, 1:2, mean, trim = control$trim
+  )
+
   measurement_error_sd <- .update_measurement_error_sd(
     data_list,
     parameters,
@@ -479,9 +499,8 @@
   gradient <- attr(obj, "gradient")
   hessian <- attr(obj, "hessian")
 
-  theta_new <- theta - solve(hessian, gradient)
-
-  rm(obj, gradient, hessian)
+  direction <- solve(hessian, gradient)
+  theta_new <- theta - direction
 
   obj_new <- .compute_objective_expected(
     theta_new,
@@ -493,7 +512,7 @@
   )
 
   loglik_value <- -as.numeric(obj_new)
-  rm(obj_new)
+  rm(obj, obj_new, gradient, hessian, direction)
 
   parameters <- .vector_to_coef(parameters, theta_new)
 
@@ -552,10 +571,9 @@
   ))
 
   if (control$verbose >= 2) {
+    cli::cli_text(sprintf("    sigma_e: %.3f", cf$measurement_error_sd))
     cli::cli_text(sprintf(
-      "    variance: sigma_e=%.3f, tr(Sigma_b)=%.2f",
-      cf$measurement_error_sd,
-      sum(diag(cf$random_effect_sigma))
+      "    Sigma_b: %s", .format_matrix(cf$random_effect_sigma)
     ))
     cli::cli_text(sprintf("    baseline: %s", .format_vector(cf$baseline)))
     cli::cli_text(sprintf("    hazard: %s", .format_vector(cf$hazard)))
@@ -599,22 +617,17 @@
       ))
     } else if (is_final) {
       cli::cli_text("")
-      cli::cli_alert_warning(sprintf(
-        paste0(
-          "Not converged after %d iterations ",
-          "(rel dL=%.2e > %.2e, dtheta=%.2e > %.2e)"
-        ),
+      msg <- sprintf(
+        "Not converged after %d iterations (rel dL=%.2e > %.2e, dtheta=%.2e > %.2e)", # nolint: line_length_linter.
         control$maxit,
         metrics$rel_l,
         control$rtol,
         metrics$delta_theta,
         control$atol
-      ))
+      )
+      cli::cli_alert_warning(msg)
       cli::cli_alert_info(
-        paste0(
-          "Try increasing maxit, relaxing tolerances (rtol/atol), ",
-          "or adjusting initial values"
-        )
+        "Try increasing maxit, relaxing tolerances, or adjusting initial values" # nolint: line_length_linter.
       )
     }
   }
@@ -645,11 +658,16 @@
 
   n_subjects <- length(data_list)
 
-  posterior_moments <- lapply(seq_len(n_subjects), function(i) {
-    .compute_posterior_moments(
-      list(nodes = posteriors$nodes[[i]], weights = posteriors$weights[[i]])
-    )
-  })
+  posterior_moments <- .parallel_apply(
+    seq_len(n_subjects),
+    function(i) {
+      .compute_posterior_moments(
+        list(nodes = posteriors$nodes[[i]], weights = posteriors$weights[[i]])
+      )
+    },
+    parallel = control$parallel,
+    n_cores = control$n_cores
+  )
 
   random_effects <- t(sapply(posterior_moments, `[[`, "mean"))
 
@@ -668,8 +686,7 @@
     posteriors,
     parameters,
     random_effects,
-    control,
-    verbose = control$verbose
+    control
   )
   dimnames(vcov_matrix) <- list(coef_names_expanded, coef_names_expanded)
 

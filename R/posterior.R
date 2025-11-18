@@ -221,9 +221,10 @@ NULL
   # When transforming from standard GHN points z to posterior space
   # theta = m + L*z, where L = chol(solve(H)), the weights need to
   # be multiplied by |det(L)|
-  jacobian <- sqrt(det(solve(hessian_neglogpost)))
+  det_result <- determinant(hessian_neglogpost, logarithm = TRUE)
+  log_jacobian <- -0.5 * as.numeric(det_result$modulus)
 
-  log_weights <- log(quad_weights) + log(jacobian) + logpost_at_nodes
+  log_weights <- log(quad_weights) + log_jacobian + logpost_at_nodes
   max_log_weight <- max(log_weights)
   aghq_weights <- exp(log_weights - max_log_weight)
   aghq_weights <- aghq_weights / sum(aghq_weights)

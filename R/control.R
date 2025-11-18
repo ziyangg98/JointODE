@@ -21,9 +21,12 @@
 #'   If 0, uses all available cores (default: 0)
 #' @param quad_level Integer; quadrature level for numerical integration
 #'   (default: 4)
-#' @param n_early Integer; number of early time points to use for quadratic
-#'   fitting when estimating initial states. Using 15 points balances capturing
-#'   initial curvature while avoiding overfitting (default: 15)
+#' @param trim Numeric; trimming proportion for robust estimation of
+#'   random effect variance-covariance matrix. Specifies the fraction of
+#'   extreme values to trim from each tail when computing the mean of
+#'   posterior second moments. Use 0 for standard mean (default), 0.05
+#'   for robust estimation with light contamination, or higher values for
+#'   datasets with more extreme outliers. Must be in [0, 0.5) (default: 0)
 #' @param .list Optional list of control parameters to process
 #' @param ... Additional control parameters
 #'
@@ -46,6 +49,9 @@
 #' # Parallel computation
 #' control <- JointODE.control(parallel = TRUE, n_cores = 4)
 #'
+#' # Robust estimation for data with potential outliers
+#' control <- JointODE.control(trim = 0.05)
+#'
 #' # Process an existing list
 #' my_list <- list(maxit = 200)
 #' control <- JointODE.control(.list = my_list)
@@ -60,7 +66,7 @@ JointODE.control <- function(
   parallel = FALSE,
   n_cores = 0,
   quad_level = 4,
-  n_early = 15,
+  trim = 0,
   .list = NULL,
   ...
 ) {
@@ -73,7 +79,7 @@ JointODE.control <- function(
     parallel = parallel,
     n_cores = n_cores,
     quad_level = quad_level,
-    n_early = n_early
+    trim = trim
   )
 
   # If a list is provided, merge with defaults
@@ -127,8 +133,8 @@ JointODE.control <- function(
   if (!is.numeric(control$quad_level) || control$quad_level < 1) {
     stop("quad_level must be a positive integer")
   }
-  if (!is.numeric(control$n_early) || control$n_early < 4) {
-    stop("n_early must be an integer >= 4")
+  if (!is.numeric(control$trim) || control$trim < 0 || control$trim >= 0.5) {
+    stop("trim must be a number in [0, 0.5)")
   }
 
   control

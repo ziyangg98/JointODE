@@ -277,10 +277,11 @@ JointODE <- function(
   # EM Algorithm
   if (control$verbose > 0) {
     cli::cli_h2("Joint ODE Model Estimation")
-    cli::cli_text(paste0(
-      "Convergence: atol={sprintf('%.1e', control$atol)}, ",
-      "rtol={sprintf('%.1e', control$rtol)}, ",
-      "max_iter={control$maxit}"
+    cli::cli_text(sprintf(
+      "Convergence: atol=%.1e, rtol=%.1e, max_iter=%d",
+      control$atol,
+      control$rtol,
+      control$maxit
     ))
     cli::cli_text("")
   }
@@ -303,7 +304,8 @@ JointODE <- function(
             data_list[[i]]$initial_state,
             data_list[[i]],
             curr$random_effects[i, ],
-            curr$parameters
+            curr$parameters,
+            tol = control$atol
           )
         },
         control$parallel,
@@ -311,6 +313,26 @@ JointODE <- function(
       )
       for (i in seq_along(data_list)) {
         data_list[[i]]$initial_state <- opt_results[[i]]$state
+      }
+
+      if (control$verbose > 0) {
+        obj_changes <- vapply(opt_results, `[[`, numeric(1), "obj_change")
+        n_increased <- sum(obj_changes > 1e-6)
+
+        base_msg <- sprintf(
+          "    State: dL=%.2e [%.2e, %.2e]",
+          mean(obj_changes),
+          min(obj_changes),
+          max(obj_changes)
+        )
+
+        if (n_increased > 0) {
+          cli::cli_alert_warning(
+            sprintf("%s | %d increased", base_msg, n_increased)
+          )
+        } else {
+          cli::cli_text(base_msg)
+        }
       }
     }
 
@@ -332,10 +354,7 @@ JointODE <- function(
 
     prev <- curr
 
-    # Periodic garbage collection every 10 iterations to free memory
-    if (em_iter %% 10 == 0) {
-      gc(verbose = FALSE, full = TRUE)
-    }
+    gc(verbose = FALSE, full = TRUE)
   }
 
   # Finalize model

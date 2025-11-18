@@ -145,7 +145,7 @@ MarginalODE <- function(
     stop("control must be a list or NULL")
   }
 
-  n_subjects <- attr(data_list, "n_subjects")  # nolint: object_usage_linter
+  n_subjects <- attr(data_list, "n_subjects") # nolint: object_usage_linter
   n_covariates <- attr(data_list, "n_covariates")
   covariate_names <- attr(data_list, "covariate_names")
   n_params <- 2 + n_covariates
@@ -570,7 +570,7 @@ predict.MarginalODE <- function(
   # Extract response and covariates using model.frame
   mf <- model.frame(formula, data = data, na.action = na.omit)
   y <- model.response(mf)
-  X <- model.matrix(formula, data = mf)  # nolint: object_name_linter
+  X <- model.matrix(formula, data = mf) # nolint: object_name_linter
 
   stopifnot(
     "Formula must include a response variable" = !is.null(y)

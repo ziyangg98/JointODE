@@ -12,7 +12,7 @@ JointODE.control(
   parallel = FALSE,
   n_cores = 0,
   quad_level = 4,
-  n_early = 15,
+  trim = 0,
   .list = NULL,
   ...
 )
@@ -41,9 +41,12 @@ If 0, uses all available cores (default: 0)}
 \item{quad_level}{Integer; quadrature level for numerical integration
 (default: 4)}
 
-\item{n_early}{Integer; number of early time points to use for quadratic
-fitting when estimating initial states. Using 15 points balances capturing
-initial curvature while avoiding overfitting (default: 15)}
+\item{trim}{Numeric; trimming proportion for robust estimation of
+random effect variance-covariance matrix. Specifies the fraction of
+extreme values to trim from each tail when computing the mean of
+posterior second moments. Use 0 for standard mean (default), 0.05
+for robust estimation with light contamination, or higher values for
+datasets with more extreme outliers. Must be in [0, 0.5) (default: 0)}
 
 \item{.list}{Optional list of control parameters to process}
 
@@ -69,6 +72,9 @@ control <- JointODE.control(verbose = TRUE)
 
 # Parallel computation
 control <- JointODE.control(parallel = TRUE, n_cores = 4)
+
+# Robust estimation for data with potential outliers
+control <- JointODE.control(trim = 0.05)
 
 # Process an existing list
 my_list <- list(maxit = 200)

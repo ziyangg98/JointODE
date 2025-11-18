@@ -1,0 +1,439 @@
+---
+title: "JointODE Examples: PBC Data Analysis"
+author: "JointODE Package"
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 8,
+  fig.height = 5,
+  cache = FALSE
+)
+```
+
+# Introduction
+
+This document demonstrates a complete analysis workflow using the **JointODE** package with the PBC (Primary Biliary Cirrhosis) dataset. We will:
+
+1. Prepare and explore the data
+2. Fit a JointODE model
+3. Compare with standard joint models (JMbayes2)
+4. Generate predictions and visualizations
+
+# Data Preparation
+
+## Load Packages
+
+```{r load-packages}
+library(JointODE)
+library(survival)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(knitr)
+```
+
+## Load and Process PBC Data
+
+The PBC data contains information from a Mayo Clinic trial on primary biliary cirrhosis (PBC) of the liver conducted between 1974 and 1984.
+
+```{r load-data}
+# Load PBC data from survival package
+# pbc: baseline and survival data (one row per patient)
+# pbcseq: longitudinal measurements (multiple rows per patient)
+data(pbc, package = "survival")
+data(pbcseq, package = "survival")
+
+# Prepare survival data (one row per patient)
+survival_data <- pbc %>%
+  filter(!is.na(trt)) %>%
+  transmute(
+    id = as.integer(id),
+    time = time / 365.25,  # Convert days to years
+    status = as.integer(status == 2),  # 2 = death, 1 = transplant, 0 = censored
+    trt = as.numeric(trt == 2),  # Treatment indicator (1 = D-penicillamine)
+    age = age,
+    sex = as.numeric(sex == "f")  # Female indicator
+  )
+
+# Prepare longitudinal data from pbcseq
+# Using log serum bilirubin as the biomarker
+longitudinal_data <- pbcseq %>%
+  filter(id %in% survival_data$id, !is.na(bili)) %>%
+  transmute(
+    id = as.integer(id),
+    time = day / 365.25,  # Convert days to years
+    observed = log(bili)  # Log serum bilirubin
+  ) %>%
+  # Add baseline covariates from survival data
+  left_join(
+    survival_data %>% select(id, trt, age, sex),
+    by = "id"
+  ) %>%
+  arrange(id, time)
+```
+
+## Data Summary
+
+```{r data-summary}
+cat("Survival Data:\n")
+cat(sprintf("  Patients: %d\n", nrow(survival_data)))
+cat(sprintf("  Events: %d (%.1f%%)\n",
+            sum(survival_data$status),
+            100 * mean(survival_data$status)))
+cat(sprintf("  Median follow-up: %.2f years\n",
+            median(survival_data$time)))
+
+cat("\nLongitudinal Data:\n")
+cat(sprintf("  Total observations: %d\n", nrow(longitudinal_data)))
+cat(sprintf("  Patients: %d\n", length(unique(longitudinal_data$id))))
+cat(sprintf("  Avg measurements per patient: %.1f\n",
+            nrow(longitudinal_data) / length(unique(longitudinal_data$id))))
+
+cat("\nLog Serum Bilirubin Summary:\n")
+print(summary(longitudinal_data$observed))
+```
+
+# Exploratory Data Analysis
+
+## Individual Trajectories
+
+```{r trajectories, fig.height=6}
+# Plot sample of individual trajectories
+set.seed(123)
+sample_ids <- sample(unique(longitudinal_data$id), 20)
+
+longitudinal_data %>%
+  filter(id %in% sample_ids) %>%
+  left_join(
+    survival_data %>% select(id, status),
+    by = "id"
+  ) %>%
+  ggplot(aes(x = time, y = observed, group = id, color = factor(status))) +
+  geom_line(alpha = 0.6) +
+  geom_point(alpha = 0.6, size = 0.8) +
+  scale_color_manual(
+    values = c("0" = "#3498db", "1" = "#e74c3c"),
+    labels = c("Censored", "Event"),
+    name = "Status"
+  ) +
+  labs(
+    title = "Log Serum Bilirubin Trajectories (Sample of 20 Patients)",
+    x = "Time (years)",
+    y = "Log Serum Bilirubin"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+**Observation:** Patients who experienced events (red) tend to have higher and increasing bilirubin levels compared to censored patients (blue).
+
+## Mean Trajectories by Event Status
+
+```{r mean-trajectories}
+longitudinal_data %>%
+  left_join(
+    survival_data %>% select(id, status),
+    by = "id"
+  ) %>%
+  group_by(status, time_bin = cut(time, breaks = seq(0, 12, by = 0.5))) %>%
+  summarise(
+    mean_bili = mean(observed),
+    se_bili = sd(observed) / sqrt(n()),
+    time_mid = mean(time),
+    .groups = "drop"
+  ) %>%
+  ggplot(aes(x = time_mid, y = mean_bili, color = factor(status))) +
+  geom_line(linewidth = 1) +
+  geom_ribbon(
+    aes(ymin = mean_bili - 1.96 * se_bili,
+        ymax = mean_bili + 1.96 * se_bili,
+        fill = factor(status)),
+    alpha = 0.2,
+    color = NA
+  ) +
+  scale_color_manual(
+    values = c("0" = "#3498db", "1" = "#e74c3c"),
+    labels = c("Censored", "Event"),
+    name = "Status"
+  ) +
+  scale_fill_manual(
+    values = c("0" = "#3498db", "1" = "#e74c3c"),
+    labels = c("Censored", "Event"),
+    name = "Status"
+  ) +
+  labs(
+    title = "Mean Log Serum Bilirubin by Event Status",
+    x = "Time (years)",
+    y = "Mean Log Serum Bilirubin",
+    subtitle = "Shaded area represents 95% confidence interval"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+**Observation:** Clear separation between event and censored groups, with diverging trajectories over time.
+
+# Model Fitting
+
+## JointODE Model
+
+We fit a joint ODE model with:
+
+- **Longitudinal submodel:** Log bilirubin modeled with both current value and rate of change
+- **Survival submodel:** Cox model with treatment, age, and sex
+- **Association:** Both biomarker value and velocity linked to hazard
+
+```{r fit-jointode}
+fit_ode <- JointODE(
+  longitudinal_formula = observed ~ biomarker + velocity + trt +
+    (biomarker + velocity | id),
+  survival_formula = Surv(time, status) ~ trt + age + sex,
+  longitudinal_data = longitudinal_data,
+  survival_data = survival_data,
+  control = list(verbose = 3)
+)
+```
+
+### Model Summary
+
+```{r summary-jointode}
+summary(fit_ode)
+```
+
+### Extract Key Results
+
+```{r results-jointode}
+# Coefficients
+coef_table <- as.data.frame(coef(fit_ode))
+kable(coef_table, digits = 4, caption = "JointODE Model Coefficients")
+
+# Model fit statistics
+cat("\nModel Fit Statistics:\n")
+cat(sprintf("  Log-likelihood: %.2f\n", logLik(fit_ode)))
+cat(sprintf("  AIC: %.2f\n", AIC(fit_ode)))
+cat(sprintf("  BIC: %.2f\n", BIC(fit_ode)))
+cat(sprintf("  C-index: %.3f\n", fit_ode$cindex))
+```
+
+## Standard Joint Model (JMbayes2)
+
+For comparison, we fit a standard joint model using JMbayes2.
+
+```{r fit-jmbayes2}
+if (requireNamespace("JMbayes2", quietly = TRUE)) {
+  library(JMbayes2)
+  library(nlme)
+
+  # Linear mixed model
+  lme_fit <- lme(
+    observed ~ time + trt,
+    random = ~ time | id,
+    data = longitudinal_data,
+    control = lmeControl(opt = "optim")
+  )
+
+  # Cox model
+  cox_fit <- coxph(
+    Surv(time, status) ~ trt + age + sex,
+    data = survival_data,
+    x = TRUE
+  )
+
+  # Joint model
+  system.time({
+    fit_jm <- jm(
+      cox_fit,
+      lme_fit,
+      time_var = "time",
+      functional_forms = ~ value(observed) + slope(observed)
+    )
+  })
+
+  cat("\nJMbayes2 Model Summary:\n")
+  print(summary(fit_jm))
+
+  has_jm <- TRUE
+} else {
+  cat("JMbayes2 not installed. Install with: install.packages('JMbayes2')\n")
+  has_jm <- FALSE
+}
+```
+
+# Model Comparison
+
+```{r model-comparison}
+# Create comparison table
+comparison <- data.frame(
+  Model = "JointODE",
+  LogLik = as.numeric(logLik(fit_ode)),
+  AIC = AIC(fit_ode),
+  BIC = BIC(fit_ode),
+  Cindex = fit_ode$cindex
+)
+
+if (exists("fit_jm")) {
+  comparison <- rbind(
+    comparison,
+    data.frame(
+      Model = "JMbayes2",
+      LogLik = as.numeric(logLik(fit_jm)),
+      AIC = AIC(fit_jm),
+      BIC = BIC(fit_jm),
+      Cindex = NA
+    )
+  )
+
+  comparison$Delta_AIC <- comparison$AIC - min(comparison$AIC)
+  comparison$Delta_BIC <- comparison$BIC - min(comparison$BIC)
+}
+
+kable(comparison, digits = 2, caption = "Model Comparison")
+```
+
+**Interpretation:**
+
+- Lower AIC/BIC indicates better model fit
+- C-index measures discrimination ability (higher is better)
+- Delta AIC/BIC > 10 suggests strong evidence for the better model
+
+# Predictions
+
+## Individual Patient Predictions
+
+We select three patients to demonstrate prediction capabilities.
+
+```{r predictions, fig.height=5}
+# Select patients
+set.seed(456)
+predict_ids <- sample(unique(longitudinal_data$id), 3)
+
+for (pid in predict_ids) {
+  cat(sprintf("\n### Patient %d\n\n", pid))
+
+  # Get patient data
+  patient_long <- longitudinal_data %>% filter(id == pid)
+  patient_surv <- survival_data %>% filter(id == pid)
+
+  cat(sprintf("- Measurements: %d\n", nrow(patient_long)))
+  cat(sprintf("- Follow-up: %.2f years\n", patient_surv$time))
+  cat(sprintf("- Event: %s\n\n", ifelse(patient_surv$status == 1, "Yes", "No")))
+
+  # Predict biomarker trajectory
+  pred_times <- seq(0, max(patient_long$time) + 2, by = 0.1)
+
+  pred_ode <- predict(
+    fit_ode,
+    newdata = list(
+      longitudinal = patient_long,
+      survival = patient_surv
+    ),
+    times = pred_times,
+    return_data = TRUE
+  )
+
+  # Plot
+  p <- ggplot() +
+    geom_line(
+      data = pred_ode,
+      aes(x = time, y = biomarker_mean),
+      color = "#3498db",
+      linewidth = 1.2
+    ) +
+    geom_ribbon(
+      data = pred_ode,
+      aes(x = time,
+          ymin = biomarker_mean - 1.96 * biomarker_se,
+          ymax = biomarker_mean + 1.96 * biomarker_se),
+      fill = "#3498db",
+      alpha = 0.2
+    ) +
+    geom_point(
+      data = patient_long,
+      aes(x = time, y = observed),
+      color = "#2c3e50",
+      size = 3
+    ) +
+    geom_vline(
+      xintercept = max(patient_long$time),
+      linetype = "dashed",
+      color = "#7f8c8d"
+    ) +
+    annotate(
+      "text",
+      x = max(patient_long$time),
+      y = max(pred_ode$biomarker_mean),
+      label = "Last observation",
+      hjust = -0.1,
+      color = "#7f8c8d"
+    ) +
+    labs(
+      title = sprintf("Patient %d: Log Serum Bilirubin Prediction", pid),
+      x = "Time (years)",
+      y = "Log Serum Bilirubin",
+      subtitle = "Observed (points), Predicted (line), 95% CI (ribbon)"
+    ) +
+    theme_minimal(base_size = 12)
+
+  print(p)
+  cat("\n\n")
+}
+```
+
+## Dynamic Survival Predictions
+
+For censored patients, we can predict future survival probabilities.
+
+```{r survival-predictions}
+# Select a censored patient
+censored_ids <- survival_data %>%
+  filter(status == 0) %>%
+  pull(id)
+
+if (length(censored_ids) > 0) {
+  example_id <- censored_ids[1]
+
+  patient_long <- longitudinal_data %>% filter(id == example_id)
+  patient_surv <- survival_data %>% filter(id == example_id)
+
+  cat(sprintf("Patient %d (Censored)\n", example_id))
+  cat(sprintf("Last observation time: %.2f years\n\n", patient_surv$time))
+
+  # Predict survival at future time points
+  future_times <- seq(patient_surv$time, patient_surv$time + 5, by = 0.5)
+
+  pred_surv <- predict(
+    fit_ode,
+    newdata = list(
+      longitudinal = patient_long,
+      survival = patient_surv
+    ),
+    times = future_times,
+    type = "survival"
+  )
+
+  kable(
+    pred_surv,
+    digits = 3,
+    caption = sprintf("Survival Predictions for Patient %d", example_id)
+  )
+}
+```
+
+# Conclusion
+
+This analysis demonstrates:
+
+1. **JointODE modeling** of longitudinal biomarkers and survival outcomes
+2. **Comparison** with standard joint models
+3. **Individual predictions** for future biomarker values and survival probabilities
+
+The JointODE framework allows flexible modeling of complex biomarker dynamics through ODE systems, which can capture non-linear patterns and rate-of-change effects.
+
+# Session Info
+
+```{r session-info}
+sessionInfo()
+```
