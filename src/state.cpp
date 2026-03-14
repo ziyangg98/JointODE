@@ -88,5 +88,6 @@ NumericVector compute_state_loglik_cppad(
     }
   }
 
+  tape.capacity_order(0);
   return result;
 }

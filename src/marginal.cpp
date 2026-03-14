@@ -394,5 +394,6 @@ NumericVector compute_marginal_state_loglik(
     }
   }
 
+  tape.capacity_order(0);
   return result;
 }

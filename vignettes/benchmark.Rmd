@@ -1,0 +1,198 @@
+---
+title: "JointODE Performance Benchmark"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{JointODE Performance Benchmark}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 8,
+  fig.height = 5
+)
+```
+
+This vignette benchmarks JointODE fitting performance across different data
+sizes and parallelization settings.
+
+## Setup
+
+```{r load}
+library(JointODE)
+library(survival)
+library(ggplot2)
+```
+
+## Benchmark Helper
+
+```{r helper}
+default_longitudinal <- list(
+  xi = c(mean = 0.4, sd = 0.1),
+  period = c(mean = 6, sd = 0.1),
+  excitation = list(offset = 0.0, covariates = c(x1 = 0.5, x2 = -0.45)),
+  initial = list(
+    offset = c(biomarker = -0.5, velocity = -0.1),
+    covariates = list(
+      biomarker = c(x1 = 0.08, x2 = -0.06),
+      velocity = c(x1 = 0.25, x2 = -0.2)
+    )
+  ),
+  error_sd = 0.1,
+  n_measurements = 100
+)
+
+bench_fit <- function(n_subjects, n_measurements, parallel, n_cores = 0,
+                      maxit = 30, seed = 42) {
+  long_config <- default_longitudinal
+  long_config$n_measurements <- n_measurements
+
+  sim <- simulate(
+    n_subjects = n_subjects,
+    longitudinal = long_config,
+    seed = seed
+  )
+
+  longitudinal_data <- sim$longitudinal_data[
+    , c("id", "time", "observed", "x1", "x2")
+  ]
+  survival_data <- sim$survival_data
+
+  elapsed <- system.time({
+    fit <- JointODE(
+      longitudinal_formula = observed ~ biomarker + velocity + x1 + x2 +
+        (biomarker + velocity | id),
+      survival_formula = Surv(time, status) ~ w1 + w2,
+      longitudinal_data = longitudinal_data,
+      survival_data = survival_data,
+      control = list(
+        maxit = maxit,
+        parallel = parallel,
+        n_cores = n_cores,
+        atol = 1e-3
+      )
+    )
+  })[["elapsed"]]
+
+  data.frame(
+    n_subjects = n_subjects,
+    n_measurements = n_measurements,
+    n_obs = nrow(longitudinal_data),
+    parallel = parallel,
+    n_cores = if (parallel) {
+      if (n_cores == 0) parallel::detectCores() else n_cores
+    } else {
+      1L
+    },
+    maxit = maxit,
+    iterations = fit$convergence$em_iterations,
+    converged = fit$convergence$converged,
+    elapsed = elapsed,
+    stringsAsFactors = FALSE
+  )
+}
+```
+
+## 1. Scaling with Data Size (Sequential)
+
+Fix `maxit = 30` to compare raw per-iteration cost across data sizes.
+
+```{r bench-size}
+size_configs <- list(
+  list(n = 100, m = 50),
+  list(n = 150, m = 80),
+  list(n = 200, m = 100)
+)
+
+results_size <- do.call(rbind, lapply(size_configs, function(cfg) {
+  bench_fit(cfg$n, cfg$m, parallel = FALSE)
+}))
+
+results_size$time_per_iter <- results_size$elapsed / results_size$iterations
+knitr::kable(
+  results_size[, c("n_subjects", "n_measurements", "n_obs",
+                    "iterations", "elapsed", "time_per_iter")],
+  digits = 2,
+  col.names = c("Subjects", "Measurements", "Total Obs",
+                "Iterations", "Time (s)", "s/iter"),
+  caption = "Sequential performance by data size (maxit = 30)"
+)
+```
+
+## 2. Parallel Scaling
+
+Compare sequential vs parallel (2, 4, and all cores) on medium-sized data.
+
+```{r bench-parallel}
+n_available <- parallel::detectCores()
+
+parallel_configs <- list(
+  list(parallel = FALSE, n_cores = 0),
+  list(parallel = TRUE,  n_cores = 2)
+)
+if (n_available >= 4) {
+  parallel_configs <- c(parallel_configs, list(
+    list(parallel = TRUE, n_cores = 4)
+  ))
+}
+if (n_available >= 8) {
+  parallel_configs <- c(parallel_configs, list(
+    list(parallel = TRUE, n_cores = 0)
+  ))
+}
+
+results_par <- do.call(rbind, lapply(parallel_configs, function(cfg) {
+  bench_fit(150, 80, parallel = cfg$parallel, n_cores = cfg$n_cores)
+}))
+
+results_par$time_per_iter <- results_par$elapsed / results_par$iterations
+seq_time <- results_par$elapsed[1]
+results_par$speedup <- seq_time / results_par$elapsed
+
+knitr::kable(
+  results_par[, c("n_cores", "iterations", "elapsed",
+                   "time_per_iter", "speedup")],
+  digits = 2,
+  col.names = c("Cores", "Iterations", "Time (s)", "s/iter", "Speedup"),
+  caption = "Parallel scaling (150 subjects, 80 measurements/subject)"
+)
+```
+
+## 3. Visualization
+
+```{r plot-size, fig.cap="Elapsed time by data size (sequential)"}
+ggplot(results_size, aes(n_obs, elapsed)) +
+  geom_point(size = 3) +
+  geom_line() +
+  labs(x = "Total Observations", y = "Elapsed Time (s)",
+       title = "Sequential Performance") +
+  theme_minimal()
+```
+
+```{r plot-parallel, fig.cap="Speedup by number of cores"}
+ggplot(results_par, aes(factor(n_cores), speedup)) +
+  geom_col(width = 0.5, fill = "steelblue") +
+  geom_hline(yintercept = 1, linetype = "dashed", color = "grey50") +
+  labs(x = "Number of Cores", y = "Speedup vs Sequential",
+       title = "Parallel Speedup (150 subjects)") +
+  theme_minimal()
+```
+
+## 4. Summary
+
+```{r summary}
+cat(sprintf("Platform: %s\n", R.version$platform))
+cat(sprintf("R version: %s\n", R.version.string))
+cat(sprintf("CPU cores available: %d\n", n_available))
+cat(sprintf("Date: %s\n", Sys.Date()))
+```
+
+## Session Info
+
+```{r session}
+sessionInfo()
+```

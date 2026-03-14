@@ -1,16 +1,21 @@
 #' @importFrom stats na.pass
 #' @noRd
 .process <- function(
-  longitudinal_formula,
-  survival_formula,
   longitudinal_data,
   survival_data,
-  state
+  state,
+  parsed_long = NULL,
+  parsed_surv = NULL,
+  survival_formula = NULL,
+  longitudinal_formula = NULL
 ) {
-  # Parse formulas once before the loop
-  parsed_long <- .parse_longitudinal_formula(longitudinal_formula)
-  parsed_surv <- .parse_survival_formula(survival_formula)
-
+  # Allow backward-compatible calls with formula arguments
+  if (is.null(parsed_long) && !is.null(longitudinal_formula)) {
+    parsed_long <- .parse_longitudinal_formula(longitudinal_formula)
+  }
+  if (is.null(parsed_surv) && !is.null(survival_formula)) {
+    parsed_surv <- .parse_survival_formula(survival_formula)
+  }
   id <- parsed_long$grouping
   time <- parsed_surv$time_var
 
@@ -108,68 +113,4 @@
     )
   }
   data_process
-}
-
-#' @noRd
-.process_marginal <- function(
-  formula,
-  data,
-  id = "id",
-  time = "time"
-) {
-  # Extract response variable name
-  response_var <- all.vars(formula[[2]])
-  if (length(response_var) != 1) {
-    stop("Formula must have exactly one response variable", call. = FALSE)
-  }
-
-  # Build model frame and matrix for covariates
-  mf <- model.frame(formula, data = data, na.action = na.pass)
-  mm <- model.matrix(formula, mf)
-
-  # Extract covariates (excluding intercept if present)
-  if ("(Intercept)" %in% colnames(mm)) {
-    covariates <- mm[, -1, drop = FALSE]
-  } else {
-    covariates <- mm
-  }
-
-  # Get unique IDs
-  unique_ids <- unique(data[[id]])
-  n_subjects <- length(unique_ids)
-
-  # Initialize result list
-  data_list <- vector("list", n_subjects)
-  names(data_list) <- as.character(unique_ids)
-
-  # Split data by ID
-  id_groups <- split(seq_len(nrow(data)), data[[id]])
-
-  for (i in seq_along(unique_ids)) {
-    sid <- as.character(unique_ids[i])
-    idx <- id_groups[[sid]]
-
-    if (length(idx) == 0) {
-      # Subject has no observations
-      data_list[[sid]] <- list(
-        time = numeric(0),
-        response = numeric(0),
-        covariates = matrix(0, nrow = 0, ncol = ncol(covariates)),
-        initial = c(0, 0)
-      )
-    } else {
-      # Extract subject data and sort by time
-      subj_times <- data[[time]][idx]
-      time_order <- order(subj_times)
-
-      data_list[[sid]] <- list(
-        time = subj_times[time_order],
-        response = data[[response_var]][idx][time_order],
-        covariates = covariates[idx[time_order], , drop = FALSE],
-        initial = c(0, 0)
-      )
-    }
-  }
-
-  data_list
 }

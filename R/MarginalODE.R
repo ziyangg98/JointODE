@@ -140,7 +140,7 @@ MarginalODE <- function(
   control <- if (is.null(control)) {
     JointODE.control()
   } else if (is.list(control)) {
-    JointODE.control(.list = modifyList(JointODE.control(), control))
+    JointODE.control(.list = control)
   } else {
     stop("control must be a list or NULL")
   }
@@ -177,6 +177,12 @@ MarginalODE <- function(
       cli::cli_alert_info("Starting iterative optimization")
     }
 
+    # Set up parallel plan once before loop
+    if (control$parallel) {
+      marginal_cleanup <- .setup_parallel_plan(control$n_cores)
+      on.exit(marginal_cleanup(), add = TRUE)
+    }
+
     theta <- rep(0, n_params)
     max_iter <- control$maxit
     tol <- control$atol
@@ -193,7 +199,8 @@ MarginalODE <- function(
           ))
         },
         control$parallel,
-        control$n_cores
+        control$n_cores,
+        setup = FALSE
       )
       for (i in seq_along(data_list)) {
         data_list[[i]]$initial <- opt_results[[i]]$state
@@ -348,6 +355,42 @@ MarginalODE <- function(
 }
 
 
+#' Print Method for MarginalODE Objects
+#'
+#' @param x An object of class \code{MarginalODE}
+#' @param digits Number of digits for numeric output
+#' @param ... Additional arguments
+#' @return Invisibly returns the object
+#' @concept model-display
+#' @importFrom stats coef
+#' @export
+print.MarginalODE <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
+  cat("\nMarginal Second-Order ODE Model\n")
+  cat("Call: ")
+  print(x$call)
+
+  n_params <- length(x$parameters)
+  n_subjects <- length(x$data)
+
+  cat(
+    "\nLog-likelihood:",
+    format(x$logLik, digits = digits),
+    "on",
+    n_params,
+    "parameters\n"
+  )
+  cat(
+    "AIC:",
+    format(x$AIC, digits = digits),
+    "  BIC:",
+    format(x$BIC, digits = digits),
+    "\n"
+  )
+  cat("Convergence:", x$convergence$message, "\n")
+  invisible(x)
+}
+
+
 #' Summary Method for MarginalODE Objects
 #'
 #' @param object An object of class \code{MarginalODE}
@@ -388,7 +431,7 @@ summary.MarginalODE <- function(object, ...) {
       ),
       sigma = c(sigma_e = object$measurement_error_sd),
       nobs = length(object$data),
-      n_observations = sum(sapply(object$data, function(s) length(s$response))),
+      n_observations = sum(vapply(object$data, function(s) length(s$response), integer(1))),
       AIC = object$AIC,
       BIC = object$BIC,
       logLik = object$logLik,
@@ -514,9 +557,9 @@ predict.MarginalODE <- function(
 
     n_cov <- ncol(subj$covariates)
     pred_cov <- if (n_cov > 0) {
-      cov_mat <- t(sapply(pred_times, function(t) {
+      cov_mat <- t(vapply(pred_times, function(t) {
         subj$covariates[which.min(abs(subj$time - t)), ]
-      }))
+      }, numeric(n_cov)))
       colnames(cov_mat) <- colnames(subj$covariates)
       cov_mat
     } else {

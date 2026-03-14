@@ -39,4 +39,12 @@ test_that("Initial state optimization converges", {
   errors <- results - sim$data$state
   bias <- colMeans(errors)
   rmse <- sqrt(colMeans(errors^2))
+
+  # Bias should be small (< 0.5 in absolute value)
+  expect_true(all(abs(bias) < 0.5),
+    info = paste("bias too large:", paste(round(bias, 4), collapse = ", ")))
+
+  # RMSE should be reasonable (< 1.0)
+  expect_true(all(rmse < 1.0),
+    info = paste("rmse too large:", paste(round(rmse, 4), collapse = ", ")))
 })

@@ -189,7 +189,7 @@ closed-form updates for variance parameters
 \examples{
 \dontrun{
 # Generate example data
-sim <- simulate(n_subjects = 100, n_times = 10)
+sim <- simulate(n_subjects = 100, n_measurements = 10)
 
 # Fit with default control parameters
 fit1 <- JointODE(

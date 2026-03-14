@@ -1,29 +1,22 @@
 #' @importFrom stats predict reformulate
 #' @noRd
 .compute_initial <- function(
-  longitudinal_formula,
   longitudinal_data,
-  survival_formula,
   survival_data,
-  spline_baseline,
   gamma,
   state,
-  control_opts
+  control_opts,
+  parsed_long,
+  parsed_surv,
+  spline_config,
+  spline_baseline_config
 ) {
   verbose <- control_opts$verbose
-
-  parsed_long <- .parse_longitudinal_formula(longitudinal_formula)
-  parsed_surv <- .parse_survival_formula(survival_formula)
-  spline_baseline <- modifyList(.default_spline, spline_baseline)
 
   id <- parsed_long$grouping
   time <- parsed_surv$time_var
 
-  dims <- .compute_dimensions(
-    longitudinal_formula,
-    survival_formula,
-    spline_baseline
-  )
+  dims <- .compute_dimensions(parsed_long, parsed_surv, spline_config)
 
   default_init <- list(
     coefficients = list(
@@ -93,8 +86,12 @@
 
   longitudinal <- marginal_fit$parameters
 
-  surv_vars <- all.vars(survival_formula[[2]])
-  surv_cov_names <- all.vars(survival_formula[[3]])
+  surv_vars <- c(parsed_surv$time_var, parsed_surv$status_var)
+  surv_cov_names <- if (is.null(parsed_surv$covariate_terms)) {
+    character(0)
+  } else {
+    parsed_surv$covariate_terms
+  }
 
   pred_result <- predict(marginal_fit)
   names(pred_result)[names(pred_result) == "time"] <- "obstime"
@@ -173,15 +170,6 @@
   if (verbose > 0) {
     cli::cli_alert_success("Hazard initialized")
   }
-
-  spline_baseline_config <- .get_spline_config(
-    x = survival_data[[surv_vars[1]]],
-    degree = spline_baseline$degree,
-    n_knots = spline_baseline$n_knots,
-    knot_placement = spline_baseline$knot_placement,
-    boundary_knots = spline_baseline$boundary_knots
-  )
-  spline_baseline_config$boundary_knots[1] <- 0
 
   baseline <- .init_baseline_spline(
     survival_data,
@@ -312,26 +300,19 @@
 #' @importFrom stats model.frame model.matrix model.response
 #' @noRd
 .initialize <- function(
-  longitudinal_formula,
-  survival_formula,
   longitudinal_data,
   survival_data,
-  spline_baseline,
+  survival_formula,
   gamma,
   state,
   init,
-  control
+  control,
+  parsed_long,
+  parsed_surv,
+  spline_config
 ) {
-  # Set defaults for spline_baseline if not provided
-  spline_baseline <- modifyList(.default_spline, spline_baseline)
-
-  # Extract data dimensions from raw data
   n_subjects <- nrow(survival_data)
 
-  # Parse formulas once
-  parsed_long <- .parse_longitudinal_formula(longitudinal_formula)
-
-  # Build formulas and matrices
   fixed_formula <- .build_formula(
     parsed_long$fixed_terms,
     response = parsed_long$response
@@ -378,10 +359,10 @@
   # Configure splines
   spline_baseline_config <- .get_spline_config(
     x = event_times,
-    degree = spline_baseline$degree,
-    n_knots = spline_baseline$n_knots,
-    knot_placement = spline_baseline$knot_placement,
-    boundary_knots = spline_baseline$boundary_knots
+    degree = spline_config$degree,
+    n_knots = spline_config$n_knots,
+    knot_placement = spline_config$knot_placement,
+    boundary_knots = spline_config$boundary_knots
   )
   spline_baseline_config$boundary_knots[1] <- 0
 
@@ -421,18 +402,23 @@
 
   if (is.null(init)) {
     parameters <- .compute_initial(
-      longitudinal_formula,
       longitudinal_data,
-      survival_formula,
       survival_data,
-      spline_baseline,
       gamma,
       state,
-      control
+      control,
+      parsed_long,
+      parsed_surv,
+      spline_config,
+      spline_baseline_config
     )
   } else {
     parameters <- init
   }
+
+  # Ensure baseline config always uses the computed spline configuration
+  # (.compute_initial() fallback may use raw config without knots/boundary)
+  parameters$configurations$baseline <- spline_baseline_config
 
   # Set correct names after initialization
   names(parameters$coefficients$baseline) <- coef_names$baseline

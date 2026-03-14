@@ -3,9 +3,9 @@
 # Package Constants ============================================================
 
 .default_spline <- list(
-  degree = 3,
-  n_knots = 5,
-  knot_placement = "quantile",
+  degree = 2,
+  n_knots = 0,
+  knot_placement = "equal",
   boundary_knots = NULL
 )
 
@@ -59,10 +59,18 @@
 
 #' @importFrom future.apply future_lapply
 #' @noRd
-.parallel_apply <- function(indices, fn, parallel = TRUE, n_cores = 0) {
+.parallel_apply <- function(
+  indices,
+  fn,
+  parallel = TRUE,
+  n_cores = 0,
+  setup = TRUE
+) {
   if (parallel) {
-    cleanup <- .setup_parallel_plan(n_cores)
-    on.exit(cleanup(), add = TRUE)
+    if (setup) {
+      cleanup <- .setup_parallel_plan(n_cores)
+      on.exit(cleanup(), add = TRUE)
+    }
     future.apply::future_lapply(indices, fn, future.seed = TRUE)
   } else {
     lapply(indices, fn)
@@ -196,46 +204,27 @@
 # Model Configuration ==========================================================
 
 #' @noRd
-.compute_dimensions <- function(
-  longitudinal_formula,
-  survival_formula,
-  spline_baseline
-) {
-  parsed_long <- .parse_longitudinal_formula(longitudinal_formula)
-  parsed_surv <- .parse_survival_formula(survival_formula)
-
+.compute_dimensions <- function(parsed_long, parsed_surv, spline_config) {
   n_longitudinal_fixed <- length(parsed_long$fixed_terms)
-  n_longitudinal_random <- if (is.null(parsed_long$random_terms)) {
-    0
-  } else {
+  n_longitudinal_random <- if (is.null(parsed_long$random_terms)) 0 else {
     length(parsed_long$random_terms)
   }
-  n_survival_covariates <- if (is.null(parsed_surv$covariate_terms)) {
-    0
-  } else {
+  n_survival_covariates <- if (is.null(parsed_surv$covariate_terms)) 0 else {
     length(parsed_surv$covariate_terms)
   }
 
   n_biomarker_velocity_fixed <- sum(
-    parsed_long$biomarker$fixed,
-    parsed_long$velocity$fixed
+    parsed_long$biomarker$fixed, parsed_long$velocity$fixed
   )
   n_biomarker_velocity_random <- sum(
-    parsed_long$biomarker$random,
-    parsed_long$velocity$random
+    parsed_long$biomarker$random, parsed_long$velocity$random
   )
 
-  n_longitudinal_coef <- n_longitudinal_fixed + n_biomarker_velocity_fixed
-  n_random_effects <- n_longitudinal_random + n_biomarker_velocity_random
-
-  spline_config <- modifyList(.default_spline, spline_baseline)
-  n_spline_basis <- spline_config$degree + spline_config$n_knots + 1
-
   list(
-    n_longitudinal_coef = n_longitudinal_coef,
-    n_random_effects = n_random_effects,
+    n_longitudinal_coef = n_longitudinal_fixed + n_biomarker_velocity_fixed,
+    n_random_effects = n_longitudinal_random + n_biomarker_velocity_random,
     n_survival_covariates = n_survival_covariates,
-    n_spline_basis = n_spline_basis,
+    n_spline_basis = spline_config$degree + spline_config$n_knots + 1,
     spline_config = spline_config
   )
 }
@@ -276,10 +265,53 @@
 
 # Variance-Covariance ==========================================================
 
+#' Fast M-step mapping for SEM Jacobian (fixed posteriors, no loglik eval)
+#' @noRd
+.m_step_map <- function(
+  theta_input, data_list, posteriors, posterior_moments, parameters, control
+) {
+  params_input <- .vector_to_coef(parameters, theta_input)
+  n_subjects <- length(data_list)
+
+  # Update sigma from fixed posterior moments
+  n_re <- length(posterior_moments[[1]]$mean)
+  if (control$trim == 0) {
+    sigma_sum <- matrix(0, n_re, n_re)
+    for (i in seq_len(n_subjects)) {
+      sigma_sum <- sigma_sum + posterior_moments[[i]]$second_moment
+    }
+    random_effect_sigma <- sigma_sum / n_subjects
+  } else {
+    all_second_moments <- simplify2array(
+      lapply(posterior_moments, `[[`, "second_moment")
+    )
+    random_effect_sigma <- apply(
+      all_second_moments, 1:2, mean, trim = control$trim
+    )
+  }
+
+  # Update measurement error from fixed posteriors
+  measurement_error_sd <- .update_measurement_error_sd(
+    data_list, params_input, posteriors
+  )
+  params_input$coefficients$measurement_error_sd <- measurement_error_sd
+  params_input$coefficients$random_effect_sigma <- random_effect_sigma
+
+  # Newton M-step (gradient + hessian only)
+  theta <- .coef_to_vector(params_input)
+  obj <- .compute_objective_expected(
+    theta, data_list, posteriors, params_input,
+    gradient = TRUE, hessian = TRUE
+  )
+  direction <- solve(attr(obj, "hessian"), attr(obj, "gradient"))
+  theta - direction
+}
+
 #' @noRd
 .compute_vcov_sem <- function(
   data_list,
   posteriors,
+  posterior_moments,
   parameters,
   random_effects,
   control
@@ -301,15 +333,12 @@
   )
   info_complete_inv <- solve(attr(obj, "hessian"))
 
+  # Use fast M-step mapping with fixed posteriors (valid at convergence)
   em_map <- function(theta_input) {
-    params_input <- .vector_to_coef(parameters, theta_input)
-    em_result <- .em_step(
-      data_list,
-      params_input,
-      random_effects,
-      control
+    .m_step_map(
+      theta_input, data_list, posteriors, posterior_moments,
+      parameters, control
     )
-    .coef_to_vector(em_result$parameters)
   }
 
   eps_weight <- sqrt(diag(info_complete_inv))
@@ -358,6 +387,16 @@
   }
 
   vcov_sym
+}
+
+# Parameter Counting ===========================================================
+
+#' @noRd
+.count_params <- function(parameters) {
+  cf <- parameters$coefficients
+  p <- nrow(cf$random_effect_sigma)
+  length(cf$baseline) + length(cf$hazard) + length(cf$longitudinal) +
+    1 + p * (p + 1) / 2
 }
 
 # Parameter Vector Conversion =================================================
@@ -453,7 +492,8 @@
     random_effects,
     control$parallel,
     control$n_cores,
-    control$quad_level
+    control$quad_level,
+    setup = FALSE
   )
 
   # Update random effects from posterior
@@ -466,16 +506,26 @@
       )
     },
     parallel = control$parallel,
-    n_cores = control$n_cores
+    n_cores = control$n_cores,
+    setup = FALSE
   )
-  random_effects <- t(sapply(posterior_moments, `[[`, "mean"))
+  n_re <- length(posterior_moments[[1]]$mean)
+  random_effects <- t(vapply(posterior_moments, `[[`, numeric(n_re), "mean"))
 
-  all_second_moments <- simplify2array(
-    lapply(posterior_moments, `[[`, "second_moment")
-  )
-  random_effect_sigma <- apply(
-    all_second_moments, 1:2, mean, trim = control$trim
-  )
+  if (control$trim == 0) {
+    sigma_sum <- matrix(0, n_re, n_re)
+    for (i in seq_len(n_subjects)) {
+      sigma_sum <- sigma_sum + posterior_moments[[i]]$second_moment
+    }
+    random_effect_sigma <- sigma_sum / n_subjects
+  } else {
+    all_second_moments <- simplify2array(
+      lapply(posterior_moments, `[[`, "second_moment")
+    )
+    random_effect_sigma <- apply(
+      all_second_moments, 1:2, mean, trim = control$trim
+    )
+  }
 
   measurement_error_sd <- .update_measurement_error_sd(
     data_list,
@@ -512,17 +562,14 @@
   )
 
   loglik_value <- -as.numeric(obj_new)
-  rm(obj, obj_new, gradient, hessian, direction)
-
   parameters <- .vector_to_coef(parameters, theta_new)
-
-  rm(posteriors, posterior_moments, theta, theta_new)
-  gc(verbose = FALSE, full = FALSE)
 
   list(
     parameters = parameters,
     random_effects = random_effects,
-    loglik = loglik_value
+    loglik = loglik_value,
+    posteriors = posteriors,
+    posterior_moments = posterior_moments
   )
 }
 
@@ -641,35 +688,16 @@
 .finalize <- function(
   data_list,
   parameters,
-  random_effects,
   loglik,
   control,
   coef_names,
-  converged
+  converged,
+  posteriors,
+  posterior_moments
 ) {
-  posteriors <- .compute_posteriors(
-    data_list,
-    parameters,
-    random_effects,
-    control$parallel,
-    control$n_cores,
-    control$quad_level
-  )
-
   n_subjects <- length(data_list)
-
-  posterior_moments <- .parallel_apply(
-    seq_len(n_subjects),
-    function(i) {
-      .compute_posterior_moments(
-        list(nodes = posteriors$nodes[[i]], weights = posteriors$weights[[i]])
-      )
-    },
-    parallel = control$parallel,
-    n_cores = control$n_cores
-  )
-
-  random_effects <- t(sapply(posterior_moments, `[[`, "mean"))
+  n_re <- length(posterior_moments[[1]]$mean)
+  random_effects <- t(vapply(posterior_moments, `[[`, numeric(n_re), "mean"))
 
   names(parameters$coefficients$baseline) <- coef_names$baseline
   names(parameters$coefficients$hazard) <- coef_names$hazard
@@ -684,21 +712,14 @@
   vcov_matrix <- .compute_vcov_sem(
     data_list,
     posteriors,
+    posterior_moments,
     parameters,
     random_effects,
     control
   )
   dimnames(vcov_matrix) <- list(coef_names_expanded, coef_names_expanded)
 
-  n_coef <- with(
-    parameters$coefficients,
-    length(baseline) + length(hazard) + length(longitudinal)
-  )
-  n_sigma_b <- with(
-    parameters$coefficients,
-    length(longitudinal) * (length(longitudinal) + 1) / 2
-  )
-  n_params <- n_coef + 1 + n_sigma_b
+  n_params <- .count_params(parameters)
   aic <- -2 * loglik + 2 * n_params
   bic <- -2 * loglik + n_params * log(n_subjects)
 
@@ -722,9 +743,6 @@
   if (control$verbose > 0) {
     cli::cli_alert_info(sprintf("C-index (concordance): %.3f", cindex))
   }
-
-  rm(posteriors, posterior_moments)
-  gc(verbose = FALSE, full = FALSE)
 
   list(
     random_effects = random_effects,

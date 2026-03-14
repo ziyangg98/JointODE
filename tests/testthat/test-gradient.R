@@ -49,4 +49,31 @@ test_that("AD gradient matches forward sensitivity gradient", {
     )
   })
   cat("CppAD gradient time:", time_ad["elapsed"], "seconds\n")
+
+  # Verify gradient is finite and non-zero
+  grad <- attr(result_ad, "gradient")
+  expect_true(all(is.finite(grad)), info = "gradient contains non-finite values")
+  expect_true(any(grad != 0), info = "gradient is all zeros")
+
+  # Verify Hessian is finite and symmetric
+  hess <- attr(result_ad, "hessian")
+  expect_true(all(is.finite(hess)), info = "Hessian contains non-finite values")
+  expect_equal(hess, t(hess), tolerance = 1e-10, info = "Hessian is not symmetric")
+
+  # Verify gradient via numeric differentiation
+  numeric_grad <- numDeriv::grad(
+    function(x) {
+      as.numeric(.compute_objective_expected(
+        params = x,
+        data_list = data_list,
+        posteriors = posteriors,
+        parameters = sim$init,
+        gradient = FALSE,
+        hessian = FALSE
+      ))
+    },
+    params
+  )
+  expect_equal(grad, numeric_grad, tolerance = 1e-4,
+    info = "analytic gradient does not match numeric gradient")
 })

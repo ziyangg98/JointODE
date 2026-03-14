@@ -103,8 +103,6 @@ class BSplineWorkspace {
   std::vector<double> knots;
   std::vector<double> work1;
   std::vector<double> work2;
-  bool knots_ready = false;
-
   BSplineWorkspace() {
     basis.reserve(20);
     knots.reserve(50);
@@ -118,7 +116,6 @@ class BSplineWorkspace {
     std::vector<double>().swap(knots);
     std::vector<double>().swap(work1);
     std::vector<double>().swap(work2);
-    knots_ready = false;
   }
 };
 
@@ -473,7 +470,6 @@ class ODEFunctor {
                           params_.spline_boundary, workspace_.basis,
                           workspace_.knots, workspace_.work1, workspace_.work2,
                           false);  // Build knots
-    workspace_.knots_ready = true;
   }
 
   void Ode(const Scalar& t, const CppAD::vector<Scalar>& y,

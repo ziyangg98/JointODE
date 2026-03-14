@@ -1,111 +1,93 @@
 #' @importFrom stats nlm
 NULL
 
-.update_measurement_error_sd <- function(
-  data_list,
-  parameters,
-  posteriors
-) {
-  n_subjects <- length(data_list)
-  n_total_obs <- sum(sapply(data_list, function(d) {
-    length(d$longitudinal$measurements)
-  }))
+# Package-level cache for quadrature grids, keyed by "dim_level"
+.quad_cache <- new.env(parent = emptyenv())
 
-  # Build data structures for batch ODE solving
-  n_nodes_per_subject <- sapply(posteriors$nodes, nrow)
+.get_quad_grid <- function(dim, level) {
+  key <- paste0(dim, "_", level)
+  if (!exists(key, envir = .quad_cache)) {
+    grid <- mvQuad::createNIGrid(
+      dim = dim, type = "GHe",
+      level = level, ndConstruction = "product"
+    )
+    assign(key, list(
+      nodes = mvQuad::getNodes(grid),
+      weights = as.numeric(mvQuad::getWeights(grid))
+    ), envir = .quad_cache)
+  }
+  get(key, envir = .quad_cache)
+}
+
+.expand_posteriors <- function(data_list, posteriors) {
+  n_subjects <- length(data_list)
+  n_nodes_per_subject <- vapply(posteriors$nodes, nrow, integer(1))
   total_nodes <- sum(n_nodes_per_subject)
 
-  # Pre-allocate
   all_nodes <- do.call(rbind, posteriors$nodes)
   all_weights <- unlist(posteriors$weights, use.names = FALSE)
   all_data <- vector("list", total_nodes)
 
-  idx <- 1
+  idx <- 1L
   for (i in seq_len(n_subjects)) {
-    n_nodes <- n_nodes_per_subject[i]
-    idx_range <- idx:(idx + n_nodes - 1)
-    all_data[idx_range] <- rep(list(data_list[[i]]), n_nodes)
-    idx <- idx + n_nodes
+    n <- n_nodes_per_subject[i]
+    all_data[idx:(idx + n - 1L)] <- rep(list(data_list[[i]]), n)
+    idx <- idx + n
   }
 
-  node_to_subject <- rep(seq_len(n_subjects), n_nodes_per_subject)
+  list(
+    nodes = all_nodes, data = all_data, weights = all_weights,
+    node_to_subject = rep(seq_len(n_subjects), n_nodes_per_subject)
+  )
+}
+
+.update_measurement_error_sd <- function(data_list, parameters, posteriors) {
+  n_total_obs <- sum(vapply(data_list, function(d) {
+    length(d$longitudinal$measurements)
+  }, integer(1)))
+
+  expanded <- .expand_posteriors(data_list, posteriors)
 
   ode_solutions <- .solve_batch_ode_cppad(
-    data_list = all_data,
-    random_effects = all_nodes,
+    data_list = expanded$data,
+    random_effects = expanded$nodes,
     parameters = parameters
   )
 
-  # Compute weighted residual sum of squares
-  sigma_e_squared <- sum(sapply(seq_along(ode_solutions), function(k) {
-    i <- node_to_subject[k]
-    data_i <- data_list[[i]]
-    measurements <- data_i$longitudinal$measurements
+  sigma_e_squared <- sum(vapply(seq_along(ode_solutions), function(k) {
+    i <- expanded$node_to_subject[k]
+    measurements <- data_list[[i]]$longitudinal$measurements
+    if (length(measurements) == 0) return(0)
 
-    if (length(measurements) == 0) {
-      return(0)
-    }
-
-    obs_times <- data_i$longitudinal$times
+    obs_times <- data_list[[i]]$longitudinal$times
     result_times <- ode_solutions[[k]]$times
-    match_idx <- match(obs_times, result_times)
+    match_idx <- vapply(obs_times, function(t) {
+      which.min(abs(result_times - t))
+    }, integer(1))
     biomarker_pred <- ode_solutions[[k]]$biomarker[match_idx]
-    residuals <- measurements - biomarker_pred
 
-    all_weights[k] * sum(residuals^2)
-  }))
-
-  # Clean up large objects
-  rm(all_nodes, all_data, all_weights, ode_solutions, node_to_subject)
+    expanded$weights[k] * sum((measurements - biomarker_pred)^2)
+  }, numeric(1)))
 
   sqrt(sigma_e_squared / n_total_obs)
 }
 
 
 .compute_objective_expected <- function(
-  params,
-  data_list,
-  posteriors,
-  parameters,
-  gradient = TRUE,
-  hessian = FALSE
+  params, data_list, posteriors, parameters,
+  gradient = TRUE, hessian = FALSE
 ) {
-  n_subjects <- length(data_list)
+  expanded <- .expand_posteriors(data_list, posteriors)
 
-  # Pre-allocate for efficiency
-  total_nodes <- sum(sapply(posteriors$nodes, nrow))
-  n_random_effects <- ncol(posteriors$nodes[[1]])
-
-  all_nodes <- matrix(0, nrow = total_nodes, ncol = n_random_effects)
-  all_data <- vector("list", total_nodes)
-  all_weights <- numeric(total_nodes)
-
-  idx <- 1
-  for (i in seq_len(n_subjects)) {
-    n_nodes <- nrow(posteriors$nodes[[i]])
-    idx_range <- idx:(idx + n_nodes - 1)
-
-    all_nodes[idx_range, ] <- posteriors$nodes[[i]]
-    all_data[idx_range] <- rep(list(data_list[[i]]), n_nodes)
-    all_weights[idx_range] <- posteriors$weights[[i]]
-
-    idx <- idx + n_nodes
-  }
-
-  result <- .compute_objective_cppad(
+  .compute_objective_cppad(
     params = params,
-    data_list = all_data,
-    random_effects = all_nodes,
+    data_list = expanded$data,
+    random_effects = expanded$nodes,
     parameters = parameters,
-    weights = all_weights,
+    weights = expanded$weights,
     gradient = gradient,
     hessian = hessian
   )
-
-  # Explicitly clean up large temporary objects
-  rm(all_nodes, all_data, all_weights)
-
-  result
 }
 
 
@@ -129,13 +111,19 @@ NULL
     value
   }
 
-  fit <- suppressWarnings(
-    nlm(
-      f = objective,
-      p = random_effect,
-      hessian = FALSE,
-      check.analyticals = FALSE
-    )
+  fit <- tryCatch(
+    suppressWarnings(
+      nlm(
+        f = objective,
+        p = random_effect,
+        hessian = FALSE,
+        check.analyticals = FALSE
+      )
+    ),
+    error = function(e) {
+      # nlm failed (e.g., non-finite value); fall back to initial estimate
+      list(estimate = random_effect, minimum = NA_real_, code = 5)
+    }
   )
 
   result_at_mode <- .compute_logpost_cppad(
@@ -190,23 +178,17 @@ NULL
     }
   )
 
-  n_random_effects <- length(fit$estimate)
-  quad_grid <- mvQuad::createNIGrid(
-    dim = n_random_effects,
-    type = "GHe",
-    level = level,
-    ndConstruction = "product"
-  )
-
-  quad_nodes <- mvQuad::getNodes(quad_grid)
-  quad_weights <- mvQuad::getWeights(quad_grid)
+  quad <- .get_quad_grid(length(fit$estimate), level)
+  quad_nodes <- quad$nodes
+  quad_weights <- quad$weights
   n_nodes <- nrow(quad_nodes)
 
-  aghq_nodes <- t(sapply(seq_len(n_nodes), function(k) {
+  n_re <- length(fit$estimate)
+  aghq_nodes <- t(vapply(seq_len(n_nodes), function(k) {
     fit$estimate + tcrossprod(quad_nodes[k, ], chol_factor)
-  }))
+  }, numeric(n_re)))
 
-  logpost_at_nodes <- sapply(seq_len(n_nodes), function(k) {
+  logpost_at_nodes <- vapply(seq_len(n_nodes), function(k) {
     result <- .compute_logpost_cppad(
       random_effect = aghq_nodes[k, ],
       data = data,
@@ -215,7 +197,7 @@ NULL
       hessian = FALSE
     )
     as.numeric(result)
-  })
+  }, numeric(1))
 
   # Compute Jacobian factor for coordinate transformation
   # When transforming from standard GHN points z to posterior space
@@ -239,16 +221,9 @@ NULL
   nodes <- posterior_result$nodes
   weights <- posterior_result$weights
 
-  n_random_effects <- ncol(nodes)
-
-  # Compute mean
-  mean <- colSums(sweep(nodes, 1, weights, "*"))
-
-  # Compute second moment (uncentered)
-  second_moment <- matrix(0, nrow = n_random_effects, ncol = n_random_effects)
-  for (k in seq_len(nrow(nodes))) {
-    second_moment <- second_moment + weights[k] * tcrossprod(nodes[k, ])
-  }
+  mean <- colSums(weights * nodes)
+  weighted_nodes <- sqrt(weights) * nodes
+  second_moment <- crossprod(weighted_nodes)
 
   list(mean = mean, second_moment = second_moment)
 }
@@ -259,9 +234,13 @@ NULL
   random_effects,
   parallel = FALSE,
   n_cores = 0,
-  level = 3
+  level = 3,
+  setup = TRUE
 ) {
   n_subjects <- length(data_list)
+
+  # Warm the cache once before parallel dispatch
+  .get_quad_grid(ncol(random_effects), level)
 
   compute_subject_posterior <- function(i) {
     .compute_posterior_laplace(
@@ -276,7 +255,8 @@ NULL
     seq_len(n_subjects),
     compute_subject_posterior,
     parallel = parallel,
-    n_cores = n_cores
+    n_cores = n_cores,
+    setup = setup
   )
 
   list(

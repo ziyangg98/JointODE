@@ -582,11 +582,7 @@ simulate <- function(
   ))
 
   # Handle survival covariates - if user passes numeric(0), ignore defaults
-  if (
-    length(survival$covariates) == 1 &&
-      is.numeric(survival$covariates) &&
-      length(survival$covariates) == 0
-  ) {
+  if (length(survival$covariates) == 0) {
     surv_cov_names <- character(0)
   } else {
     surv_cov_names <- names(survival$covariates)

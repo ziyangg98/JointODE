@@ -79,7 +79,7 @@ fit <- JointODE(
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = longitudinal_data,
   survival_data = sim$data$survival_data,
-  control = list(atol = 1e-3, verbose = 3)
+  control = list(atol = 1e-3)
 )
 ```
 

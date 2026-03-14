@@ -834,7 +834,7 @@ plot.JointODE <- function(
   # Track if we're using individual means for time-varying covariates
   using_individual_means <- FALSE
 
-  group_var <- sapply(x$data, function(subj) {
+  group_var <- vapply(x$data, function(subj) {
     # Check if 'by' is in survival covariates
     if (by %in% survival_cov_names) {
       idx <- which(survival_cov_names == by)
@@ -871,7 +871,7 @@ plot.JointODE <- function(
     }
 
     NA
-  })
+  }, numeric(1))
 
   # Inform user if grouping by individual means
   if (using_individual_means) {
@@ -927,9 +927,9 @@ plot.JointODE <- function(
     quantile_breaks <- quantile(group_var, probs = probs, na.rm = TRUE)
 
     # Generate labels for groups
-    group_labels <- sapply(1:n_groups, function(i) {
+    group_labels <- vapply(seq_len(n_groups), function(i) {
       sprintf("G%d (%.0f-%.0f%%)", i, probs[i] * 100, probs[i + 1] * 100)
-    })
+    }, character(1))
 
     # Assign each observation to a quantile group
     group_var_discrete <- cut(

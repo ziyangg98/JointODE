@@ -28,3 +28,4 @@
 .compute_state_loglik_cppad <- function(initial_state, data, random_effect, parameters, gradient = TRUE, hessian = FALSE) {
     .Call(`_JointODE_compute_state_loglik_cppad`, initial_state, data, random_effect, parameters, gradient, hessian)
 }
+
