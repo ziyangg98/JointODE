@@ -552,6 +552,13 @@ summary.JointODE <- function(object, ...) {
   )
 }
 
+#' @noRd
+.printCoefmat <- function(x, digits = 4, signif.stars = TRUE, ...) {
+  # Format Estimate and Std. Error as fixed-point
+  x[, 1:2] <- round(x[, 1:2], digits)
+  printCoefmat(x, digits = digits, signif.stars = signif.stars, ...)
+}
+
 #' @concept model-summary
 #' @importFrom stats printCoefmat
 #' @export
@@ -584,7 +591,7 @@ print.summary.JointODE <- function(
   # Longitudinal Process (ODE model)
   cat("Longitudinal Process: Second-Order ODE Model\n")
   if (!is.null(x$coef_longitudinal)) {
-    printCoefmat(
+    .printCoefmat(
       x$coef_longitudinal,
       digits = digits,
       signif.stars = signif.stars,
@@ -595,7 +602,7 @@ print.summary.JointODE <- function(
   # Derived ODE characteristics
   if (!is.null(x$derived_params)) {
     cat("\nODE System Characteristics:\n")
-    printCoefmat(
+    .printCoefmat(
       x$derived_params,
       digits = digits,
       signif.stars = signif.stars,
@@ -606,7 +613,7 @@ print.summary.JointODE <- function(
   # Survival Process
   cat("\nSurvival Process: Proportional Hazards Model\n")
   if (!is.null(x$coef_survival)) {
-    printCoefmat(
+    .printCoefmat(
       x$coef_survival,
       digits = digits,
       signif.stars = signif.stars,
