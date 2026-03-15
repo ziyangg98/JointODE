@@ -2,8 +2,6 @@
 # Mock Object Factories for S3 Method Tests
 # ==============================================================================
 
-library(survival)
-
 # Build processed data from sim dataset
 .build_mock_data <- function() {
   long_formula <- observed ~ biomarker + velocity + x1 + x2 +

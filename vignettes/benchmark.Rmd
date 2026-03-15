@@ -24,7 +24,6 @@ sizes and parallelization settings.
 
 ```{r load}
 library(JointODE)
-library(survival)
 library(ggplot2)
 ```
 

@@ -116,7 +116,6 @@ utils::globalVariables(c(
 #' @examples
 #' \dontrun{
 #' library(JointODE)
-#' library(survival)
 #'
 #' # Load example dataset
 #' data(sim)
