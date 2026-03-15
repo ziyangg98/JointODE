@@ -124,6 +124,18 @@ test_that(".compute_dimensions handles no covariates", {
   expect_equal(dims$n_spline_basis, 5) # 2 + 2 + 1
 })
 
+test_that(".compute_dimensions counts biomarker/velocity random effects", {
+  parsed_long <- .parse_longitudinal_formula(
+    y ~ biomarker + velocity + (biomarker + velocity | id)
+  )
+  parsed_surv <- .parse_survival_formula(Surv(time, status) ~ 1)
+  spline_config <- list(degree = 2, n_knots = 0)
+
+  dims <- .compute_dimensions(parsed_long, parsed_surv, spline_config)
+  expect_equal(dims$n_random_effects, 2) # biomarker + velocity
+  expect_equal(dims$n_longitudinal_coef, 3) # intercept + biomarker + velocity
+})
+
 # --- .parse_longitudinal_formula ---
 
 test_that(".parse_longitudinal_formula extracts components", {
@@ -159,6 +171,21 @@ test_that(".parse_longitudinal_formula handles intercept only", {
   expect_null(parsed$random_terms)
 })
 
+test_that(".parse_longitudinal_formula with random intercept only", {
+  parsed <- .parse_longitudinal_formula(y ~ x1 + (1 | id))
+  expect_equal(parsed$grouping, "id")
+  expect_equal(parsed$random_terms, "(Intercept)")
+  expect_false(parsed$biomarker$random)
+  expect_false(parsed$velocity$random)
+})
+
+test_that(".parse_longitudinal_formula with mixed random terms", {
+  parsed <- .parse_longitudinal_formula(y ~ x1 + (x1 + biomarker | id))
+  expect_true(parsed$biomarker$random)
+  expect_equal(parsed$random_terms, "x1")
+  expect_equal(parsed$grouping, "id")
+})
+
 # --- .parse_survival_formula ---
 
 test_that(".parse_survival_formula extracts components", {
@@ -182,4 +209,138 @@ test_that(".parse_survival_formula validates Surv()", {
     .parse_survival_formula(y ~ x1),
     "Surv"
   )
+})
+
+# --- .build_formula ---
+
+test_that(".build_formula builds response formula with covariates", {
+  f <- .build_formula(c("(Intercept)", "x1", "x2"), response = "y")
+  expect_equal(deparse(f), "y ~ x1 + x2")
+})
+
+test_that(".build_formula builds intercept-only formula", {
+  f <- .build_formula("(Intercept)", response = "y")
+  expect_equal(deparse(f), "y ~ 1")
+})
+
+test_that(".build_formula builds formula without intercept", {
+  f <- .build_formula(c("x1", "x2"), response = "y")
+  expect_equal(deparse(f), "y ~ 0 + x1 + x2")
+})
+
+test_that(".build_formula builds random formula", {
+  f <- .build_formula(c("(Intercept)", "x1"), is_random = TRUE)
+  expect_true(inherits(f, "formula"))
+})
+
+# --- .get_spline_config ---
+
+test_that(".get_spline_config with quantile placement", {
+  x <- seq(0, 10, length.out = 100)
+  config <- .get_spline_config(x, degree = 3, n_knots = 5,
+                                knot_placement = "quantile")
+  expect_equal(length(config$knots), 5)
+  expect_equal(config$degree, 3)
+  expect_equal(config$df, 5 + 3 + 1)
+})
+
+test_that(".get_spline_config with equal placement", {
+  x <- seq(0, 10, length.out = 100)
+  config <- .get_spline_config(x, degree = 2, n_knots = 3,
+                                knot_placement = "equal")
+  expect_equal(length(config$knots), 3)
+})
+
+test_that(".get_spline_config with custom boundary_knots", {
+  x <- seq(1, 5, length.out = 50)
+  config <- .get_spline_config(x, degree = 2, n_knots = 2,
+                                boundary_knots = c(0, 10))
+  expect_equal(config$boundary_knots, c(0, 10))
+})
+
+test_that(".get_spline_config errors on invalid placement", {
+  expect_error(
+    .get_spline_config(1:10, knot_placement = "invalid"),
+    "knot_placement"
+  )
+})
+
+# --- .update_random_effect_sigma ---
+
+test_that(".update_random_effect_sigma without trimming", {
+  moments <- list(
+    list(mean = c(0, 0), second_moment = diag(2)),
+    list(mean = c(0, 0), second_moment = diag(2) * 3)
+  )
+  control <- list(trim = 0)
+  result <- .update_random_effect_sigma(moments, n_subjects = 2, control)
+  expect_equal(result, diag(2) * 2) # (1 + 3) / 2
+})
+
+test_that(".update_random_effect_sigma with trimming", {
+  moments <- list(
+    list(mean = c(0, 0), second_moment = diag(2)),
+    list(mean = c(0, 0), second_moment = diag(2) * 2),
+    list(mean = c(0, 0), second_moment = diag(2) * 100)
+  )
+  control <- list(trim = 0.3)
+  result <- .update_random_effect_sigma(moments, n_subjects = 3, control)
+  expect_true(is.matrix(result))
+  expect_equal(nrow(result), 2)
+})
+
+# --- .compute_metrics ---
+
+test_that(".compute_metrics computes correctly at iter > 1", {
+  curr <- list(
+    loglik = -100,
+    parameters = list(coefficients = list(
+      baseline = c(0.1, 0.2),
+      hazard = c(0.5),
+      longitudinal = c(-0.01),
+      measurement_error_sd = 0.5,
+      random_effect_sigma = diag(2)
+    ))
+  )
+  prev <- list(
+    loglik = -110,
+    parameters = list(coefficients = list(
+      baseline = c(0.1, 0.2),
+      hazard = c(0.5),
+      longitudinal = c(-0.01),
+      measurement_error_sd = 0.5,
+      random_effect_sigma = diag(2)
+    ))
+  )
+
+  m <- .compute_metrics(curr, prev, iter = 2)
+  expect_equal(m$delta_l, 10) # -100 - (-110) = 10
+  expect_true(m$rel_l > 0)
+})
+
+test_that(".compute_metrics at iter 1", {
+  curr <- list(loglik = -100)
+  m <- .compute_metrics(curr, NULL, iter = 1)
+  expect_equal(m$delta_l, -100)
+})
+
+# --- .parallel_apply ---
+
+test_that(".parallel_apply works in sequential mode", {
+  result <- .parallel_apply(1:5, function(i) i^2, parallel = FALSE)
+  expect_equal(result, as.list((1:5)^2))
+})
+
+# --- .format_vector / .format_matrix ---
+
+test_that(".format_vector formats correctly", {
+  expect_equal(.format_vector(numeric(0)), "[]")
+  expect_true(grepl("^\\[", .format_vector(c(1.0, 2.0))))
+  expect_true(grepl("\\+", .format_vector(1:10, n = 3)))
+})
+
+test_that(".format_matrix formats correctly", {
+  expect_equal(.format_matrix(NULL), "[]")
+  result <- .format_matrix(diag(2))
+  expect_true(grepl("1.000", result))
 })

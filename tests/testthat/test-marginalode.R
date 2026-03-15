@@ -51,7 +51,7 @@ test_that("MarginalODE fits without state (iterative)", {
   fit <- MarginalODE(
     formula = observed ~ x1,
     data = marginal_sim$longitudinal_data,
-    control = list(maxit = 20, atol = 1e-3)
+    control = list(maxit = 20, tol = 1e-3)
   )
 
   expect_s3_class(fit, "MarginalODE")

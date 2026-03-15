@@ -17,9 +17,11 @@
   )
 }
 
-create_mock_jointode <- function() {
+create_mock_jointode <- function(n_subjects = 20L) {
   data_list <- .build_mock_data()
-  n_subjects <- length(data_list)
+  # Subset to n_subjects for faster tests (plot, S3 methods)
+  n_subjects <- min(n_subjects, length(data_list))
+  data_list <- data_list[seq_len(n_subjects)]
 
   parameters <- sim$init
   # Add names to coefficients

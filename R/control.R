@@ -6,14 +6,8 @@
 #' process a list to fill in missing values with defaults.
 #'
 #' @param maxit Maximum number of EM iterations (default: 200)
-#' @param atol Absolute tolerance for parameter convergence. The EM algorithm
-#'   converges when the maximum absolute change in any parameter (including
-#'   variance parameters) is less than this value:
-#'   max(|theta_new - theta_old|) < atol (default: 1e-4)
-#' @param rtol Relative tolerance for log-likelihood convergence. The EM
-#'   algorithm converges when the relative change in log-likelihood is less
-#'   than this value: |L_new - L_old| / (|L_new| + epsilon) < rtol, where
-#'   epsilon = 1e-8 prevents division by zero (default: 1e-5)
+#' @param tol Relative tolerance for convergence. The EM algorithm converges
+#'   when |L_new - L_old| / (|L_old| + 1) < tol (default: 1e-4)
 #' @param verbose Logical or numeric; controls verbosity level. FALSE/0 for
 #'   silent, TRUE/1 for basic progress, 2 for detailed output (default: FALSE)
 #' @param parallel Logical; whether to use parallel computation (default: FALSE)
@@ -24,9 +18,8 @@
 #' @param trim Numeric; trimming proportion for robust estimation of
 #'   random effect variance-covariance matrix. Specifies the fraction of
 #'   extreme values to trim from each tail when computing the mean of
-#'   posterior second moments. Use 0 for standard mean (default), 0.05
-#'   for robust estimation with light contamination, or higher values for
-#'   datasets with more extreme outliers. Must be in [0, 0.5) (default: 0)
+#'   posterior second moments. 0 for standard mean (default), 0.5 for
+#'   median. Must be in [0, 0.5] (default: 0)
 #' @param .list Optional list of control parameters to process
 #' @param ... Additional control parameters
 #'
@@ -41,7 +34,7 @@
 #' control <- JointODE.control()
 #'
 #' # Custom settings for faster exploration
-#' control <- JointODE.control(maxit = 30, atol = 1e-4, rtol = 1e-4)
+#' control <- JointODE.control(maxit = 30, tol = 1e-3)
 #'
 #' # Verbose output for debugging
 #' control <- JointODE.control(verbose = TRUE)
@@ -60,8 +53,7 @@
 # nolint next: object_name_linter
 JointODE.control <- function(
   maxit = 200,
-  atol = 1e-4,
-  rtol = 1e-5,
+  tol = 1e-4,
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,
@@ -73,8 +65,7 @@ JointODE.control <- function(
   # Define defaults (use function arguments as source of truth)
   defaults <- list(
     maxit = maxit,
-    atol = atol,
-    rtol = rtol,
+    tol = tol,
     verbose = verbose,
     parallel = parallel,
     n_cores = n_cores,
@@ -118,11 +109,8 @@ JointODE.control <- function(
   if (control$maxit <= 0) {
     stop("maxit must be positive")
   }
-  if (control$atol <= 0) {
-    stop("atol must be positive")
-  }
-  if (control$rtol <= 0) {
-    stop("rtol must be positive")
+  if (control$tol <= 0) {
+    stop("tol must be positive")
   }
   if (!is.logical(control$parallel)) {
     stop("parallel must be TRUE or FALSE")
@@ -133,8 +121,8 @@ JointODE.control <- function(
   if (!is.numeric(control$quad_level) || control$quad_level < 1) {
     stop("quad_level must be a positive integer")
   }
-  if (!is.numeric(control$trim) || control$trim < 0 || control$trim >= 0.5) {
-    stop("trim must be a number in [0, 0.5)")
+  if (!is.numeric(control$trim) || control$trim < 0 || control$trim > 0.5) {
+    stop("trim must be a number in [0, 0.5]")
   }
 
   control

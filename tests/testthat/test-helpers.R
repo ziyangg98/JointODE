@@ -130,12 +130,10 @@ test_that(".compute_metrics computes correctly at iter > 1", {
   m <- .compute_metrics(curr, prev, iter = 2)
   expect_equal(m$delta_l, 10) # -100 - (-110) = 10
   expect_true(m$rel_l > 0)
-  expect_equal(m$delta_theta, 0) # same params
 })
 
 test_that(".compute_metrics at iter 1", {
   curr <- list(loglik = -100)
   m <- .compute_metrics(curr, NULL, iter = 1)
   expect_equal(m$delta_l, -100)
-  expect_equal(m$delta_theta, Inf)
 })

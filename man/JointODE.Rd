@@ -13,7 +13,7 @@ JointODE(
   state = NULL,
   spline_baseline = list(degree = 2, n_knots = 0, knot_placement = "equal",
     boundary_knots = NULL),
-  init = NULL,
+  init = "default",
   control = list(),
   ...
 )
@@ -64,14 +64,13 @@ the boundary knot locations. If \code{NULL}, automatically set to the
 range of observed event times (default: \code{NULL})}
 }}
 
-\item{init}{Optional initial values for model parameters. Can be either:
+\item{init}{Initial values for model parameters. Can be:
 \itemize{
-\item \code{NULL} (default): Automatically calls
-\code{\link{MarginalODE}} to compute data-driven initial estimates
-for longitudinal parameters and random effects. Recommended for
-most applications.
+\item \code{"default"} (default): Use zero/default initial values.
+\item \code{"marginal"}: Use \code{\link{MarginalODE}} to compute
+data-driven initial estimates. Falls back to defaults on failure.
 \item A list with the same structure as the fitted model's
-\code{parameters} component for full manual control
+\code{parameters} component for full manual control.
 }
 When providing a list, it should have elements:
 \describe{
@@ -96,10 +95,7 @@ spline configuration from \code{spline_baseline}}
 \code{\link{JointODE.control}}. Key parameters include:
 \describe{
 \item{\code{maxit}}{Maximum number of EM iterations (default: 200)}
-\item{\code{atol}}{Absolute tolerance for parameter convergence
-(default: 5e-4)}
-\item{\code{rtol}}{Relative tolerance for log-likelihood
-convergence (default: 1e-5)}
+\item{\code{tol}}{Relative tolerance for convergence (default: 1e-4)}
 \item{\code{verbose}}{Verbosity level: FALSE/0 for silent, TRUE/1 for
 progress messages, 2 for detailed output (default: FALSE)}
 \item{\code{parallel}}{Logical flag enabling parallel computation
@@ -201,7 +197,7 @@ fit1 <- JointODE(
 
 # Fit with custom control parameters using JointODE.control()
 control <- JointODE.control(
-  maxit = 200, atol = 1e-4, rtol = 1e-6, verbose = TRUE
+  maxit = 200, tol = 1e-4, verbose = TRUE
 )
 fit2 <- JointODE(
   longitudinal_formula = observed ~ x1 + x2,

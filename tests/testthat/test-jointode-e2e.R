@@ -48,7 +48,7 @@ test_that("JointODE fits and converges", {
     longitudinal_data = e2e_sim$longitudinal_data,
     survival_data = e2e_sim$survival_data,
     state = e2e_sim$state,
-    control = list(maxit = 30, atol = 1e-3, rtol = 1e-4)
+    control = list(maxit = 30, tol = 1e-3)
   )
 
   expect_s3_class(fit, "JointODE")
@@ -65,7 +65,7 @@ test_that("JointODE S3 methods work on fitted object", {
     longitudinal_data = e2e_sim$longitudinal_data,
     survival_data = e2e_sim$survival_data,
     state = e2e_sim$state,
-    control = list(maxit = 30, atol = 1e-3, rtol = 1e-4)
+    control = list(maxit = 30, tol = 1e-3)
   )
 
   # coef

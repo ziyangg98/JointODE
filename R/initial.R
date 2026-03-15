@@ -1,3 +1,30 @@
+#' @noRd
+.default_parameters <- function(
+  dims, gamma, parsed_long, spline_baseline_config
+) {
+  list(
+    coefficients = list(
+      baseline = rep(0, dims$n_spline_basis),
+      hazard = rep(0, dims$n_survival_covariates + 2),
+      longitudinal = rep(0, dims$n_longitudinal_coef),
+      measurement_error_sd = 1,
+      random_effect_sigma = diag(1, dims$n_random_effects)
+    ),
+    configurations = list(
+      baseline = spline_baseline_config,
+      gamma = gamma,
+      biomarker = list(
+        fixed = parsed_long$biomarker$fixed,
+        random = parsed_long$biomarker$random
+      ),
+      velocity = list(
+        fixed = parsed_long$velocity$fixed,
+        random = parsed_long$velocity$random
+      )
+    )
+  )
+}
+
 #' @importFrom stats predict reformulate
 #' @noRd
 .compute_initial <- function(
@@ -17,31 +44,8 @@
   time <- parsed_surv$time_var
 
   dims <- .compute_dimensions(parsed_long, parsed_surv, spline_config)
-
-  default_init <- list(
-    coefficients = list(
-      baseline = rep(0, dims$n_spline_basis),
-      hazard = rep(0, dims$n_survival_covariates + 2),
-      longitudinal = rep(0, dims$n_longitudinal_coef),
-      measurement_error_sd = 1,
-      random_effect_sigma = diag(
-        1.0,
-        dims$n_random_effects,
-        dims$n_random_effects
-      )
-    ),
-    configurations = list(
-      baseline = dims$spline_config,
-      gamma = gamma,
-      biomarker = list(
-        fixed = parsed_long$biomarker$fixed,
-        random = parsed_long$biomarker$random
-      ),
-      velocity = list(
-        fixed = parsed_long$velocity$fixed,
-        random = parsed_long$velocity$random
-      )
-    )
+  default_init <- .default_parameters(
+    dims, gamma, parsed_long, spline_baseline_config
   )
 
   if (verbose > 0) {
@@ -85,6 +89,19 @@
   }
 
   longitudinal <- marginal_fit$parameters
+  measurement_error_sd <- marginal_fit$measurement_error_sd
+
+  # Estimate random effect covariance from individual-level predictions
+  pred_result <- predict(marginal_fit)
+  subj_means <- tapply(pred_result$biomarker, pred_result[[id]], mean)
+  subj_vel <- tapply(pred_result$velocity, pred_result[[id]], mean)
+  re_vars <- c(var(subj_means, na.rm = TRUE), var(subj_vel, na.rm = TRUE))
+  re_vars[is.na(re_vars) | re_vars < 1e-4] <- 1e-2
+  n_re <- dims$n_random_effects
+  random_effect_sigma <- diag(
+    rep_len(re_vars, n_re),
+    n_re, n_re
+  )
 
   surv_vars <- c(parsed_surv$time_var, parsed_surv$status_var)
   surv_cov_names <- if (is.null(parsed_surv$covariate_terms)) {
@@ -93,7 +110,6 @@
     parsed_surv$covariate_terms
   }
 
-  pred_result <- predict(marginal_fit)
   names(pred_result)[names(pred_result) == "time"] <- "obstime"
 
   merged_data <- merge(pred_result, survival_data, by = id, all.x = TRUE)
@@ -184,8 +200,8 @@
       baseline = baseline,
       hazard = hazard,
       longitudinal = longitudinal,
-      measurement_error_sd = default_init$coefficients$measurement_error_sd,
-      random_effect_sigma = default_init$coefficients$random_effect_sigma
+      measurement_error_sd = measurement_error_sd,
+      random_effect_sigma = random_effect_sigma
     ),
     configurations = list(
       baseline = spline_baseline_config,
@@ -400,7 +416,7 @@
   n_random_effects <- n_longitudinal_random + n_biomarker_velocity_random
   random_effects <- matrix(0, n_subjects, n_random_effects)
 
-  if (is.null(init)) {
+  if (is.character(init) && init == "marginal") {
     parameters <- .compute_initial(
       longitudinal_data,
       survival_data,
@@ -412,8 +428,13 @@
       spline_config,
       spline_baseline_config
     )
-  } else {
+  } else if (is.list(init)) {
     parameters <- init
+  } else {
+    dims <- .compute_dimensions(parsed_long, parsed_surv, spline_config)
+    parameters <- .default_parameters(
+      dims, gamma, parsed_long, spline_baseline_config
+    )
   }
 
   # Ensure baseline config always uses the computed spline configuration

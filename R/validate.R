@@ -436,14 +436,17 @@
   parsed_surv,
   spline_config
 ) {
-  if (is.null(init)) {
+  if (is.character(init)) {
+    if (!init %in% c("default", "marginal")) {
+      stop("init: must be 'default', 'marginal', or a list", call. = FALSE)
+    }
     return(invisible(TRUE))
   }
 
   dims <- .compute_dimensions(parsed_long, parsed_surv, spline_config)
 
   if (!is.list(init)) {
-    stop("init: must be a list", call. = FALSE)
+    stop("init: must be 'default', 'marginal', or a list", call. = FALSE)
   }
 
   valid_components <- c("coefficients", "configurations")

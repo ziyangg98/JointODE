@@ -35,9 +35,7 @@ NULL
 .estimate_marginal_state <- function(
   initial_guess,
   subject_data,
-  theta,
-  max_iter = 50,
-  tol = 1e-6
+  theta
 ) {
   objective <- function(state) {
     .marginal_state_objective(state, subject_data, theta)
@@ -47,8 +45,7 @@ NULL
     nlm(
       f = objective,
       p = initial_guess,
-      iterlim = max_iter,
-      gradtol = tol,
+      iterlim = 10,
       hessian = FALSE,
       check.analyticals = FALSE
     )
@@ -185,7 +182,8 @@ MarginalODE <- function(
 
     theta <- rep(0, n_params)
     max_iter <- control$maxit
-    tol <- control$atol
+    tol <- control$tol
+    prev_obj <- Inf
 
     for (iter in 1:max_iter) {
       # Step 1: Optimize all initial states in parallel
@@ -217,30 +215,33 @@ MarginalODE <- function(
         check.analyticals = FALSE
       ))
 
-      theta_change <- max(abs(res_theta$estimate - theta))
       theta <- res_theta$estimate
+      curr_obj <- res_theta$minimum
+      rel_change <- abs(curr_obj - prev_obj) / (abs(curr_obj) + 1)
 
       if (control$verbose > 1) {
         cli::cli_alert_info(
-          "Iteration {iter}: theta change = {round(theta_change, 6)}"
+          "Iteration {iter}: obj = {round(curr_obj, 4)}, rel change = {round(rel_change, 6)}" # nolint: line_length_linter.
         )
       }
 
-      if (theta_change < tol) {
+      if (iter > 1 && rel_change < tol) {
         if (control$verbose > 0) {
           cli::cli_alert_success("Converged in {iter} iterations")
         }
         break
       }
+      prev_obj <- curr_obj
     }
 
-    if (iter == max_iter && theta_change >= tol && control$verbose > 0) {
+    converged <- iter > 1 && rel_change < tol
+    if (!converged && control$verbose > 0) {
       cli::cli_alert_warning("Did not converge in {max_iter} iterations")
     }
 
     res <- list(
       estimate = theta,
-      code = if (theta_change < tol) 1 else 4,
+      code = if (converged) 1 else 4,
       iterations = iter,
       minimum = as.numeric(.compute_marginal_objective_cppad(
         theta,
@@ -649,14 +650,6 @@ predict.MarginalODE <- function(
     t_subj <- times[idx]
     x_subj <- X[idx, , drop = FALSE]
 
-    if (length(t_subj) == 1 && t_subj[1] == 0) {
-      warning(sprintf(
-        "Subject %s: only one observation at t=0, skipping",
-        subjects[i]
-      ))
-      return(NULL)
-    }
-
     initial_state <- if (!is.null(state)) {
       c(state[i, 1], state[i, 2])
     } else {
@@ -672,8 +665,6 @@ predict.MarginalODE <- function(
     )
   })
 
-  # Remove NULL entries (subjects with insufficient data)
-  subject_data <- Filter(Negate(is.null), subject_data)
   names(subject_data) <- as.character(vapply(
     subject_data,
     function(x) x$subject,

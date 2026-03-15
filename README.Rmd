@@ -79,8 +79,7 @@ fit <- JointODE(
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = longitudinal_data,
   survival_data = sim$data$survival_data,
-  init = sim$init,
-  control = list(atol = 1e-3, parallel = TRUE)
+  control = list(parallel = TRUE, verbose = 3)
 )
 cat(sprintf("Elapsed: %.1f s\n", (proc.time() - t0)["elapsed"]))
 ```

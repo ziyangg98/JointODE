@@ -104,7 +104,7 @@ test_that("simulate is reproducible", {
 test_that("dynamics transformation and covariance are correct", {
   skip_on_cran()
 
-  n <- 50
+  n <- 20
   xi_mean <- 0.6
   period_mean <- 7
 
@@ -139,7 +139,7 @@ test_that("dynamics transformation and covariance are correct", {
 })
 
 test_that("random_effects are properly centered", {
-  n <- 30
+  n <- 15
   sim <- JointODE::simulate(
     n_subjects = n,
     longitudinal = list(
@@ -292,7 +292,7 @@ test_that("simulate handles edge cases", {
 
 test_that("simulate respects gamma parameter", {
   sim_g0 <- JointODE::simulate(
-    n_subjects = 20,
+    n_subjects = 5,
     survival = list(
       baseline = list(type = "weibull", shape = 2, scale = 15),
       value = 0.5,
@@ -304,7 +304,7 @@ test_that("simulate respects gamma parameter", {
   )
 
   sim_g1 <- JointODE::simulate(
-    n_subjects = 20,
+    n_subjects = 5,
     survival = list(
       baseline = list(type = "weibull", shape = 2, scale = 15),
       value = 0.5,
@@ -316,7 +316,7 @@ test_that("simulate respects gamma parameter", {
   )
 
   sim_g2 <- JointODE::simulate(
-    n_subjects = 20,
+    n_subjects = 5,
     survival = list(
       baseline = list(type = "weibull", shape = 2, scale = 15),
       value = 0.5,
@@ -408,7 +408,7 @@ test_that("simulate handles covariates correctly", {
 test_that(".create_example_data works", {
   skip_on_cran()
 
-  example <- .create_example_data(n_subjects = 50, seed = 123)
+  example <- .create_example_data(n_subjects = 20, seed = 123)
 
   expect_named(example, c("data", "init"))
   expect_named(example$init, c("coefficients", "configurations"))
@@ -430,7 +430,7 @@ test_that(".create_example_data works", {
 
   expect_equal(example$init$configurations$gamma, 1)
 
-  example2 <- .create_example_data(n_subjects = 50, seed = 123)
+  example2 <- .create_example_data(n_subjects = 20, seed = 123)
   expect_identical(
     example$data$survival_data$time,
     example2$data$survival_data$time

@@ -1,4 +1,4 @@
-test_that("Initial state optimization converges", {
+test_that("State optimization with single random effect", {
   data("sim", package = "JointODE")
 
   data_list <- .process(
@@ -28,23 +28,20 @@ test_that("Initial state optimization converges", {
       parameters = params
     )
 
-    # Check convergence
-    expect_true(opt_result$converged)
-    expect_true(opt_result$iterations < 50)
+    # Single Newton step should decrease objective
+    expect_true(opt_result$obj_change <= 1e-6,
+      info = sprintf("subject %d: obj increased by %.4e", i,
+                     opt_result$obj_change))
 
-    # Check optimized state is reasonable (close to true state)
-    true_state <- sim$data$state[i, ]
     results[i, ] <- opt_result$state
   }
+
   errors <- results - sim$data$state
   bias <- colMeans(errors)
   rmse <- sqrt(colMeans(errors^2))
 
-  # Bias should be small (< 0.5 in absolute value)
   expect_true(all(abs(bias) < 0.5),
     info = paste("bias too large:", paste(round(bias, 4), collapse = ", ")))
-
-  # RMSE should be reasonable (< 1.0)
   expect_true(all(rmse < 1.0),
     info = paste("rmse too large:", paste(round(rmse, 4), collapse = ", ")))
 })

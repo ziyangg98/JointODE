@@ -48,11 +48,30 @@ NumericVector compute_state_loglik_cppad(
   const std::vector<ADdouble> y0 = {ADdouble(0.0), ad_initial_state[0], ad_initial_state[1]};
   const auto solution = solve_ode(y0, times, params);
 
-  // Compute log-likelihood (longitudinal only)
+  // Compute log-likelihood (longitudinal + survival)
   ADdouble log_lik(0.0);
   const ADdouble half_inv_sigma_e2(0.5 * inv_sigma_e2);
   const int n_obs = params.subject.longitudinal_times.size();
 
+  // Survival: cumulative hazard + log hazard at event
+  const int event_idx = find_time_idx(times, params.subject.event_time);
+  if (event_idx >= 0) {
+    log_lik -= solution[event_idx][0];  // -H(t)
+
+    if (params.subject.status == 1) {
+      compute_bspline_basis(params.subject.event_time,
+                            params.spline_degree, params.spline_knots,
+                            params.spline_boundary, workspace.basis,
+                            workspace.knots, workspace.work1, workspace.work2,
+                            true);
+      log_lik += compute_log_hazard(
+          solution[event_idx][1], solution[event_idx][2], workspace.basis,
+          params.baseline_coefs, params.hazard_coefs,
+          params.subject.survival_covariates, params.gamma);
+    }
+  }
+
+  // Longitudinal: residuals
   for (int i = 0; i < n_obs; ++i) {
     const int idx = find_time_idx(times, params.subject.longitudinal_times[i]);
     if (idx >= 0) {

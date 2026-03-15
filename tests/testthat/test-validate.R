@@ -15,7 +15,7 @@ test_that(".validate checks formula types", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Formula must be a formula object"
   )
@@ -30,7 +30,7 @@ test_that(".validate checks formula types", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Formula must be a formula object"
   )
@@ -45,7 +45,7 @@ test_that(".validate checks formula types", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Surv\\(\\) must have at least time and status arguments"
   )
@@ -62,7 +62,7 @@ test_that(".validate checks data frame types", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Data must be a data frame"
   )
@@ -77,7 +77,7 @@ test_that(".validate checks data frame types", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Data must be a data frame"
   )
@@ -98,7 +98,7 @@ test_that(".validate checks for empty data", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Longitudinal data has no rows"
   )
@@ -117,7 +117,7 @@ test_that(".validate checks for empty data", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Survival data has no rows"
   )
@@ -138,7 +138,7 @@ test_that(".validate checks required columns", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Grouping variable 'id' not found"
   )
@@ -153,7 +153,7 @@ test_that(".validate checks required columns", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Time variable 'time' not in longitudinal data"
   )
@@ -168,7 +168,7 @@ test_that(".validate checks required columns", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "ID variable 'id' not in survival data"
   )
@@ -189,7 +189,7 @@ test_that(".validate checks formula variables exist", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Variables not found: missing_var"
   )
@@ -204,7 +204,7 @@ test_that(".validate checks formula variables exist", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Variables not found: missing_pred"
   )
@@ -219,7 +219,7 @@ test_that(".validate checks formula variables exist", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Variables not found in data: missing_surv"
   )
@@ -240,7 +240,7 @@ test_that(".validate checks Surv formula structure", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Survival formula must have Surv\\(\\) on the left-hand side"
   )
@@ -265,7 +265,7 @@ test_that(".validate checks for missing values", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Missing values in Time in longitudinal data"
   )
@@ -280,7 +280,7 @@ test_that(".validate checks for missing values", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Missing values found in status variable 'status'"
   )
@@ -305,7 +305,7 @@ test_that(".validate checks ID consistency", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Duplicate IDs in survival data"
   )
@@ -324,7 +324,7 @@ test_that(".validate checks ID consistency", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Subjects in longitudinal but not survival data: 3"
   )
@@ -347,7 +347,7 @@ test_that(".validate checks ID consistency", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Subjects in survival but not longitudinal data: 3, 4"
   )
@@ -372,7 +372,7 @@ test_that(".validate checks time values", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Negative time values in longitudinal data"
   )
@@ -387,7 +387,7 @@ test_that(".validate checks time values", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Invalid observation times in 'time' \\(must be positive\\)"
   )
@@ -410,7 +410,7 @@ test_that(".validate checks time values", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "1 subjects have measurements after observation time: 1"
   )
@@ -429,7 +429,7 @@ test_that(".validate checks time values", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Each subject has only one longitudinal observation"
   )
@@ -450,7 +450,7 @@ test_that(".validate checks status values", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     paste0(
       "Invalid status values in 'status': 2\\. ",
@@ -474,7 +474,7 @@ test_that(".validate checks state matrix", {
       state = c(1, 2),
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "state.*must be a matrix"
   )
@@ -493,7 +493,7 @@ test_that(".validate checks state matrix", {
       state = matrix(c(1, 2), nrow = 1),
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "state.*wrong rows"
   )
@@ -508,7 +508,7 @@ test_that(".validate checks state matrix", {
       state = matrix(c(1, 2, 3), nrow = 1),
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "state.*must have 2 columns"
   )
@@ -523,7 +523,7 @@ test_that(".validate checks state matrix", {
       state = matrix(c(1, NA), nrow = 1),
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "state.*must contain finite values"
   )
@@ -544,7 +544,7 @@ test_that(".validate checks spline_baseline parameters", {
       state = NULL,
       gamma = 1,
       spline_baseline = list(invalid_param = 1),
-      init = NULL
+      init = "default"
     ),
     "Invalid parameters in spline_baseline: invalid_param"
   )
@@ -558,7 +558,7 @@ test_that(".validate checks spline_baseline parameters", {
       survival_data = data.frame(id = 1, time = 1, status = 1),
       state = NULL,
       gamma = 1,
-      init = NULL,
+      init = "default",
       spline_baseline = list(degree = 10)
     ),
     "spline_baseline\\$degree must be a single integer between 1 and 5"
@@ -573,7 +573,7 @@ test_that(".validate checks spline_baseline parameters", {
       survival_data = data.frame(id = 1, time = 1, status = 1),
       state = NULL,
       gamma = 1,
-      init = NULL,
+      init = "default",
       spline_baseline = list(n_knots = 50)
     ),
     "spline_baseline\\$n_knots must be a single integer between 0 and 20"
@@ -588,7 +588,7 @@ test_that(".validate checks spline_baseline parameters", {
       survival_data = data.frame(id = 1, time = 1, status = 1),
       state = NULL,
       gamma = 1,
-      init = NULL,
+      init = "default",
       spline_baseline = list(boundary_knots = c(0, 1, 2))
     ),
     "spline_baseline\\$boundary_knots must be NULL or.*numeric vector"
@@ -603,7 +603,7 @@ test_that(".validate checks spline_baseline parameters", {
       survival_data = data.frame(id = 1, time = 1, status = 1),
       state = NULL,
       gamma = 1,
-      init = NULL,
+      init = "default",
       spline_baseline = list(knot_placement = "invalid")
     ),
     "spline_baseline\\$knot_placement must be one of: quantile, equal"
@@ -618,7 +618,7 @@ test_that(".validate checks spline_baseline parameters", {
       survival_data = data.frame(id = 1, time = 1, status = 1),
       state = NULL,
       gamma = 1,
-      init = NULL,
+      init = "default",
       spline_baseline = list(boundary_knots = c(2, 1))
     ),
     "boundary_knots\\[1\\] must be less than"
@@ -642,7 +642,7 @@ test_that(".validate checks init parameter structure", {
       spline_baseline = list(),
       init = "not a list"
     ),
-    "init.*must be a list"
+    "init.*must be 'default', 'marginal', or a list"
   )
 
   # Unknown init components
@@ -1021,7 +1021,7 @@ test_that(".validate accepts valid inputs", {
     state = NULL,
     gamma = 1,
     spline_baseline = list(),
-    init = NULL
+    init = "default"
   )
   expect_true(is.null(result))
 })

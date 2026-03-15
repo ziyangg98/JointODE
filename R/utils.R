@@ -273,13 +273,14 @@
     for (i in seq_len(n_subjects)) {
       sigma_sum <- sigma_sum + posterior_moments[[i]]$second_moment
     }
-    sigma_sum / n_subjects
+    sigma <- sigma_sum / n_subjects
   } else {
     all_second_moments <- simplify2array(
       lapply(posterior_moments, `[[`, "second_moment")
     )
-    apply(all_second_moments, 1:2, mean, trim = control$trim)
+    sigma <- apply(all_second_moments, 1:2, mean, trim = control$trim)
   }
+  sigma
 }
 
 #' Fast M-step mapping for SEM Jacobian (fixed posteriors, no loglik eval)
@@ -468,7 +469,7 @@
     .compute_state_objective(state, data, random_effect, parameters)
   }
 
-  obj_initial <- objective(initial_guess)
+  obj_initial <- as.numeric(objective(initial_guess))
 
   fit <- suppressWarnings(
     nlm(
@@ -526,6 +527,7 @@
   parameters$coefficients$measurement_error_sd <- measurement_error_sd
   parameters$coefficients$random_effect_sigma <- random_effect_sigma
 
+  # M-step: Newton step for fixed effects
   theta <- .coef_to_vector(parameters)
 
   obj <- .compute_objective_expected(
@@ -573,28 +575,13 @@
 .compute_metrics <- function(curr, prev, iter) {
   if (iter > 1) {
     delta_l <- curr$loglik - prev$loglik
-    rel_l <- abs(delta_l) / (abs(curr$loglik) + 1e-8)
-    delta_theta <- with(curr$parameters$coefficients, {
-      max(abs(c(
-        baseline - prev$parameters$coefficients$baseline,
-        hazard - prev$parameters$coefficients$hazard,
-        longitudinal - prev$parameters$coefficients$longitudinal,
-        measurement_error_sd -
-          prev$parameters$coefficients$measurement_error_sd,
-        random_effect_sigma - prev$parameters$coefficients$random_effect_sigma
-      )))
-    })
+    rel_l <- abs(delta_l) / (abs(curr$loglik) + 1)
   } else {
     delta_l <- curr$loglik
     rel_l <- 1
-    delta_theta <- Inf
   }
 
-  list(
-    delta_l = delta_l,
-    rel_l = rel_l,
-    delta_theta = delta_theta
-  )
+  list(delta_l = delta_l, rel_l = rel_l)
 }
 
 # Progress Tracking ============================================================
@@ -604,13 +591,12 @@
   cf <- curr$parameters$coefficients
 
   cli::cli_text(sprintf(
-    "[%3d/%3d] L=%10.2f | dL=%.3e (%.2e) | dtheta=%.2e",
+    "[%3d/%3d] L=%10.2f | dL=%.3e (%.2e)",
     iter,
     control$maxit,
     curr$loglik,
     metrics$delta_l,
-    metrics$rel_l,
-    metrics$delta_theta
+    metrics$rel_l
   ))
 
   if (control$verbose >= 2) {
@@ -640,8 +626,7 @@
   }
 
   converged <- iter > 1 &&
-    metrics$rel_l < control$rtol &&
-    metrics$delta_theta < control$atol
+    metrics$rel_l < control$tol
 
   is_final <- iter == control$maxit
 
@@ -653,20 +638,17 @@
     if (converged) {
       cli::cli_text("")
       cli::cli_alert_success(sprintf(
-        "Converged in %d iterations (rel dL=%.2e, dtheta=%.2e)",
+        "Converged in %d iterations (rel dL=%.2e)",
         iter,
-        metrics$rel_l,
-        metrics$delta_theta
+        metrics$rel_l
       ))
     } else if (is_final) {
       cli::cli_text("")
       msg <- sprintf(
-        "Not converged after %d iterations (rel dL=%.2e > %.2e, dtheta=%.2e > %.2e)", # nolint: line_length_linter.
+        "Not converged after %d iterations (rel dL=%.2e > %.2e)", # nolint: line_length_linter.
         control$maxit,
         metrics$rel_l,
-        control$rtol,
-        metrics$delta_theta,
-        control$atol
+        control$tol
       )
       cli::cli_alert_warning(msg)
       cli::cli_alert_info(
