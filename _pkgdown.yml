@@ -1,4 +1,4 @@
-url: http://gongziyang.com/JointODE/
+url: https://gongziyang.com/JointODE/
 
 template:
   bootstrap: 5
@@ -6,29 +6,38 @@ template:
   math-rendering: katex
   light-switch: true
 
-  navbar:
-    structure:
-      left: [intro, reference, articles, tutorials, news]
-      right: [search, github, lightswitch]
-    components:
-      articles:
-        text: Vignettes
-        menu:
-        - text: Illustration
-          href: articles/illustration.html
-        - text: Technical Details
-          href: articles/technical-details.html
-        - text: Comparison
-          href: articles/comparison.html
+navbar:
+  structure:
+    left: [intro, reference, articles, tutorials, news]
+    right: [search, github, lightswitch]
+  components:
+    articles:
+      text: Vignettes
+      menu:
+      - text: Illustration
+        href: articles/illustration.html
+      - text: Technical Details
+        href: articles/technical-details.html
+      - text: Examples
+        href: articles/examples.html
+      - text: Comparison
+        href: articles/comparison.html
+      - text: Benchmark
+        href: articles/benchmark.html
 
 # Article index configuration
 articles:
-- title: Technical Documentation
+- title: Getting Started
   navbar: ~
   contents:
   - illustration
+  - examples
+- title: Technical Documentation
+  navbar: ~
+  contents:
   - technical-details
   - comparison
+  - benchmark
 
 # Reference configuration
 reference:

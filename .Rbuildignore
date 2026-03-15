@@ -16,6 +16,8 @@
 ^vignettes/\.gitignore$
 ^vignettes/.*\.html$
 ^\.pre-commit-config\.yaml$
-^[.]?air[.]toml$
 ^\.vscode$
 ^\.covrignore$
+^codecov\.yml$
+^\.editorconfig$
+^cran-comments\.md$
