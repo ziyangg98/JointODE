@@ -265,6 +265,23 @@
 
 # Variance-Covariance ==========================================================
 
+#' @noRd
+.update_random_effect_sigma <- function(posterior_moments, n_subjects, control) {
+  n_re <- length(posterior_moments[[1]]$mean)
+  if (control$trim == 0) {
+    sigma_sum <- matrix(0, n_re, n_re)
+    for (i in seq_len(n_subjects)) {
+      sigma_sum <- sigma_sum + posterior_moments[[i]]$second_moment
+    }
+    sigma_sum / n_subjects
+  } else {
+    all_second_moments <- simplify2array(
+      lapply(posterior_moments, `[[`, "second_moment")
+    )
+    apply(all_second_moments, 1:2, mean, trim = control$trim)
+  }
+}
+
 #' Fast M-step mapping for SEM Jacobian (fixed posteriors, no loglik eval)
 #' @noRd
 .m_step_map <- function(
@@ -274,21 +291,9 @@
   n_subjects <- length(data_list)
 
   # Update sigma from fixed posterior moments
-  n_re <- length(posterior_moments[[1]]$mean)
-  if (control$trim == 0) {
-    sigma_sum <- matrix(0, n_re, n_re)
-    for (i in seq_len(n_subjects)) {
-      sigma_sum <- sigma_sum + posterior_moments[[i]]$second_moment
-    }
-    random_effect_sigma <- sigma_sum / n_subjects
-  } else {
-    all_second_moments <- simplify2array(
-      lapply(posterior_moments, `[[`, "second_moment")
-    )
-    random_effect_sigma <- apply(
-      all_second_moments, 1:2, mean, trim = control$trim
-    )
-  }
+  random_effect_sigma <- .update_random_effect_sigma(
+    posterior_moments, n_subjects, control
+  )
 
   # Update measurement error from fixed posteriors
   measurement_error_sd <- .update_measurement_error_sd(
@@ -301,7 +306,8 @@
   theta <- .coef_to_vector(params_input)
   obj <- .compute_objective_expected(
     theta, data_list, posteriors, params_input,
-    gradient = TRUE, hessian = TRUE
+    gradient = TRUE, hessian = TRUE,
+    parallel = control$parallel, n_cores = control$n_cores
   )
   direction <- solve(attr(obj, "hessian"), attr(obj, "gradient"))
   theta - direction
@@ -329,7 +335,9 @@
     posteriors,
     parameters,
     gradient = FALSE,
-    hessian = TRUE
+    hessian = TRUE,
+    parallel = control$parallel,
+    n_cores = control$n_cores
   )
   info_complete_inv <- solve(attr(obj, "hessian"))
 
@@ -498,34 +506,17 @@
 
   # Update random effects from posterior
   n_subjects <- length(data_list)
-  posterior_moments <- .parallel_apply(
-    seq_len(n_subjects),
-    function(i) {
-      .compute_posterior_moments(
-        list(nodes = posteriors$nodes[[i]], weights = posteriors$weights[[i]])
-      )
-    },
-    parallel = control$parallel,
-    n_cores = control$n_cores,
-    setup = FALSE
-  )
+  posterior_moments <- lapply(seq_len(n_subjects), function(i) {
+    .compute_posterior_moments(
+      list(nodes = posteriors$nodes[[i]], weights = posteriors$weights[[i]])
+    )
+  })
   n_re <- length(posterior_moments[[1]]$mean)
   random_effects <- t(vapply(posterior_moments, `[[`, numeric(n_re), "mean"))
 
-  if (control$trim == 0) {
-    sigma_sum <- matrix(0, n_re, n_re)
-    for (i in seq_len(n_subjects)) {
-      sigma_sum <- sigma_sum + posterior_moments[[i]]$second_moment
-    }
-    random_effect_sigma <- sigma_sum / n_subjects
-  } else {
-    all_second_moments <- simplify2array(
-      lapply(posterior_moments, `[[`, "second_moment")
-    )
-    random_effect_sigma <- apply(
-      all_second_moments, 1:2, mean, trim = control$trim
-    )
-  }
+  random_effect_sigma <- .update_random_effect_sigma(
+    posterior_moments, n_subjects, control
+  )
 
   measurement_error_sd <- .update_measurement_error_sd(
     data_list,
@@ -543,26 +534,31 @@
     posteriors,
     parameters,
     gradient = TRUE,
-    hessian = TRUE
+    hessian = TRUE,
+    parallel = control$parallel,
+    n_cores = control$n_cores
   )
 
-  gradient <- attr(obj, "gradient")
-  hessian <- attr(obj, "hessian")
+  loglik_value <- -as.numeric(obj)
+  grad <- attr(obj, "gradient")
+  hess <- attr(obj, "hessian")
 
-  direction <- solve(hessian, gradient)
-  theta_new <- theta - direction
-
-  obj_new <- .compute_objective_expected(
-    theta_new,
-    data_list,
-    posteriors,
-    parameters,
-    gradient = FALSE,
-    hessian = FALSE
-  )
-
-  loglik_value <- -as.numeric(obj_new)
-  parameters <- .vector_to_coef(parameters, theta_new)
+  if (any(!is.finite(grad)) || any(!is.finite(hess))) {
+    warning("Non-finite gradient/hessian detected, skipping Newton step",
+      call. = FALSE
+    )
+  } else {
+    direction <- tryCatch(
+      solve(hess, grad),
+      error = function(e) NULL
+    )
+    if (!is.null(direction) && all(is.finite(direction))) {
+      theta_new <- theta - direction
+      parameters <- .vector_to_coef(parameters, theta_new)
+    } else {
+      warning("Singular Hessian, skipping Newton step", call. = FALSE)
+    }
+  }
 
   list(
     parameters = parameters,

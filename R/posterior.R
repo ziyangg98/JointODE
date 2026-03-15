@@ -75,19 +75,70 @@ NULL
 
 .compute_objective_expected <- function(
   params, data_list, posteriors, parameters,
-  gradient = TRUE, hessian = FALSE
+  gradient = TRUE, hessian = FALSE,
+  parallel = FALSE, n_cores = 0
 ) {
-  expanded <- .expand_posteriors(data_list, posteriors)
+  n_subjects <- length(data_list)
 
-  .compute_objective_cppad(
-    params = params,
-    data_list = expanded$data,
-    random_effects = expanded$nodes,
-    parameters = parameters,
-    weights = expanded$weights,
-    gradient = gradient,
-    hessian = hessian
-  )
+  if (parallel && n_subjects > 1) {
+    if (n_cores == 0) {
+      n_cores <- max(1L, parallel::detectCores() - 1L)
+    }
+    n_chunks <- min(n_cores, n_subjects)
+    chunks <- split(seq_len(n_subjects), cut(seq_len(n_subjects),
+      n_chunks, labels = FALSE))
+
+    compute_chunk <- function(subject_indices) {
+      chunk_data <- data_list[subject_indices]
+      chunk_posteriors <- list(
+        nodes = posteriors$nodes[subject_indices],
+        weights = posteriors$weights[subject_indices]
+      )
+      expanded <- .expand_posteriors(chunk_data, chunk_posteriors)
+      .compute_objective_cppad(
+        params = params,
+        data_list = expanded$data,
+        random_effects = expanded$nodes,
+        parameters = parameters,
+        weights = expanded$weights,
+        gradient = gradient,
+        hessian = hessian
+      )
+    }
+
+    results <- .parallel_apply(
+      chunks, compute_chunk,
+      parallel = TRUE, n_cores = n_cores, setup = FALSE
+    )
+
+    total_obj <- sum(vapply(results, as.numeric, numeric(1)))
+    result <- structure(total_obj, names = NULL)
+
+    if (gradient) {
+      total_grad <- Reduce(`+`, lapply(results, function(r) {
+        as.vector(attr(r, "gradient"))
+      }))
+      attr(result, "gradient") <- total_grad
+    }
+    if (hessian) {
+      total_hess <- Reduce(`+`, lapply(results, function(r) {
+        attr(r, "hessian")
+      }))
+      attr(result, "hessian") <- total_hess
+    }
+    result
+  } else {
+    expanded <- .expand_posteriors(data_list, posteriors)
+    .compute_objective_cppad(
+      params = params,
+      data_list = expanded$data,
+      random_effects = expanded$nodes,
+      parameters = parameters,
+      weights = expanded$weights,
+      gradient = gradient,
+      hessian = hessian
+    )
+  }
 }
 
 
