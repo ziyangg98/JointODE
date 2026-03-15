@@ -108,6 +108,7 @@ NumericVector compute_logpost_cppad(const NumericVector& random_effect,
   // Optimize the tape to reduce memory and improve performance
   tape.optimize();
 
+  tape.check_for_nan(false);
   const std::vector<double> x(random_effect.begin(), random_effect.end());
   const std::vector<double> y = tape.Forward(0, x);
 

@@ -123,6 +123,7 @@ static void compute_subject_objective(
   tape.Dependent(ad_params, ADvector{neg_ll});
   tape.optimize();
 
+  tape.check_for_nan(false);
   const std::vector<double> y = tape.Forward(0, params_vec);
   obj_out = weight * y[0];
 

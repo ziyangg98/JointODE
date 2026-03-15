@@ -72,6 +72,7 @@ NumericVector compute_state_loglik_cppad(
   tape.optimize();
 
   // Evaluate
+  tape.check_for_nan(false);
   std::vector<double> x(initial_state.begin(), initial_state.end());
   std::vector<double> y = tape.Forward(0, x);
 

@@ -119,7 +119,6 @@ slope) relate to hazard ratios.
 \examples{
 \dontrun{
 library(JointODE)
-library(survival)
 
 # Load example dataset
 data(sim)

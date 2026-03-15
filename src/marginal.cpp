@@ -212,6 +212,7 @@ NumericVector compute_marginal_objective_cppad(
   tape.optimize();
 
   // Evaluate at the parameter values (同 objective.cpp)
+  tape.check_for_nan(false);
   const std::vector<double> x(params.begin(), params.end());
   const std::vector<double> y = tape.Forward(0, x);
 
@@ -378,6 +379,7 @@ NumericVector compute_marginal_state_loglik(
   tape.optimize();
 
   // Evaluate
+  tape.check_for_nan(false);
   std::vector<double> x(initial_state.begin(), initial_state.end());
   std::vector<double> y = tape.Forward(0, x);
 
