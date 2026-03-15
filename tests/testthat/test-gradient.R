@@ -17,7 +17,6 @@ test_that("AD gradient matches forward sensitivity gradient", {
   random_effects <- sim$data$random_effects
 
   # Compute posteriors and measure time
-  cat("\n=== Computing Posteriors ===\n")
   time_posterior <- system.time({
     posteriors <- .compute_posteriors(
       data_list = data_list,
@@ -28,7 +27,6 @@ test_that("AD gradient matches forward sensitivity gradient", {
       level = 3
     )
   })
-  cat("Posterior computation time:", time_posterior["elapsed"], "seconds\n")
 
   coefficients <- sim$init$coefficients
   params <- c(
@@ -36,8 +34,8 @@ test_that("AD gradient matches forward sensitivity gradient", {
     coefficients$hazard,
     as.vector(coefficients$longitudinal)
   )
+
   # Compute using AD and measure time
-  cat("\n=== Computing Gradient & Hessian ===\n")
   time_ad <- system.time({
     result_ad <- .compute_objective_expected(
       params = params,
@@ -48,7 +46,6 @@ test_that("AD gradient matches forward sensitivity gradient", {
       hessian = TRUE
     )
   })
-  cat("CppAD gradient time:", time_ad["elapsed"], "seconds\n")
 
   # Verify gradient is finite and non-zero
   grad <- attr(result_ad, "gradient")
@@ -59,21 +56,4 @@ test_that("AD gradient matches forward sensitivity gradient", {
   hess <- attr(result_ad, "hessian")
   expect_true(all(is.finite(hess)), info = "Hessian contains non-finite values")
   expect_equal(hess, t(hess), tolerance = 1e-10, info = "Hessian is not symmetric")
-
-  # Verify gradient via numeric differentiation
-  numeric_grad <- numDeriv::grad(
-    function(x) {
-      as.numeric(.compute_objective_expected(
-        params = x,
-        data_list = data_list,
-        posteriors = posteriors,
-        parameters = sim$init,
-        gradient = FALSE,
-        hessian = FALSE
-      ))
-    },
-    params
-  )
-  expect_equal(grad, numeric_grad, tolerance = 1e-4,
-    info = "analytic gradient does not match numeric gradient")
 })

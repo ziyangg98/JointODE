@@ -78,7 +78,6 @@ library(JointODE)
 #> The following object is masked from 'package:stats':
 #> 
 #>     simulate
-library(survival)
 
 # Load example dataset (200 subjects with longitudinal and survival data)
 data(sim)
@@ -87,14 +86,18 @@ data(sim)
 longitudinal_data <- sim$data$longitudinal_data[
   , c("id", "time", "observed", "x1", "x2")
 ]
+t0 <- proc.time()
 fit <- JointODE(
   longitudinal_formula = observed ~ biomarker + velocity + x1 + x2 +
     (biomarker + velocity | id),
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = longitudinal_data,
   survival_data = sim$data$survival_data,
-  control = list(atol = 1e-3)
+  init = sim$init,
+  control = list(atol = 1e-3, parallel = TRUE)
 )
+cat(sprintf("Elapsed: %.1f s\n", (proc.time() - t0)["elapsed"]))
+#> Elapsed: 376.6 s
 ```
 
 ``` r
@@ -105,7 +108,8 @@ summary(fit)
 #> JointODE(longitudinal_formula = observed ~ biomarker + velocity + 
 #>     x1 + x2 + (biomarker + velocity | id), survival_formula = Surv(time, 
 #>     status) ~ w1 + w2, longitudinal_data = longitudinal_data, 
-#>     survival_data = sim$data$survival_data, control = list(atol = 0.001))
+#>     survival_data = sim$data$survival_data, init = sim$init, 
+#>     control = list(atol = 0.001, parallel = TRUE))
 #> 
 #> Data Descriptives:
 #> Longitudinal Process            Survival Process
@@ -113,48 +117,48 @@ summary(fit)
 #> Number of Subjects: 200
 #> 
 #>        AIC        BIC     logLik
-#> -31483.646 -31430.873  15757.823
+#> -31491.218 -31438.445  15761.609
 #> 
 #> Coefficients:
 #> Longitudinal Process: Second-Order ODE Model
-#>               Estimate Std. Error  z value Pr(>|z|)    
-#> biomarker   -1.090e+00  4.384e-03 -248.708   <2e-16 ***
-#> velocity    -8.568e-01  4.415e-03 -194.072   <2e-16 ***
-#> (Intercept) -2.817e-05  8.964e-04   -0.031    0.975    
-#> x1           5.442e-01  2.499e-03  217.777   <2e-16 ***
-#> x2          -4.900e-01  2.263e-03 -216.560   <2e-16 ***
+#>             Estimate Std. Error  z value Pr(>|z|)    
+#> biomarker    -1.0880     0.0044 -248.236   <2e-16 ***
+#> velocity     -0.8366     0.0044 -189.527   <2e-16 ***
+#> (Intercept)  -0.0001     0.0009   -0.165    0.869    
+#> x1            0.5433     0.0025  217.555   <2e-16 ***
+#> x2           -0.4892     0.0023 -216.334   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> ODE System Characteristics:
 #>                    Estimate Std. Error z value Pr(>|z|)    
-#> T (period)         6.016981   0.012096   497.4   <2e-16 ***
-#> xi (damping ratio) 0.410238   0.001762   232.8   <2e-16 ***
+#> T (period)           6.0238     0.0121   496.5   <2e-16 ***
+#> xi (damping ratio)   0.4010     0.0018   226.8   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Survival Process: Proportional Hazards Model
 #>         Estimate Std. Error z value Pr(>|z|)    
-#> alpha_1   0.7241     0.1879   3.853 0.000116 ***
-#> alpha_2   1.8302     0.7680   2.383 0.017174 *  
+#> alpha_1   0.7239     0.1880   3.850 0.000118 ***
+#> alpha_2   1.8521     0.7675   2.413 0.015810 *  
 #> w1        0.6862     0.1245   5.512 3.54e-08 ***
-#> w2       -1.3431     0.2859  -4.697 2.64e-06 ***
+#> w2       -1.3426     0.2860  -4.695 2.66e-06 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Baseline Hazard: B-spline with 3 basis functions
-#> (Coefficients range: [-4.816, -2.023] )
+#> (Coefficients range: [-4.835, -2.010] )
 #> 
 #> Variance Components:
-#> Measurement Error SD: 0.098718
+#> Measurement Error SD: 0.098733
 #> Random Effect Covariance Matrix:
 #>          [,1]     [,2]
-#> [1,] 0.001379 0.001858
-#> [2,] 0.001858 0.034805
+#> [1,] 0.001368 0.001774
+#> [2,] 0.001774 0.032909
 #> 
 #> Model Diagnostics:
-#> C-index (Concordance): 0.667
-#> Convergence: EM algorithm converged after 26 iterations
+#> C-index (Concordance): 0.668
+#> Convergence: EM algorithm converged after 17 iterations
 
 # Plot results
 plot(fit)
