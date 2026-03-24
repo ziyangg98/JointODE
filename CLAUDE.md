@@ -37,15 +37,14 @@ R CMD INSTALL --no-docs --no-multiarch .
 
 `JointODE()` in `R/JointODE.R` is the main entry point. It runs an EM loop:
 
-1. **E-step** (`R/posterior.R`): For each subject, find posterior mode of random effects via Laplace approximation. Calls `.compute_logpost_cppad()` (C++). Uses Gill-Murray regularization when the posterior Hessian is not positive definite.
-2. **M-step** (`R/JointODE.R`): Update fixed effects by minimizing negative log-likelihood. Calls `.compute_objective_cppad()` (C++). Variance components updated in closed form.
-3. **State optimization**: Periodically re-optimizes initial ODE states `[m(0), v(0)]` via `.compute_state_loglik_cppad()` (C++).
+1. **E-step** (`R/posterior.R`): For each subject, find posterior mode of random effects via Laplace approximation + AGHQ. Calls `.compute_joint_logpost()` (C++). Uses `.regularized_chol()` (Gill-Murray) when the posterior Hessian is not positive definite.
+2. **M-step** (`R/posterior.R`): One Newton step for fixed effects via `.compute_objective_expected()` → `.compute_joint_objective()` (C++). Variance components (sigma_e, Sigma_b) updated in closed form. Newton step uses `.regularized_solve()` for Hessian inversion.
+3. **SEM vcov** (`R/posterior.R`): Post-convergence variance-covariance via supplemented EM (Louis formula). Numerical Jacobian of EM map with Richardson extrapolation (r=2).
 
 ### C++ Layer (`src/`)
 
-- **`solver.h`** — Header-only: all shared logic including `SubjectData`/`ODEParams` structs, ODE solver (`ode_step`, `ode_solve`), joint log-likelihood (`compute_joint_loglik`), B-spline basis, AD tape evaluation, and log-linear hazard integration.
-- **`exports.cpp`** — 4 `Rcpp::export` functions for the joint model: `compute_objective_cppad` (M-step, AD over theta), `compute_logpost_cppad` (E-step, AD over b), `compute_state_loglik_cppad` (state opt, AD over initial states), `solve_batch_ode_cppad` (prediction, no AD).
-- **`marginal.cpp`** — Standalone module for `MarginalODE` (longitudinal-only model, no survival component). Exports 3 functions.
+- **`solver.h`** — Header-only: all shared logic including `SubjectData`/`ODEParams` structs, ODE solver (`ode_step`, `ode_solve_joint`, `ode_solve_marginal`), joint/marginal log-likelihood, B-spline basis, AD tape evaluation (`eval_tape`), and log-linear hazard integration.
+- **`exports.cpp`** — 7 `Rcpp::export` functions: `compute_joint_objective` (M-step, AD over theta), `compute_joint_logpost` (E-step, AD over b), `compute_joint_state` (state opt, AD over initial states), `solve_batch_joint` (prediction, no AD), `compute_marginal_objective`, `compute_marginal_state`, `solve_batch_marginal`.
 - **`cppad_stub.cpp`** — Minimal CppAD compilation unit required for linking.
 
 CppAD headers are vendored in `inst/include/cppad/` and included via `PKG_CPPFLAGS = -I../inst/include` in `src/Makevars`.
@@ -58,22 +57,25 @@ The ODE is solved analytically via Cayley-Hamilton decomposition of exp(A*dt), w
 
 ### Hazard Integration
 
-Uses log-linear interpolation between consecutive ODE time points, with trapezoidal fallback when the log-hazard difference is near zero. This replaced the earlier RK45 approach for ~5x speedup.
+Uses log-linear interpolation between consecutive ODE time points, with trapezoidal fallback (via `CppAD::CondExpGt`) when the log-hazard difference is near zero.
 
 ### Key R Modules
 
+- `R/posterior.R` — E-step (Laplace + AGHQ), M-step (Newton), SEM vcov
+- `R/utils.R` — Formula parsing, `.regularized_chol`/`.regularized_solve` (Gill-Murray), parameter conversion, convergence tracking
 - `R/process.R` — Data preprocessing: parses formulas, builds per-subject data lists for C++
 - `R/initial.R` — Default parameter construction and `MarginalODE`-based initial value computation
-- `R/posterior.R` — E-step: Laplace approximation of random effect posteriors with Gill-Murray regularization
-- `R/control.R` — `JointODE.control()` for EM algorithm settings
-- `R/utils.R` — Formula parsing, Newton step solver, shared utilities
+- `R/finalize.R` — Post-convergence: C-index, AIC/BIC, SEM vcov call
+- `R/control.R` — `JointODE.control()` / `MarginalODE.control()` for algorithm settings
 - `R/validate.R` — Input validation
 - `R/MarginalODE.R` — Longitudinal-only model (no survival)
+- `R/state.R` — Per-subject initial state optimization via `nlm`
 
 ## Conventions
 
 - Commit messages: English with emoji prefix (e.g., `refactor:`, `fix:`, `feat:`)
 - C++ uses CppAD for AD and RcppArmadillo for linear algebra; `LinkingTo: Rcpp, RcppArmadillo`
-- Errors must `stop()` directly — never use `tryCatch` to silently fall back
+- Errors must `stop()` directly — never use `tryCatch` to silently fall back, `suppressWarnings`, `ginv`, or silent guards. Fix root causes in C++ when possible.
 - testthat edition 3; test helpers in `tests/testthat/helper-*.R`
 - Tests rely on the bundled `sim` dataset (`data/sim.rda`) for processed data, initial parameters, and random effects
+- Ad-hoc test scripts (PBC, sim benchmarks) go in `scripts/`, not `tests/`

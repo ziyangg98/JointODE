@@ -3,8 +3,8 @@
 # ==============================================================================
 
 # Use small dataset for speed
-e2e_sim <- simulate(
-  n_subjects = 30,
+e2e_sim <- JointODE::simulate(
+  n_subjects = 50,
   longitudinal = list(
     xi = c(mean = 0.4, sd = 0.05),
     period = c(mean = 6, sd = 0.1),
@@ -38,52 +38,45 @@ e2e_sim$longitudinal_data$biomarker <- NULL
 e2e_sim$longitudinal_data$velocity <- NULL
 e2e_sim$longitudinal_data$acceleration <- NULL
 
-test_that("JointODE fits and converges", {
-  fit <- JointODE(
-    longitudinal_formula = observed ~ biomarker + velocity + x1 +
-      (biomarker + velocity | id),
-    survival_formula = Surv(time, status) ~ w1,
-    longitudinal_data = e2e_sim$longitudinal_data,
-    survival_data = e2e_sim$survival_data,
-    control = list(maxit = 30, tol = 1e-3)
-  )
+# Fit once, reuse across tests
+e2e_fit <- JointODE(
+  longitudinal_formula = observed ~ biomarker + velocity + x1 +
+    (biomarker + velocity | id),
+  survival_formula = Surv(time, status) ~ w1,
+  longitudinal_data = e2e_sim$longitudinal_data,
+  survival_data = e2e_sim$survival_data,
+  init = "marginal",
+  control = list(maxit = 30, tol = 1e-3)
+)
 
-  expect_s3_class(fit, "JointODE")
-  expect_true(is.finite(fit$logLik))
-  expect_true(!is.null(fit$vcov))
-  expect_true(is.matrix(fit$vcov))
+test_that("JointODE fits and converges", {
+  expect_s3_class(e2e_fit, "JointODE")
+  expect_true(is.finite(e2e_fit$logLik))
+  expect_true(!is.null(e2e_fit$vcov))
+  expect_true(is.matrix(e2e_fit$vcov))
 })
 
 test_that("JointODE S3 methods work on fitted object", {
-  fit <- JointODE(
-    longitudinal_formula = observed ~ biomarker + velocity + x1 +
-      (biomarker + velocity | id),
-    survival_formula = Surv(time, status) ~ w1,
-    longitudinal_data = e2e_sim$longitudinal_data,
-    survival_data = e2e_sim$survival_data,
-    control = list(maxit = 30, tol = 1e-3)
-  )
-
   # coef
-  cf <- coef(fit)
+  cf <- coef(e2e_fit)
   expect_true(is.numeric(cf))
   expect_true(length(cf) > 0)
 
   # logLik
-  ll <- logLik(fit)
+  ll <- logLik(e2e_fit)
   expect_s3_class(ll, "logLik")
   expect_true(is.finite(as.numeric(ll)))
 
   # summary
-  s <- summary(fit)
+  s <- summary(e2e_fit)
   expect_s3_class(s, "summary.JointODE")
 
   # print (no error)
-  out <- capture.output(print(fit))
+  out <- capture.output(print(e2e_fit))
   expect_true(length(out) > 0)
 
   # predict
-  pred <- predict(fit)
+  pred <- predict(e2e_fit)
   expect_s3_class(pred, "data.frame")
   expect_true(nrow(pred) > 0)
 })

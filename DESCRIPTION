@@ -37,7 +37,6 @@ Imports:
     patchwork,
     dplyr,
     tidyr,
-    magrittr,
     viridisLite
 LinkingTo:
     Rcpp,

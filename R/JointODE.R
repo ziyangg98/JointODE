@@ -153,7 +153,6 @@
 #'     closed-form updates for variance parameters
 #' }
 #'
-#' @importFrom stats optim
 #' @importFrom utils modifyList
 #' @importFrom survival Surv
 #' @importFrom cli cli_h2 cli_text cli_alert_success
@@ -300,8 +299,6 @@ JointODE <- function(
   coef_names <- model_config$coef_names
 
   # Initialize state RE from first observations
-  id_var <- parsed_long$grouping
-  time_var <- parsed_surv$time_var
   for (i in seq_along(data_list)) {
     obs <- data_list[[i]]$longitudinal
     if (length(obs$measurements) >= 1) {
@@ -361,8 +358,6 @@ JointODE <- function(
     }
 
     prev <- curr
-
-    gc(verbose = FALSE, full = FALSE)
   }
 
   # Finalize model
@@ -380,7 +375,7 @@ JointODE <- function(
   # Return fitted model
   structure(
     list(
-      parameters = curr$parameters,
+      parameters = final_results$parameters,
       logLik = final_results$loglik,
       AIC = final_results$aic,
       BIC = final_results$bic,

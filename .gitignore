@@ -12,3 +12,7 @@ inst/doc
 # Development environment
 .vscode/
 JointODE_*.tar.gz
+*.Rcheck/
+*.bak
+testthat-problems.rds
+tests/*.rds

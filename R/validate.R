@@ -37,42 +37,6 @@
 }
 
 
-.validate_state <- function(state, survival_data) {
-  if (is.null(state)) {
-    return(invisible(TRUE))
-  }
-
-  if (!is.matrix(state)) {
-    stop("state: must be a matrix", call. = FALSE)
-  }
-
-  n_subjects <- nrow(survival_data)
-  if (nrow(state) != n_subjects) {
-    stop(
-      sprintf(
-        "state: wrong rows (expected %d, got %d)",
-        n_subjects,
-        nrow(state)
-      ),
-      call. = FALSE
-    )
-  }
-
-  if (ncol(state) != 2) {
-    stop(
-      sprintf("state: must have 2 columns, got %d", ncol(state)),
-      call. = FALSE
-    )
-  }
-
-  if (any(!is.finite(state))) {
-    stop("state: must contain finite values", call. = FALSE)
-  }
-
-  invisible(TRUE)
-}
-
-
 .validate_gamma <- function(gamma) {
   if (!is.numeric(gamma) || length(gamma) != 1) {
     stop("gamma must be a single numeric value", call. = FALSE)

@@ -756,7 +756,6 @@ simulate <- function(
   beta_m <- init_covs$biomarker
   beta_v <- init_covs$velocity
   shared_covs <- intersect(names(beta_m), names(beta_v))
-  all_covs <- union(names(beta_m), names(beta_v))
 
   var_m0 <- sum(vapply(names(beta_m), function(nm) {
     beta_m[nm]^2 * cov_variance(nm, cov_defs)

@@ -70,6 +70,15 @@ inline Scalar clamp(const Scalar& value, const Scalar& min_val,
                           CppAD::CondExpLt(value, min_val, min_val, value));
 }
 
+// Safe exp: linear extension beyond threshold preserves gradient for AD
+template <typename Scalar>
+inline Scalar safe_exp(const Scalar& x) {
+  const Scalar M(500.0);
+  const Scalar capped = CppAD::CondExpGt(x, M, M, x);
+  const Scalar excess = CppAD::CondExpGt(x, M, x - M, Scalar(0));
+  return CppAD::exp(capped) * (Scalar(1.0) + excess);
+}
+
 // Convert Rcpp vector to std::vector<double>
 template <typename T>
 inline std::vector<double> to_double_vec(const T& v) {
@@ -522,7 +531,7 @@ inline void ode_step(Scalar& m, Scalar& v,
     // D > 0, |b1| > eps: both roots well-separated from zero
     const Scalar s = CppAD::sqrt(b2 * b2 + Scalar(4.0) * b1);
     const Scalar l1 = h + s * Scalar(0.5), l2 = h - s * Scalar(0.5);
-    const Scalar e1 = CppAD::exp(l1 * dt), e2 = CppAD::exp(l2 * dt);
+    const Scalar e1 = safe_exp(l1 * dt), e2 = safe_exp(l2 * dt);
     a0 = (l1 * e2 - l2 * e1) / s;
     a1 = (e1 - e2) / s;
     const Scalar F1 = (e1 - Scalar(1.0)) / l1;
@@ -534,7 +543,7 @@ inline void ode_step(Scalar& m, Scalar& v,
     // b1 ~ 0: m'' = b2*m' + f (first-order in v = m')
     // v(t) = (v0 + f/b2)*e^{b2t} - f/b2
     // m(t) = m0 + (v0 + f/b2)*(e^{b2t}-1)/b2 - f*t/b2
-    const Scalar eb = CppAD::exp(b2 * dt);
+    const Scalar eb = safe_exp(b2 * dt);
     const Scalar Fb = (eb - Scalar(1.0)) / b2;  // b2 != 0 (guaranteed)
     const Scalar vf = v + f / b2;  // v0 + f/b2
     m = m + vf * Fb - f * dt / b2;
@@ -545,7 +554,7 @@ inline void ode_step(Scalar& m, Scalar& v,
     // D < 0: conjugate roots a ± iw, with a²+w² = -b1 > 0
     const Scalar w = CppAD::sqrt(-(b2 * b2 + Scalar(4.0) * b1)) * Scalar(0.5);
     const Scalar r2 = h * h + w * w;
-    const Scalar ea = CppAD::exp(h * dt);
+    const Scalar ea = safe_exp(h * dt);
     const Scalar c = CppAD::cos(w * dt), s = CppAD::sin(w * dt);
     a0 = ea * (c - h * s / w);
     a1 = ea * s / w;
@@ -556,7 +565,7 @@ inline void ode_step(Scalar& m, Scalar& v,
 
   } else if (br == MatExpBranch::REPEATED) {
     // D ~ 0, |h| > eps: double root at h
-    const Scalar e = CppAD::exp(h * dt);
+    const Scalar e = safe_exp(h * dt);
     a0 = e * (Scalar(1.0) - h * dt);
     a1 = dt * e;
     const Scalar F = (e - Scalar(1.0)) / h;
@@ -635,9 +644,9 @@ inline std::vector<std::vector<Scalar>> ode_solve_joint(
     //   int h(t)dt = dt * h0 * (exp(d) - 1) / d,  d = lh1 - lh0
     // When d ~ 0, falls back to trapezoidal (same result to first order)
     Scalar lh_curr = eval_hazard(m, v, params, ws, t1);
-    Scalar h0 = CppAD::exp(lh_prev);
+    Scalar h0 = safe_exp(lh_prev);
     Scalar d = lh_curr - lh_prev;
-    Scalar ed = CppAD::exp(d);
+    Scalar ed = safe_exp(d);
     Scalar abs_d = CppAD::CondExpGe(d, Scalar(0), d, -d);
     Scalar loglin = Scalar(dt) * h0 * (ed - Scalar(1)) / d;
     Scalar trap = Scalar(dt * 0.5) * (h0 + h0 * ed);

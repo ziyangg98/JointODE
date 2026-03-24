@@ -62,6 +62,7 @@
   }
 
   list(
+    parameters = parameters,
     random_effects = random_effects,
     vcov = vcov_matrix,
     loglik = loglik,

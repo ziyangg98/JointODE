@@ -3,7 +3,7 @@
 # ==============================================================================
 
 # Generate small test data for MarginalODE
-marginal_sim <- simulate(
+marginal_sim <- JointODE::simulate(
   n_subjects = 20,
   longitudinal = list(
     xi = c(mean = 0.5, sd = 0.05),

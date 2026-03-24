@@ -48,7 +48,11 @@
   time <- parsed_surv$time_var
   marginal_fit <- MarginalODE(
     .build_formula(parsed_long$fixed_terms, response = parsed_long$response),
-    longitudinal_data, time, id, control = control
+    longitudinal_data, time, id,
+    control = MarginalODE.control(
+      maxit = 200, verbose = control$verbose,
+      parallel = control$parallel, n_cores = control$n_cores
+    )
   )
   if (!marginal_fit$convergence$converged) {
     stop("MarginalODE failed to converge", call. = FALSE)
@@ -157,19 +161,16 @@
   ni <- diff(subj_idx)
 
   stop_vec <- event_vec <- numeric(nrow(merged))
-  pos <- 1
   for (i in seq_along(ni)) {
     s <- subj_idx[i]
     e <- subj_idx[i + 1] - 1
-    rng <- pos:(pos + ni[i] - 1)
     if (ni[i] == 1) {
-      stop_vec[pos] <- merged[[surv_vars[1]]][s]
-      event_vec[pos] <- merged[[surv_vars[2]]][s]
+      stop_vec[s] <- merged[[surv_vars[1]]][s]
+      event_vec[s] <- merged[[surv_vars[2]]][s]
     } else {
-      stop_vec[rng] <- c(merged$obstime[(s + 1):e], merged[[surv_vars[1]]][e])
-      event_vec[rng] <- c(rep(0, ni[i] - 1), merged[[surv_vars[2]]][e])
+      stop_vec[s:e] <- c(merged$obstime[(s + 1):e], merged[[surv_vars[1]]][e])
+      event_vec[s:e] <- c(rep(0, ni[i] - 1), merged[[surv_vars[2]]][e])
     }
-    pos <- pos + ni[i]
   }
   merged$stop <- stop_vec
   merged$event <- event_vec

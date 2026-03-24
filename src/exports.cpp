@@ -35,10 +35,13 @@ static void eval_subject_nll(
   const int n_re = inv_sigma_b.n_rows;
 
   // RE layout: [b_m0, b_v0, b_coef...]
-  NumericVector long_coefs = as<List>(parameters["coefficients"])["longitudinal"];
   NumericVector coef_re(random_effect.begin() + 2, random_effect.end());
+  // Use proposed theta for branch classification, not stale parameters
+  NumericVector proposed_long(n_long);
+  for (int j = 0; j < n_long; j++)
+    proposed_long[j] = theta_vec[n_baseline + n_hazard + j];
   MatExpBranch branch = params_template.branch;
-  update_branch(branch, long_coefs, coef_re,
+  update_branch(branch, proposed_long, coef_re,
                 params_template.biomarker_random,
                 params_template.velocity_random);
 

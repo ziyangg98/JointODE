@@ -88,11 +88,7 @@
   if (n_cores == 0) {
     n_cores <- max(1, parallel::detectCores() - 1)
   }
-  if (.Platform$OS.type == "unix") {
-    future::plan(future::multicore, workers = n_cores)
-  } else {
-    future::plan(future::multisession, workers = n_cores)
-  }
+  future::plan(future::multisession, workers = n_cores)
   function() future::plan(future::sequential)
 }
 
@@ -302,6 +298,28 @@
   )
 }
 
+# Gill-Murray Regularized Cholesky ============================================
+
+#' @noRd
+.regularized_chol <- function(H) {
+  n <- nrow(H)
+  tau <- 0
+  ds <- max(abs(diag(H)), 1, na.rm = TRUE)
+  if (!is.finite(ds)) ds <- 1
+  for (k in seq_len(20)) {
+    R <- try(chol(H + diag(tau, n)), silent = TRUE)
+    if (!inherits(R, "try-error")) return(R)
+    tau <- if (tau == 0) 1e-4 * ds else tau * 10
+  }
+  stop("Hessian is not positive definite after regularization")
+}
+
+#' @noRd
+.regularized_solve <- function(H, g) {
+  R <- .regularized_chol(H)
+  backsolve(R, backsolve(R, g, transpose = TRUE))
+}
+
 # Parameter Counting & Conversion =============================================
 
 #' @noRd
@@ -339,11 +357,25 @@
   if (iter > 1) {
     delta_l <- curr$loglik - prev$loglik
     rel_l <- abs(delta_l) / (abs(curr$loglik) + 1)
+
+    # Parameter change: max relative change across fixed effects + variance
+    theta_curr <- c(
+      .coef_to_vector(curr$parameters),
+      curr$parameters$coefficients$measurement_error_sd,
+      as.vector(curr$parameters$coefficients$random_effect_sigma)
+    )
+    theta_prev <- c(
+      .coef_to_vector(prev$parameters),
+      prev$parameters$coefficients$measurement_error_sd,
+      as.vector(prev$parameters$coefficients$random_effect_sigma)
+    )
+    rel_theta <- max(abs(theta_curr - theta_prev) / (abs(theta_prev) + 1e-8))
   } else {
     delta_l <- curr$loglik
     rel_l <- 1
+    rel_theta <- 1
   }
-  list(delta_l = delta_l, rel_l = rel_l)
+  list(delta_l = delta_l, rel_l = rel_l, rel_theta = rel_theta)
 }
 
 #' @noRd
@@ -351,21 +383,35 @@
   cf <- curr$parameters$coefficients
 
   cli::cli_text(sprintf(
-    "[%3d/%3d] L=%10.2f | dL=%.3e (%.2e)",
+    "[%3d/%3d] L=%10.2f | dL=%+.2e  dTheta=%.2e",
     iter, control$maxit, curr$loglik,
-    metrics$delta_l, metrics$rel_l
+    metrics$delta_l, metrics$rel_theta
   ))
 
   if (control$verbose >= 2) {
-    cli::cli_text(sprintf("    sigma_e: %.3f", cf$measurement_error_sd))
+    cli::cli_text(sprintf("    sigma_e: %.5f", cf$measurement_error_sd))
     cli::cli_text(sprintf(
-      "    Sigma_b: %s", .format_matrix(cf$random_effect_sigma)
+      "    Sigma_b diag: %s",
+      paste(sprintf("%.4f", diag(cf$random_effect_sigma)), collapse = ", ")
     ))
     cli::cli_text(sprintf("    baseline: %s", .format_vector(cf$baseline)))
     cli::cli_text(sprintf("    hazard: %s", .format_vector(cf$hazard)))
     cli::cli_text(sprintf(
       "    longitudinal: %s", .format_vector(cf$longitudinal, 6)
     ))
+    if (!is.null(cf$initial_state)) {
+      cli::cli_text(sprintf("    initial_state: %s",
+        paste(sprintf("%.4f", cf$initial_state), collapse = ", ")))
+    }
+  }
+  if (control$verbose >= 3) {
+    re <- curr$random_effects
+    if (!is.null(re)) {
+      for (k in seq_len(ncol(re))) {
+        cli::cli_text(sprintf("    RE[,%d] range: [%.3f, %.3f]",
+          k, min(re[, k]), max(re[, k])))
+      }
+    }
   }
 }
 
@@ -387,7 +433,7 @@
     ))
   }
 
-  converged <- iter > 1 && metrics$rel_l < control$tol
+  converged <- iter > 1 && metrics$rel_theta < control$tol
   is_final <- iter == control$maxit
 
   if (control$verbose > 0 && !(is_final && !converged)) {
@@ -398,14 +444,14 @@
     if (converged) {
       cli::cli_text("")
       cli::cli_alert_success(sprintf(
-        "Converged in %d iterations (rel dL=%.2e)",
-        iter, metrics$rel_l
+        "Converged in %d iterations (dTheta=%.2e)",
+        iter, metrics$rel_theta
       ))
     } else if (is_final) {
       cli::cli_text("")
       cli::cli_alert_warning(sprintf(
-        "Not converged after %d iterations (rel dL=%.2e > %.2e)",
-        control$maxit, metrics$rel_l, control$tol
+        "Not converged after %d iterations (dTheta=%.2e > %.2e)",
+        control$maxit, metrics$rel_theta, control$tol
       ))
       cli::cli_alert_info(
         "Try increasing maxit, relaxing tolerances, or adjusting initial values"

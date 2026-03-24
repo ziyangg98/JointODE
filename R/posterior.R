@@ -8,8 +8,7 @@ NULL
 .quad_cache <- new.env(parent = emptyenv())
 
 .get_quad_grid <- function(dim, level) {
-  # Auto-reduce level for high dimensions to control cost
-  if (dim >= 4 && level > 2) level <- 2
+  if (dim >= 4 && level > 3) level <- 3
   key <- paste0(dim, "_", level)
   if (!exists(key, envir = .quad_cache)) {
     grid <- mvQuad::createNIGrid(
@@ -192,21 +191,8 @@ NULL
   )
   hessian_neglogpost <- -attr(result_at_mode, "hessian")
 
-  # Gill-Murray: find minimal tau s.t. H + tau*I is positive definite
-  n <- nrow(hessian_neglogpost)
-  tau <- 0
-  ds <- max(abs(diag(hessian_neglogpost)), 1, na.rm = TRUE)
-  if (!is.finite(ds)) ds <- 1
-  chol_factor <- NULL
-  for (k in seq_len(20)) {
-    R <- try(chol(hessian_neglogpost + diag(tau, n)), silent = TRUE)
-    if (!inherits(R, "try-error")) {
-      chol_factor <- t(backsolve(R, diag(n)))
-      break
-    }
-    tau <- if (tau == 0) 1e-4 * ds else tau * 10
-  }
-  if (is.null(chol_factor)) chol_factor <- diag(1e-4, n)
+  R <- .regularized_chol(hessian_neglogpost)
+  chol_factor <- t(backsolve(R, diag(nrow(hessian_neglogpost))))
 
   quad <- .get_quad_grid(length(fit$estimate), level)
   n_nodes <- nrow(quad$nodes)
@@ -224,8 +210,7 @@ NULL
     ))
   }, numeric(1))
 
-  det_result <- determinant(hessian_neglogpost, logarithm = TRUE)
-  log_jacobian <- -0.5 * as.numeric(det_result$modulus)
+  log_jacobian <- -sum(log(diag(R)))
 
   log_weights <- log(quad$weights) + log_jacobian + logpost_at_nodes
   max_log_weight <- max(log_weights)
@@ -294,7 +279,9 @@ NULL
     gradient = TRUE, hessian = TRUE,
     parallel = control$parallel, n_cores = control$n_cores
   )
-  theta - solve(attr(obj, "hessian"), attr(obj, "gradient"))
+  as.vector(theta - .regularized_solve(
+    attr(obj, "hessian"), attr(obj, "gradient")
+  ))
 }
 
 #' @noRd
@@ -312,7 +299,16 @@ NULL
     gradient = FALSE, hessian = TRUE,
     parallel = control$parallel, n_cores = control$n_cores
   )
-  info_complete_inv <- solve(attr(obj, "hessian"))
+  hess <- attr(obj, "hessian")
+  n_coef <- nrow(hess)
+  r_hess <- try(.regularized_chol(hess), silent = TRUE)
+  if (inherits(r_hess, "try-error")) {
+    if (control$verbose > 0) {
+      cli::cli_alert_warning("Hessian singular, vcov unavailable")
+    }
+    return(matrix(NA, n_coef, n_coef))
+  }
+  info_complete_inv <- chol2inv(r_hess)
 
   em_map <- function(theta_input) {
     .m_step_map(
@@ -321,12 +317,8 @@ NULL
     )
   }
 
-  eps_weight <- sqrt(diag(info_complete_inv))
-  eps_weight <- eps_weight / min(eps_weight) * sqrt(.Machine$double.eps)
-
   dm_matrix <- numDeriv::jacobian(
-    func = em_map, x = theta,
-    method = "simple", method.args = list(eps = eps_weight)
+    func = em_map, x = theta, method.args = list(r = 2)
   )
 
   info_observed_inv <- info_complete_inv %*% solve(diag(n_coef) - t(dm_matrix))
@@ -387,16 +379,18 @@ NULL
   parameters$coefficients$measurement_error_sd <- measurement_error_sd
   parameters$coefficients$random_effect_sigma <- random_effect_sigma
 
+  # M-step: one Newton step for fixed effects
   theta <- .coef_to_vector(parameters)
   obj <- .compute_objective_expected(
     theta, data_list, posteriors, parameters,
     gradient = TRUE, hessian = TRUE,
     parallel = control$parallel, n_cores = control$n_cores
   )
-
+  theta_new <- as.vector(theta - .regularized_solve(
+    attr(obj, "hessian"), attr(obj, "gradient")
+  ))
   loglik_value <- -as.numeric(obj)
-  direction <- solve(attr(obj, "hessian"), attr(obj, "gradient"))
-  parameters <- .vector_to_coef(parameters, theta - direction)
+  parameters <- .vector_to_coef(parameters, theta_new)
 
   list(
     parameters = parameters,
