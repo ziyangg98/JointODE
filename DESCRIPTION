@@ -46,12 +46,11 @@ Suggests:
     knitr,
     rmarkdown,
     testthat (>= 3.0.0),
-    JSM,
+    JMbayes2,
     nlme,
     purrr,
     gridExtra,
-    latex2exp,
-    kableExtra
+    latex2exp
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 Depends:
