@@ -21,3 +21,6 @@
 ^codecov\.yml$
 ^\.editorconfig$
 ^cran-comments\.md$
+^scripts$
+^src/symbols\.rds$
+^CLAUDE\.md$

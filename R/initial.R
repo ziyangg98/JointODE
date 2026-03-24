@@ -25,7 +25,7 @@
   )
 }
 
-#' @importFrom stats predict reformulate
+#' @importFrom stats predict reformulate var
 #' @noRd
 .compute_initial <- function(
   longitudinal_data,

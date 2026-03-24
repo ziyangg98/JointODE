@@ -11,3 +11,4 @@ inst/doc
 
 # Development environment
 .vscode/
+JointODE_*.tar.gz

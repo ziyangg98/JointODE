@@ -1,7 +1,10 @@
 ---
 title: "JointODE Examples: PBC Data Analysis"
-author: "JointODE Package"
-date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{JointODE Examples: PBC Data Analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
 
 ```{r setup, include=FALSE}
