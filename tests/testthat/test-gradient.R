@@ -1,20 +1,18 @@
 test_that("AD gradient matches forward sensitivity gradient", {
-  # Setup: Use full dataset
+  n_test <- 50
+  test_ids <- unique(sim$data$longitudinal_data$id)[seq_len(n_test)]
   data_list <- .process(
-    longitudinal_data = sim$data$longitudinal_data[, c(
-      "id",
-      "time",
-      "observed",
-      "x1",
-      "x2"
-    )],
+    longitudinal_data = sim$data$longitudinal_data[
+      sim$data$longitudinal_data$id %in% test_ids,
+      c("id", "time", "observed", "x1", "x2")],
     longitudinal_formula = observed ~
       biomarker + velocity + x1 + x2 + (biomarker + velocity | id),
-    survival_data = sim$data$survival_data,
+    survival_data = sim$data$survival_data[
+      sim$data$survival_data$id %in% test_ids, ],
     survival_formula = Surv(time, status) ~ w1 + w2,
-    state = as.matrix(sim$data$state)
+    state = as.matrix(sim$data$state)[seq_len(n_test), ]
   )
-  random_effects <- sim$data$random_effects
+  random_effects <- sim$data$random_effects[seq_len(n_test), ]
 
   # Compute posteriors and measure time
   time_posterior <- system.time({

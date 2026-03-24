@@ -20,10 +20,6 @@ navbar:
         href: articles/technical-details.html
       - text: Examples
         href: articles/examples.html
-      - text: Comparison
-        href: articles/comparison.html
-      - text: Benchmark
-        href: articles/benchmark.html
 
 # Article index configuration
 articles:
@@ -36,8 +32,6 @@ articles:
   navbar: ~
   contents:
   - technical-details
-  - comparison
-  - benchmark
 
 # Reference configuration
 reference:

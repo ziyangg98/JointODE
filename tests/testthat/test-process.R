@@ -34,7 +34,9 @@ test_that(".process structures data correctly", {
   expect_equal(s1$time, 3)
   expect_equal(s1$status, 1)
   expect_equal(as.numeric(s1$covariates), as.numeric(surv_data[1, "w1"]))
-  expect_equal(s1$initial_state, c(0, 0))
+  m0 <- long_data$v[1]
+  v0 <- (long_data$v[2] - long_data$v[1]) / (1 - 0)
+  expect_equal(as.numeric(s1$initial_state), c(m0, v0))
   expect_equal(length(s1$longitudinal$times), 3)
   expect_equal(s1$longitudinal$times, 0:2)
   expect_equal(as.numeric(s1$longitudinal$measurements), long_data$v[1:3])

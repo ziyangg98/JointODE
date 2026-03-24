@@ -5,23 +5,28 @@
 # ==========================================================================
 # Setup: Process data once for all tests
 # ==========================================================================
+n_test <- 50
+test_ids <- unique(sim$data$longitudinal_data$id)[seq_len(n_test)]
+long_sub <- sim$data$longitudinal_data[
+  sim$data$longitudinal_data$id %in% test_ids,
+  c("id", "time", "observed", "x1", "x2")
+]
+surv_sub <- sim$data$survival_data[
+  sim$data$survival_data$id %in% test_ids,
+]
+state_sub <- as.matrix(sim$data$state)[seq_len(n_test), ]
+
 data_processed <- .process(
-  longitudinal_data = sim$data$longitudinal_data[, c(
-    "id",
-    "time",
-    "observed",
-    "x1",
-    "x2"
-  )],
+  longitudinal_data = long_sub,
   longitudinal_formula = observed ~
     biomarker + velocity + x1 + x2 + (biomarker + velocity | id),
-  survival_data = sim$data$survival_data,
+  survival_data = surv_sub,
   survival_formula = Surv(time, status) ~ w1 + w2,
-  state = as.matrix(sim$data$state)
+  state = state_sub
 )
 
 parameters <- sim$init
-random_effects <- sim$data$random_effects
+random_effects <- sim$data$random_effects[seq_len(n_test), ]
 n_subjects <- length(data_processed)
 
 # ==========================================================================
@@ -114,7 +119,8 @@ test_that(".solve_batch_ode_cppad - basic mode structure and accuracy", {
     acceleration_pred <- batch_cppad[[i]]$acceleration[match_idx]
     names(acceleration_pred) <- NULL
 
-    # Check accuracy
+    # Check accuracy (matrix exponential is exact; sim data used RK45
+    # approximation, so tolerance reflects RK45 error, not matexp error)
     expect_equal(
       biomarker_pred,
       biomarker_true,

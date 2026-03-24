@@ -9,3 +9,23 @@ repos:
         args: ['--maxkb=1000']
       - id: mixed-line-ending
         args: ['--fix=lf']
+
+  - repo: local
+    hooks:
+      - id: r-syntax
+        name: Check R syntax
+        entry: Rscript -e "for(f in commandArgs(TRUE)) tryCatch(parse(f), error=function(e) { cat(f,conditionMessage(e),'\n'); quit(status=1) })"
+        language: system
+        files: '\.R$'
+      - id: no-debug
+        name: No debug statements
+        entry: bash -c 'if grep -nE "browser\(\)|debug\(|debugonce\(" "$@"; then exit 1; else exit 0; fi' --
+        language: system
+        files: '\.R$'
+        types: [text]
+      - id: roxygenize
+        name: Update roxygen docs
+        entry: Rscript -e "roxygen2::roxygenise(clean=FALSE)"
+        language: system
+        pass_filenames: false
+        files: '^R/.*\.R$'

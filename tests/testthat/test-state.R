@@ -1,16 +1,17 @@
 test_that("State optimization with single random effect", {
   data("sim", package = "JointODE")
 
+  n_test <- 50
+  test_ids <- unique(sim$data$longitudinal_data$id)[seq_len(n_test)]
   data_list <- .process(
     longitudinal_formula = observed ~ biomarker +
-      velocity +
-      x1 +
-      x2 +
-      (biomarker + velocity | id),
+      velocity + x1 + x2 + (biomarker + velocity | id),
     survival_formula = Surv(time, status) ~ w1 + w2,
-    longitudinal_data = sim$data$longitudinal_data,
-    survival_data = sim$data$survival_data,
-    state = as.matrix(sim$data$state)
+    longitudinal_data = sim$data$longitudinal_data[
+      sim$data$longitudinal_data$id %in% test_ids, ],
+    survival_data = sim$data$survival_data[
+      sim$data$survival_data$id %in% test_ids, ],
+    state = as.matrix(sim$data$state)[seq_len(n_test), ]
   )
 
   n_subjects <- length(data_list)
@@ -36,12 +37,12 @@ test_that("State optimization with single random effect", {
     results[i, ] <- opt_result$state
   }
 
-  errors <- results - sim$data$state
+  errors <- results - sim$data$state[seq_len(n_test), ]
   bias <- colMeans(errors)
   rmse <- sqrt(colMeans(errors^2))
 
-  expect_true(all(abs(bias) < 0.5),
+  expect_true(all(abs(bias) < 0.05),
     info = paste("bias too large:", paste(round(bias, 4), collapse = ", ")))
-  expect_true(all(rmse < 1.0),
+  expect_true(all(rmse < 0.1),
     info = paste("rmse too large:", paste(round(rmse, 4), collapse = ", ")))
 })

@@ -73,10 +73,10 @@ Here’s a basic example using the included simulated dataset:
 
 ``` r
 library(JointODE)
-#> 
+#>
 #> Attaching package: 'JointODE'
 #> The following object is masked from 'package:stats':
-#> 
+#>
 #>     simulate
 
 # Load example dataset (200 subjects with longitudinal and survival data)
@@ -93,72 +93,73 @@ fit <- JointODE(
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = longitudinal_data,
   survival_data = sim$data$survival_data,
-  init = sim$init,
-  control = list(atol = 1e-3, parallel = TRUE)
+  init = "marginal",
+  control = list(parallel = TRUE)
 )
 cat(sprintf("Elapsed: %.1f s\n", (proc.time() - t0)["elapsed"]))
-#> Elapsed: 376.6 s
+#> Elapsed: 279.8 s
 ```
 
 ``` r
 # Model summary
 summary(fit)
-#> 
+#> Warning in sqrt(diag(object$vcov)): NaNs produced
+#>
 #> Call:
-#> JointODE(longitudinal_formula = observed ~ biomarker + velocity + 
-#>     x1 + x2 + (biomarker + velocity | id), survival_formula = Surv(time, 
-#>     status) ~ w1 + w2, longitudinal_data = longitudinal_data, 
-#>     survival_data = sim$data$survival_data, init = sim$init, 
-#>     control = list(atol = 0.001, parallel = TRUE))
-#> 
+#> JointODE(longitudinal_formula = observed ~ biomarker + velocity +
+#>     x1 + x2 + (biomarker + velocity | id), survival_formula = Surv(time,
+#>     status) ~ w1 + w2, longitudinal_data = longitudinal_data,
+#>     survival_data = sim$data$survival_data, init = "marginal",
+#>     control = list(parallel = TRUE))
+#>
 #> Data Descriptives:
 #> Longitudinal Process            Survival Process
 #> Number of Observations: 17350   Number of Events: 61 (30%)
 #> Number of Subjects: 200
-#> 
+#>
 #>        AIC        BIC     logLik
-#> -31491.218 -31438.445  15761.609
-#> 
+#> -31491.145 -31438.371  15761.572
+#>
 #> Coefficients:
 #> Longitudinal Process: Second-Order ODE Model
-#>             Estimate Std. Error  z value Pr(>|z|)    
-#> biomarker    -1.0880     0.0044 -248.236   <2e-16 ***
-#> velocity     -0.8366     0.0044 -189.527   <2e-16 ***
-#> (Intercept)  -0.0001     0.0009   -0.165    0.869    
-#> x1            0.5433     0.0025  217.555   <2e-16 ***
-#> x2           -0.4892     0.0023 -216.334   <2e-16 ***
+#>             Estimate Std. Error z value Pr(>|z|)
+#> biomarker    -1.0807     0.0044 -246.60   <2e-16 ***
+#> velocity     -0.8312     0.0044 -188.22   <2e-16 ***
+#> (Intercept)  -0.0005     0.0009   -0.57    0.568
+#> x1            0.5406     0.0025  216.64   <2e-16 ***
+#> x2           -0.4867     0.0023 -215.40   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#> 
+#>
 #> ODE System Characteristics:
-#>                    Estimate Std. Error z value Pr(>|z|)    
-#> T (period)           6.0238     0.0121   496.5   <2e-16 ***
-#> xi (damping ratio)   0.4010     0.0018   226.8   <2e-16 ***
+#>                    Estimate Std. Error z value Pr(>|z|)
+#> T (period)           6.0442     0.0123   493.2   <2e-16 ***
+#> xi (damping ratio)   0.3998     0.0018   225.4   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#> 
+#>
 #> Survival Process: Proportional Hazards Model
-#>         Estimate Std. Error z value Pr(>|z|)    
-#> alpha_1   0.7239     0.1880   3.850 0.000118 ***
-#> alpha_2   1.8521     0.7675   2.413 0.015810 *  
-#> w1        0.6862     0.1245   5.512 3.54e-08 ***
-#> w2       -1.3426     0.2860  -4.695 2.66e-06 ***
+#>         Estimate Std. Error z value Pr(>|z|)
+#> alpha_1   0.7243     0.1870   3.874 0.000107 ***
+#> alpha_2   1.8728     0.6761   2.770 0.005606 **
+#> w1        0.6862     0.1237   5.546 2.92e-08 ***
+#> w2       -1.3423     0.2866  -4.684 2.81e-06 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#> 
+#>
 #> Baseline Hazard: B-spline with 3 basis functions
-#> (Coefficients range: [-4.835, -2.010] )
-#> 
+#> (Coefficients range: [-4.853, -1.996] )
+#>
 #> Variance Components:
-#> Measurement Error SD: 0.098733
+#> Measurement Error SD: 0.098770
 #> Random Effect Covariance Matrix:
 #>          [,1]     [,2]
-#> [1,] 0.001368 0.001774
-#> [2,] 0.001774 0.032909
-#> 
+#> [1,] 0.001369 0.001522
+#> [2,] 0.001522 0.030368
+#>
 #> Model Diagnostics:
 #> C-index (Concordance): 0.668
-#> Convergence: EM algorithm converged after 17 iterations
+#> Convergence: EM algorithm converged after 10 iterations
 
 # Plot results
 plot(fit)

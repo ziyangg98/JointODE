@@ -14,7 +14,7 @@ Description: Implements joint modeling of longitudinal biomarker trajectories an
     capturing complex temporal patterns through ODE-based trajectory modeling while
     accounting for their association with event times through shared random effects.
 License: MIT + file LICENSE
-URL: https://github.com/ziyangg98/JointODE, http://gongziyang.com/JointODE/
+URL: https://github.com/ziyangg98/JointODE, https://gongziyang.com/JointODE/
 BugReports: https://github.com/ziyangg98/JointODE/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

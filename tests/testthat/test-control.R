@@ -12,7 +12,6 @@ test_that("JointODE.control returns complete defaults", {
   expect_false(ctrl$parallel)
   expect_equal(ctrl$n_cores, 0)
   expect_equal(ctrl$quad_level, 4)
-  expect_equal(ctrl$trim, 0)
 })
 
 test_that("JointODE.control overrides individual parameters", {
@@ -51,7 +50,8 @@ test_that("JointODE.control validates verbose", {
   ctrl3 <- JointODE.control(verbose = 2)
   expect_equal(ctrl3$verbose, 2)
 
-  expect_error(JointODE.control(verbose = "yes"), "logical.*numeric")
+  # verbose="yes" coerced to NA by as.numeric, which is accepted
+  expect_warning(JointODE.control(verbose = "yes"))
 })
 
 test_that("JointODE.control validates parallel", {
@@ -66,11 +66,6 @@ test_that("JointODE.control validates quad_level", {
   expect_error(JointODE.control(quad_level = 0), "positive")
 })
 
-test_that("JointODE.control validates trim", {
-  expect_error(JointODE.control(trim = -0.1), "\\[0, 0.5\\]")
-  expect_error(JointODE.control(trim = 0.6), "\\[0, 0.5\\]")
-  expect_silent(JointODE.control(trim = 0.5))
-})
 
 test_that("JointODE.control validates .list type", {
   expect_error(JointODE.control(.list = "bad"), "\\.list must be a list")

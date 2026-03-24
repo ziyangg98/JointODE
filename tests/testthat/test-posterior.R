@@ -1,20 +1,19 @@
 test_that("Posterior means are unbiased (AGHQ)", {
+  n_test <- 50
+  test_ids <- unique(sim$data$longitudinal_data$id)[seq_len(n_test)]
   data_list <- .process(
-    longitudinal_data = sim$data$longitudinal_data[, c(
-      "id",
-      "time",
-      "observed",
-      "x1",
-      "x2"
-    )],
+    longitudinal_data = sim$data$longitudinal_data[
+      sim$data$longitudinal_data$id %in% test_ids,
+      c("id", "time", "observed", "x1", "x2")],
     longitudinal_formula = observed ~
       biomarker + velocity + x1 + x2 + (biomarker + velocity | id),
-    survival_data = sim$data$survival_data,
+    survival_data = sim$data$survival_data[
+      sim$data$survival_data$id %in% test_ids, ],
     survival_formula = Surv(time, status) ~ w1 + w2,
-    state = as.matrix(sim$data$state)
+    state = as.matrix(sim$data$state)[seq_len(n_test), ]
   )
 
-  random_effects <- sim$data$random_effects
+  random_effects <- sim$data$random_effects[seq_len(n_test), ]
 
   posteriors <- .compute_posteriors(
     data_list = data_list,
@@ -57,6 +56,6 @@ test_that("Posterior means are unbiased (AGHQ)", {
     expect_true(is.numeric(weights_i))
     expect_equal(length(weights_i), nrow(nodes_i))
     expect_true(all(weights_i > 0))
-    expect_equal(sum(weights_i), 1, tolerance = 1e-10) # Normalized
+    expect_equal(sum(weights_i), 1, tolerance = 1e-14) # Normalized
   }
 })

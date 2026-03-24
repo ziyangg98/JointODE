@@ -267,26 +267,13 @@ test_that(".get_spline_config errors on invalid placement", {
 
 # --- .update_random_effect_sigma ---
 
-test_that(".update_random_effect_sigma without trimming", {
+test_that(".update_random_effect_sigma computes mean of second moments", {
   moments <- list(
     list(mean = c(0, 0), second_moment = diag(2)),
     list(mean = c(0, 0), second_moment = diag(2) * 3)
   )
-  control <- list(trim = 0)
-  result <- .update_random_effect_sigma(moments, n_subjects = 2, control)
+  result <- .update_random_effect_sigma(moments, n_subjects = 2)
   expect_equal(result, diag(2) * 2) # (1 + 3) / 2
-})
-
-test_that(".update_random_effect_sigma with trimming", {
-  moments <- list(
-    list(mean = c(0, 0), second_moment = diag(2)),
-    list(mean = c(0, 0), second_moment = diag(2) * 2),
-    list(mean = c(0, 0), second_moment = diag(2) * 100)
-  )
-  control <- list(trim = 0.3)
-  result <- .update_random_effect_sigma(moments, n_subjects = 3, control)
-  expect_true(is.matrix(result))
-  expect_equal(nrow(result), 2)
 })
 
 # --- .compute_metrics ---
