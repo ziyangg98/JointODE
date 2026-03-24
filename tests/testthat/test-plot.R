@@ -107,8 +107,10 @@ test_that("plot.JointODE subject_ids produces faceted survival plot", {
 
 test_that("plot.JointODE show_observed=FALSE hides points in faceted view", {
   ids <- names(mock$data)[1:2]
-  p <- .safe_plot(mock, type = "trajectory_biomarker",
-                  subject_ids = ids, show_observed = FALSE)
+  p <- .safe_plot(mock,
+    type = "trajectory_biomarker",
+    subject_ids = ids, show_observed = FALSE
+  )
   expect_s3_class(p, "gg")
 })
 
@@ -120,14 +122,18 @@ test_that("plot.JointODE show_individual=FALSE for biomarker", {
 })
 
 test_that("plot.JointODE show_individual=FALSE for phase", {
-  p <- .safe_plot(mock, type = "phase_biomarker_velocity",
-                  show_individual = FALSE)
+  p <- .safe_plot(mock,
+    type = "phase_biomarker_velocity",
+    show_individual = FALSE
+  )
   expect_s3_class(p, "gg")
 })
 
 test_that("plot.JointODE show_individual=FALSE for vel_acc", {
-  p <- .safe_plot(mock, type = "phase_velocity_acceleration",
-                  show_individual = FALSE)
+  p <- .safe_plot(mock,
+    type = "phase_velocity_acceleration",
+    show_individual = FALSE
+  )
   expect_s3_class(p, "gg")
 })
 

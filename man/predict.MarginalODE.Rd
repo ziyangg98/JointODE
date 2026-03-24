@@ -14,37 +14,22 @@
 )
 }
 \arguments{
-\item{object}{An object of class \code{MarginalODE}}
+\item{object}{A MarginalODE object}
 
-\item{newdata}{Optional data frame with new subjects. If NULL, uses the
-training data from the model fit.}
+\item{newdata}{Not yet supported}
 
-\item{times}{Optional time points for prediction. Can be:
-\itemize{
-\item A numeric vector for the same times across all subjects
-\item A named list with subject-specific time vectors
-\item NULL to use observation times from the data (default)
-}}
+\item{times}{Prediction times (NULL = observed)}
 
-\item{parallel}{Logical flag for parallel computation (default: FALSE)}
+\item{parallel}{Logical for parallel computation}
 
-\item{n_cores}{Number of cores for parallel processing. If 0, automatically
-detects available cores (default: 0)}
+\item{n_cores}{Number of cores (0 = auto)}
 
-\item{...}{Additional arguments (currently unused)}
+\item{...}{Additional arguments}
 }
 \value{
-A data.frame with columns:
-\describe{
-\item{\code{id}}{Subject identifier}
-\item{\code{time}}{Time points for predictions}
-\item{\code{biomarker}}{Predicted biomarker values}
-\item{\code{velocity}}{Predicted velocity (first derivative)}
-\item{\code{acceleration}}{Predicted acceleration (second derivative)}
-}
+A data.frame with id, time, biomarker, velocity, acceleration
 }
 \description{
-Computes predicted biomarker trajectories, velocities, and accelerations
-for subjects based on the fitted marginal ODE model.
+Predict Method for MarginalODE Objects
 }
 \concept{model-prediction}

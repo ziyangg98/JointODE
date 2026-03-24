@@ -2,8 +2,6 @@
 # JointODE End-to-End Integration Tests
 # ==============================================================================
 
-skip_on_cran()
-
 # Use small dataset for speed
 e2e_sim <- simulate(
   n_subjects = 30,
@@ -47,7 +45,6 @@ test_that("JointODE fits and converges", {
     survival_formula = Surv(time, status) ~ w1,
     longitudinal_data = e2e_sim$longitudinal_data,
     survival_data = e2e_sim$survival_data,
-    state = e2e_sim$state,
     control = list(maxit = 30, tol = 1e-3)
   )
 
@@ -64,7 +61,6 @@ test_that("JointODE S3 methods work on fitted object", {
     survival_formula = Surv(time, status) ~ w1,
     longitudinal_data = e2e_sim$longitudinal_data,
     survival_data = e2e_sim$survival_data,
-    state = e2e_sim$state,
     control = list(maxit = 30, tol = 1e-3)
   )
 

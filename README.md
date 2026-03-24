@@ -97,7 +97,7 @@ fit <- JointODE(
   control = list(parallel = TRUE)
 )
 cat(sprintf("Elapsed: %.1f s\n", (proc.time() - t0)["elapsed"]))
-#> Elapsed: 279.8 s
+#> Elapsed: 72.9 s
 ```
 
 ``` r
@@ -123,27 +123,27 @@ summary(fit)
 #> Coefficients:
 #> Longitudinal Process: Second-Order ODE Model
 #>             Estimate Std. Error z value Pr(>|z|)
-#> biomarker    -1.0807     0.0044 -246.60   <2e-16 ***
-#> velocity     -0.8312     0.0044 -188.22   <2e-16 ***
+#> biomarker    -1.0807     0.0044 -246.35   <2e-16 ***
+#> velocity     -0.8312     0.0044 -188.00   <2e-16 ***
 #> (Intercept)  -0.0005     0.0009   -0.57    0.568
-#> x1            0.5406     0.0025  216.64   <2e-16 ***
-#> x2           -0.4867     0.0023 -215.40   <2e-16 ***
+#> x1            0.5406     0.0025  216.44   <2e-16 ***
+#> x2           -0.4867     0.0023 -215.20   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> ODE System Characteristics:
 #>                    Estimate Std. Error z value Pr(>|z|)
-#> T (period)           6.0442     0.0123   493.2   <2e-16 ***
-#> xi (damping ratio)   0.3998     0.0018   225.4   <2e-16 ***
+#> T (period)           6.0442     0.0123   492.7   <2e-16 ***
+#> xi (damping ratio)   0.3998     0.0018   225.2   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Survival Process: Proportional Hazards Model
 #>         Estimate Std. Error z value Pr(>|z|)
-#> alpha_1   0.7243     0.1870   3.874 0.000107 ***
-#> alpha_2   1.8728     0.6761   2.770 0.005606 **
-#> w1        0.6862     0.1237   5.546 2.92e-08 ***
-#> w2       -1.3423     0.2866  -4.684 2.81e-06 ***
+#> alpha_1   0.7243     0.1917   3.778 0.000158 ***
+#> alpha_2   1.8728        NaN     NaN      NaN
+#> w1        0.6862     0.1263   5.432 5.59e-08 ***
+#> w2       -1.3423     0.2892  -4.642 3.46e-06 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
@@ -159,7 +159,7 @@ summary(fit)
 #>
 #> Model Diagnostics:
 #> C-index (Concordance): 0.668
-#> Convergence: EM algorithm converged after 10 iterations
+#> Convergence: Converged after 10 iterations
 
 # Plot results
 plot(fit)

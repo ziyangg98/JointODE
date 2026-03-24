@@ -83,3 +83,67 @@ JointODE.control <- function(
 
   control
 }
+
+#' Control Parameters for MarginalODE
+#'
+#' @description
+#' Construct control parameters for the MarginalODE optimization.
+#'
+#' @param maxit Maximum number of alternating optimization iterations
+#'   (default: 200)
+#' @param tol Relative tolerance for convergence (default: 1e-4)
+#' @param verbose Logical or numeric; FALSE/0 for silent, TRUE/1 for basic
+#'   progress, 2 for detailed output (default: FALSE)
+#' @param parallel Logical; whether to use parallel computation (default: FALSE)
+#' @param n_cores Integer; number of cores (0 = auto) (default: 0)
+#' @param .list Optional list of control parameters to process
+#' @param ... Additional control parameters
+#'
+#' @return A list of control parameters with all defaults filled in
+#'
+#' @concept model-fitting
+#' @keywords internal
+#' @export
+#'
+#' @examples
+#' control <- MarginalODE.control()
+#' control <- MarginalODE.control(maxit = 50, tol = 1e-3)
+#'
+#' @seealso \code{\link{MarginalODE}}
+# nolint next: object_name_linter
+MarginalODE.control <- function(
+  maxit = 200,
+  tol = 1e-4,
+  verbose = FALSE,
+  parallel = FALSE,
+  n_cores = 0,
+  .list = NULL,
+  ...
+) {
+  defaults <- list(
+    maxit = maxit, tol = tol, verbose = verbose,
+    parallel = parallel, n_cores = n_cores
+  )
+
+  if (!is.null(.list)) {
+    if (!is.list(.list)) stop(".list must be a list or NULL")
+    control <- defaults
+    for (name in names(.list)) control[[name]] <- .list[[name]]
+  } else {
+    control <- defaults
+  }
+
+  dots <- list(...)
+  for (name in names(dots)) control[[name]] <- dots[[name]]
+
+  control$verbose <- as.numeric(control$verbose)
+
+  if (control$maxit <= 0) stop("maxit must be positive")
+  if (control$tol <= 0) stop("tol must be positive")
+  if (!is.logical(control$parallel)) stop("parallel must be TRUE or FALSE")
+  if (!is.numeric(control$n_cores) || control$n_cores < 0) {
+    stop("n_cores must be a non-negative integer")
+  }
+
+  control
+}

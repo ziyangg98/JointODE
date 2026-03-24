@@ -10,12 +10,13 @@ test_that(".count_params counts correctly", {
       baseline = c(0.1, 0.2, 0.3),
       hazard = c(0.5, -0.3),
       longitudinal = c(-0.01, 0.02, 0.1),
+      initial_state = c(0, 0),
       measurement_error_sd = 0.5,
       random_effect_sigma = diag(2)
     )
   )
-  # 3 + 2 + 3 + 1 (sigma_e) + 2*(2+1)/2 (lower tri of 2x2) = 12
-  expect_equal(.count_params(params), 12)
+  # 3 + 2 + 3 + 2 + 1 + 3 = 14
+  expect_equal(.count_params(params), 14)
 })
 
 test_that(".count_params handles different dimensions", {
@@ -24,12 +25,13 @@ test_that(".count_params handles different dimensions", {
       baseline = numeric(5),
       hazard = numeric(3),
       longitudinal = numeric(4),
+      initial_state = c(0, 0),
       measurement_error_sd = 0.1,
       random_effect_sigma = diag(3)
     )
   )
-  # 5 + 3 + 4 + 1 + 3*(3+1)/2 = 19
-  expect_equal(.count_params(params), 19)
+  # 5 + 3 + 4 + 2 + 1 + 6 = 21
+  expect_equal(.count_params(params), 21)
 })
 
 # --- .coef_table ---
@@ -69,16 +71,23 @@ test_that(".coef_to_vector roundtrips with .vector_to_coef", {
   expect_true(is.numeric(theta))
   n_expected <- length(params$coefficients$baseline) +
     length(params$coefficients$hazard) +
-    length(params$coefficients$longitudinal)
+    length(params$coefficients$longitudinal) +
+    length(params$coefficients$initial_state)
   expect_equal(length(theta), n_expected)
 
   params_recovered <- .vector_to_coef(params, theta)
-  expect_equal(unname(params_recovered$coefficients$baseline),
-               unname(params$coefficients$baseline))
-  expect_equal(unname(params_recovered$coefficients$hazard),
-               unname(params$coefficients$hazard))
-  expect_equal(unname(params_recovered$coefficients$longitudinal),
-               unname(params$coefficients$longitudinal))
+  expect_equal(
+    unname(params_recovered$coefficients$baseline),
+    unname(params$coefficients$baseline)
+  )
+  expect_equal(
+    unname(params_recovered$coefficients$hazard),
+    unname(params$coefficients$hazard)
+  )
+  expect_equal(
+    unname(params_recovered$coefficients$longitudinal),
+    unname(params$coefficients$longitudinal)
+  )
 })
 
 test_that(".coef_to_vector preserves parameter ordering", {
@@ -88,12 +97,21 @@ test_that(".coef_to_vector preserves parameter ordering", {
   n_b <- length(params$coefficients$baseline)
   n_h <- length(params$coefficients$hazard)
   n_l <- length(params$coefficients$longitudinal)
+  n_s <- length(params$coefficients$initial_state)
 
   expect_equal(unname(theta[1:n_b]), unname(params$coefficients$baseline))
-  expect_equal(unname(theta[(n_b + 1):(n_b + n_h)]),
-               unname(params$coefficients$hazard))
-  expect_equal(unname(theta[(n_b + n_h + 1):(n_b + n_h + n_l)]),
-               unname(params$coefficients$longitudinal))
+  expect_equal(
+    unname(theta[(n_b + 1):(n_b + n_h)]),
+    unname(params$coefficients$hazard)
+  )
+  expect_equal(
+    unname(theta[(n_b + n_h + 1):(n_b + n_h + n_l)]),
+    unname(params$coefficients$longitudinal)
+  )
+  expect_equal(
+    unname(theta[(n_b + n_h + n_l + 1):(n_b + n_h + n_l + n_s)]),
+    unname(params$coefficients$initial_state)
+  )
 })
 
 # --- .compute_dimensions ---
@@ -110,8 +128,8 @@ test_that(".compute_dimensions returns correct values", {
   expect_true("n_random_effects" %in% names(dims))
   expect_true("n_survival_covariates" %in% names(dims))
   expect_true("n_spline_basis" %in% names(dims))
-  expect_equal(dims$n_survival_covariates, 2) # w1, w2
-  expect_equal(dims$n_spline_basis, 3) # degree + n_knots + 1
+  expect_equal(dims$n_survival_covariates, 2)
+  expect_equal(dims$n_spline_basis, 3)
 })
 
 test_that(".compute_dimensions handles no covariates", {
@@ -121,7 +139,7 @@ test_that(".compute_dimensions handles no covariates", {
 
   dims <- .compute_dimensions(parsed_long, parsed_surv, spline_config)
   expect_equal(dims$n_survival_covariates, 0)
-  expect_equal(dims$n_spline_basis, 5) # 2 + 2 + 1
+  expect_equal(dims$n_spline_basis, 5)
 })
 
 test_that(".compute_dimensions counts biomarker/velocity random effects", {
@@ -132,7 +150,7 @@ test_that(".compute_dimensions counts biomarker/velocity random effects", {
   spline_config <- list(degree = 2, n_knots = 0)
 
   dims <- .compute_dimensions(parsed_long, parsed_surv, spline_config)
-  expect_equal(dims$n_random_effects, 2) # biomarker + velocity
+  expect_equal(dims$n_random_effects, 4) # 2 state RE + biomarker + velocity
   expect_equal(dims$n_longitudinal_coef, 3) # intercept + biomarker + velocity
 })
 
@@ -237,8 +255,10 @@ test_that(".build_formula builds random formula", {
 
 test_that(".get_spline_config with quantile placement", {
   x <- seq(0, 10, length.out = 100)
-  config <- .get_spline_config(x, degree = 3, n_knots = 5,
-                                knot_placement = "quantile")
+  config <- .get_spline_config(x,
+    degree = 3, n_knots = 5,
+    knot_placement = "quantile"
+  )
   expect_equal(length(config$knots), 5)
   expect_equal(config$degree, 3)
   expect_equal(config$df, 5 + 3 + 1)
@@ -246,15 +266,19 @@ test_that(".get_spline_config with quantile placement", {
 
 test_that(".get_spline_config with equal placement", {
   x <- seq(0, 10, length.out = 100)
-  config <- .get_spline_config(x, degree = 2, n_knots = 3,
-                                knot_placement = "equal")
+  config <- .get_spline_config(x,
+    degree = 2, n_knots = 3,
+    knot_placement = "equal"
+  )
   expect_equal(length(config$knots), 3)
 })
 
 test_that(".get_spline_config with custom boundary_knots", {
   x <- seq(1, 5, length.out = 50)
-  config <- .get_spline_config(x, degree = 2, n_knots = 2,
-                                boundary_knots = c(0, 10))
+  config <- .get_spline_config(x,
+    degree = 2, n_knots = 2,
+    boundary_knots = c(0, 10)
+  )
   expect_equal(config$boundary_knots, c(0, 10))
 })
 
@@ -285,8 +309,9 @@ test_that(".compute_metrics computes correctly at iter > 1", {
       baseline = c(0.1, 0.2),
       hazard = c(0.5),
       longitudinal = c(-0.01),
+      initial_state = c(0, 0),
       measurement_error_sd = 0.5,
-      random_effect_sigma = diag(2)
+      random_effect_sigma = diag(4)
     ))
   )
   prev <- list(
@@ -295,13 +320,14 @@ test_that(".compute_metrics computes correctly at iter > 1", {
       baseline = c(0.1, 0.2),
       hazard = c(0.5),
       longitudinal = c(-0.01),
+      initial_state = c(0, 0),
       measurement_error_sd = 0.5,
-      random_effect_sigma = diag(2)
+      random_effect_sigma = diag(4)
     ))
   )
 
   m <- .compute_metrics(curr, prev, iter = 2)
-  expect_equal(m$delta_l, 10) # -100 - (-110) = 10
+  expect_equal(m$delta_l, 10)
   expect_true(m$rel_l > 0)
 })
 

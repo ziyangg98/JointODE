@@ -57,6 +57,6 @@ for (bm in names(results)) {
   f <- results[[bm]]
   cat(sprintf(
     "%s: %d iter, LogLik=%.2f, C=%.3f\n",
-    bm, f$convergence$em_iterations, f$logLik, f$cindex
+    bm, f$convergence$iterations, f$logLik, f$cindex
   ))
 }

@@ -2,28 +2,19 @@
 % Please edit documentation in R/MarginalODE.R
 \name{summary.MarginalODE}
 \alias{summary.MarginalODE}
-\title{Summary Method for MarginalODE Objects}
+\title{Summary of MarginalODE Model}
 \usage{
 \method{summary}{MarginalODE}(object, ...)
 }
 \arguments{
-\item{object}{An object of class \code{MarginalODE}}
+\item{object}{A MarginalODE object}
 
-\item{...}{Additional arguments (currently unused)}
+\item{...}{Additional arguments}
 }
 \value{
-A list of class \code{summary.MarginalODE} containing:
-\item{call}{The model call}
-\item{coefficients}{Coefficient table for longitudinal ODE parameters}
-\item{sigma}{Named vector with measurement error SD}
-\item{nobs}{Number of subjects}
-\item{n_observations}{Total number of observations}
-\item{AIC}{Akaike Information Criterion}
-\item{BIC}{Bayesian Information Criterion}
-\item{logLik}{Log-likelihood}
-\item{convergence}{Convergence information}
+A summary.MarginalODE object
 }
 \description{
-Summary Method for MarginalODE Objects
+Summary of MarginalODE Model
 }
 \concept{model-summary}

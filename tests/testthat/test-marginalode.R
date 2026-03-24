@@ -2,8 +2,6 @@
 # MarginalODE Unit Tests
 # ==============================================================================
 
-skip_on_cran()
-
 # Generate small test data for MarginalODE
 marginal_sim <- simulate(
   n_subjects = 20,
@@ -91,7 +89,7 @@ test_that("print.summary.MarginalODE works", {
   s <- summary(marginal_fit)
   out <- capture.output(result <- print(s))
   expect_identical(result, s)
-  expect_true(any(grepl("Second-Order ODE", out)))
+  expect_true(any(grepl("Coefficients", out)))
 })
 
 test_that("MarginalODE parameters are named", {
@@ -110,8 +108,10 @@ test_that("MarginalODE vcov is accessible", {
 test_that("predict.MarginalODE returns data.frame", {
   pred <- predict(marginal_fit)
   expect_s3_class(pred, "data.frame")
-  expect_true(all(c("id", "time", "biomarker", "velocity", "acceleration") %in%
-    names(pred)))
+  expect_true(
+    all(c("id", "time", "biomarker", "velocity", "acceleration") %in%
+      names(pred))
+  )
   expect_true(nrow(pred) > 0)
 })
 
@@ -122,20 +122,35 @@ test_that("predict.MarginalODE errors on newdata", {
   )
 })
 
+test_that("coef.MarginalODE works", {
+  expect_equal(coef(marginal_fit), marginal_fit$parameters)
+})
+
+test_that("vcov.MarginalODE works", {
+  expect_equal(vcov(marginal_fit), marginal_fit$vcov)
+})
+
+test_that("logLik.MarginalODE works", {
+  ll <- logLik(marginal_fit)
+  expect_s3_class(ll, "logLik")
+  expect_equal(as.numeric(ll), marginal_fit$logLik)
+  expect_true(attr(ll, "df") > 0)
+  expect_true(attr(ll, "nobs") > 0)
+})
+
 # --- C++ functions ---
 
-test_that(".compute_marginal_objective_cppad gradient is correct", {
-  data_list <- .process_long(
+test_that(".compute_marginal_objective gradient is correct", {
+  data_list <- JointODE:::.process_marginal(
     observed ~ x1,
     marginal_sim$longitudinal_data,
     "time", "id",
-    marginal_sim$state,
-    list()
+    marginal_sim$state
   )
 
   theta <- c(-0.5, -0.3, 0.2)
 
-  result <- .compute_marginal_objective_cppad(
+  result <- .compute_marginal_objective(
     theta, data_list,
     gradient = TRUE, hessian = FALSE
   )
@@ -143,7 +158,7 @@ test_that(".compute_marginal_objective_cppad gradient is correct", {
 
   numeric_grad <- numDeriv::grad(
     function(x) {
-      as.numeric(.compute_marginal_objective_cppad(
+      as.numeric(.compute_marginal_objective(
         x, data_list,
         gradient = FALSE, hessian = FALSE
       ))
@@ -154,35 +169,36 @@ test_that(".compute_marginal_objective_cppad gradient is correct", {
   expect_equal(analytic_grad, numeric_grad, tolerance = 1e-4)
 })
 
-test_that(".solve_marginal_ode_cppad returns correct dimensions", {
-  theta <- c(-0.5, -0.3, 0.2)
-  initial <- c(1.0, 0.0)
-  times <- seq(0, 5, by = 0.5)
-  covariates <- matrix(rnorm(length(times)), ncol = 1)
-
-  sol <- .solve_marginal_ode_cppad(theta, initial, times, covariates)
-
-  expect_type(sol, "list")
-  expect_named(sol, c("biomarker", "velocity", "acceleration"))
-  expect_equal(length(sol$biomarker), length(times))
-  expect_equal(length(sol$velocity), length(times))
-  expect_equal(length(sol$acceleration), length(times))
-  expect_true(all(is.finite(sol$biomarker)))
-})
-
-test_that(".compute_marginal_state_loglik gradient is correct", {
-  data_list <- .process_long(
+test_that(".solve_batch_marginal returns correct structure", {
+  data_list <- JointODE:::.process_marginal(
     observed ~ x1,
     marginal_sim$longitudinal_data,
     "time", "id",
-    marginal_sim$state,
-    list()
+    marginal_sim$state
+  )
+  theta <- c(-0.5, -0.3, 0.2)
+
+  sols <- .solve_batch_marginal(data_list, theta)
+
+  expect_type(sols, "list")
+  expect_equal(length(sols), length(data_list))
+  sol <- sols[[1]]
+  expect_named(sol, c("times", "biomarker", "velocity", "acceleration"))
+  expect_true(all(is.finite(sol$biomarker)))
+})
+
+test_that(".compute_marginal_state gradient is correct", {
+  data_list <- JointODE:::.process_marginal(
+    observed ~ x1,
+    marginal_sim$longitudinal_data,
+    "time", "id",
+    marginal_sim$state
   )
 
   theta <- c(-0.5, -0.3, 0.2)
   initial_state <- c(0.5, 0.1)
 
-  result <- .compute_marginal_state_loglik(
+  result <- .compute_marginal_state(
     initial_state, data_list[[1]], theta,
     gradient = TRUE, hessian = FALSE
   )
@@ -190,7 +206,7 @@ test_that(".compute_marginal_state_loglik gradient is correct", {
 
   numeric_grad <- numDeriv::grad(
     function(x) {
-      as.numeric(.compute_marginal_state_loglik(
+      as.numeric(.compute_marginal_state(
         x, data_list[[1]], theta,
         gradient = FALSE, hessian = FALSE
       ))

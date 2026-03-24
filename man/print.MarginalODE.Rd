@@ -2,12 +2,12 @@
 % Please edit documentation in R/MarginalODE.R
 \name{print.MarginalODE}
 \alias{print.MarginalODE}
-\title{Print Method for MarginalODE Objects}
+\title{Print MarginalODE Model}
 \usage{
 \method{print}{MarginalODE}(x, digits = max(3L, getOption("digits") - 3L), ...)
 }
 \arguments{
-\item{x}{An object of class \code{MarginalODE}}
+\item{x}{A MarginalODE object}
 
 \item{digits}{Number of digits for numeric output}
 
@@ -17,6 +17,6 @@
 Invisibly returns the object
 }
 \description{
-Print Method for MarginalODE Objects
+Print MarginalODE Model
 }
 \concept{model-display}

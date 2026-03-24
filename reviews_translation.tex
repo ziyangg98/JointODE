@@ -1,0 +1,549 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{xeCJK}
+\setCJKmainfont{STSong}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{titlesec}
+
+\titleformat{\section}{\Large\bfseries\color{blue!70!black}}{}{0em}{}
+\titleformat{\subsection}{\large\bfseries\color{blue!50!black}}{}{0em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{}{0em}{}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\title{\textbf{ICML 2026 Submission 17342 --- Reviews with Chinese Translation}\\[0.5em]
+\large 审稿意见中英文对照}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{center}
+\begin{tabular}{lccccccc}
+\toprule
+\textbf{Reviewer} & \textbf{Overall} & \textbf{Confidence} & \textbf{Soundness} & \textbf{Presentation} & \textbf{Significance} & \textbf{Originality} \\
+\midrule
+wqwf & 3 (Weak Reject) & 4 & 2 & 3 & 3 & 3 \\
+ooNF & 4 (Weak Accept) & 3 & 3 & 3 & 3 & 2 \\
+2G2B & 5 (Accept) & 3 & 3 & 3 & 3 & 3 \\
+dFi9 & 5 (Accept) & 4 & 4 & 3 & 3 & 4 \\
+D2Tu & 3 (Weak Reject) & 3 & 2 & 3 & 3 & 3 \\
+\midrule
+\textbf{Average} & \textbf{4.0} & \textbf{3.4} & \textbf{2.8} & \textbf{3.0} & \textbf{3.0} & \textbf{3.0} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\vspace{1em}
+
+%% ============================================================
+%% REVIEWER wqwf
+%% ============================================================
+\section{Reviewer wqwf --- Overall: 3 (Weak Reject), Confidence: 4}
+
+\subsection{Summary / 摘要}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+\endfirsthead
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+\endhead
+This paper introduces a novel method called COLSA (Cox Online Learning with Sieve Approximation). It addresses the challenge of performing survival analysis in a streaming or federated setting where data arrives in batches and cannot be stored in full. The paper presents a framework for online estimation and inference in the Cox proportional hazards model without storing historical data or constructing global risk sets. This paper makes a contribution to the field of online survival analysis.
+&
+本文提出了一种名为COLSA（Cox Online Learning with Sieve Approximation）的新方法。该方法解决了在流数据或联邦学习场景中进行生存分析的挑战——数据以批次到达且无法完整存储。本文提出了一个在Cox比例风险模型下进行在线估计和推断的框架，无需存储历史数据或构建全局风险集。本文对在线生存分析领域做出了贡献。 \\
+\hline
+\end{longtable}
+
+\subsection{Strengths And Weaknesses / 优点与缺点}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+\endfirsthead
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+\endhead
+Strengths: The paper addresses a well-known limitation of the Cox model in distributed/streaming settings: the non-decomposable partial likelihood. The the submission clearly written and well structured.
+&
+优点：本文解决了Cox模型在分布式/流数据场景中的一个众所周知的局限性：不可分解的偏似然。投稿写作清晰，结构良好。 \\
+\hline
+\end{longtable}
+
+\noindent Soundness: 2: fair \quad|\quad Presentation: 3: good \quad|\quad Significance: 3: good \quad|\quad Originality: 3: good
+
+\noindent Soundness: 2: 一般 \quad|\quad Presentation: 3: 好 \quad|\quad Significance: 3: 好 \quad|\quad Originality: 3: 好
+
+\subsection{Key Questions For Authors / 作者需回答的关键问题}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+\endfirsthead
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+\endhead
+Here are suggestions the author(s) should consider:
+&
+以下是作者应考虑的建议： \\
+\hline
+\textbf{Computational Trade-offs Compared to Simpler/Classical Methods}
+
+Since this paper uses a second-order update that aggregates gradients and Hessians to ensure statistical efficiency, it inherently requires more time and memory. The authors should provide a more detailed comparison with the classical Meta method, as from Figure 1 and Table 2, the performance of these two methods appears similar. However, the computational costs differ substantially: for K=200, Meta requires only 1.585 seconds, whereas COLSA requires 28.36 seconds. A discussion on when the additional computational expense of COLSA is justified---particularly in terms of statistical efficiency gains or scenarios where Meta may fail---would help readers understand the practical trade-offs.
+&
+\textbf{与更简单/经典方法的计算权衡}
+
+由于本文使用二阶更新来聚合梯度和Hessian矩阵以确保统计效率，因此本质上需要更多时间和内存。作者应提供与经典Meta方法更详细的比较，因为从Figure 1和Table 2来看，这两种方法的表现相似。然而计算成本差异显著：当K=200时，Meta仅需1.585秒，而COLSA需要28.36秒。讨论COLSA额外计算开销在何时是合理的——特别是在统计效率增益方面或Meta可能失效的场景——将帮助读者理解实际权衡。 \\
+\hline
+\textbf{Handling High-Dimensional Covariates}
+
+The current framework assumes a fixed number of covariates d, but in high-dimensional streaming settings, the authors should discuss how COLSA could be extended to handle high-dimensional covariates.
+&
+\textbf{高维协变量的处理}
+
+当前框架假设协变量维度d固定，但在高维流数据场景中，作者应讨论COLSA如何扩展以处理高维协变量。 \\
+\hline
+\textbf{Implementation Complexity}
+
+The algorithm involves multiple projections, degree elevation, and shadow Hessians, which may be challenging to implement and tune. Providing a simplified pseudocode, a reference implementation, or practical guidelines for practitioners would enhance the accessibility and reproducibility of the method.
+&
+\textbf{实现复杂度}
+
+该算法涉及多次投影、阶数提升和shadow Hessian，这些可能难以实现和调优。提供简化的伪代码、参考实现或面向实践者的指南将增强该方法的可及性和可复现性。 \\
+\hline
+\textbf{Hyperparameter Sensitivity}
+
+The method relies on several hyperparameters (C,$\nu$,$\rho$) with specific recommended values. While AIC-based selection for C is data-driven, the sensitivity of COLSA to these hyperparameter choices in practice is not fully explored. The authors should include a sensitivity analysis or robustness study across different hyperparameter settings to demonstrate the stability of the method and guide users in real-world applications.
+&
+\textbf{超参数敏感性}
+
+该方法依赖多个超参数（C, $\nu$, $\rho$），并给出了特定推荐值。虽然C的选择基于AIC是数据驱动的，但COLSA在实践中对这些超参数选择的敏感性并未被充分探索。作者应包含敏感性分析或鲁棒性研究，涵盖不同的超参数设置，以展示方法的稳定性并指导用户在真实应用中的使用。 \\
+\hline
+\textbf{Privacy Guarantees}
+
+While the method transmits only summary statistics (gradients and Hessians) rather than raw data, it does not provide formal privacy guarantees. The authors should mention this limitation and propose future extensions to incorporate formal privacy mechanisms, such as differential privacy.
+&
+\textbf{隐私保证}
+
+虽然该方法仅传输汇总统计量（梯度和Hessian）而非原始数据，但并未提供形式化的隐私保证。作者应提及这一局限性，并提出未来扩展以纳入形式化隐私机制（如差分隐私）。 \\
+\hline
+\end{longtable}
+
+\subsection{Limitations / 局限性}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+yes & 是（已提及） \\
+\hline
+\end{longtable}
+
+\subsection{Overall Recommendation / 总体推荐}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+3: Weak reject: A paper with clear merits, but also some weaknesses, which overall outweigh the merits. Papers in this category require revisions before they can be meaningfully built upon by others. Please use sparingly.
+&
+3: Weak reject：论文有明确优点，但也有一些缺点，总体上缺点大于优点。此类论文需要修改后才能被他人有意义地引用。请谨慎使用此评分。 \\
+\hline
+\end{longtable}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+Confidence: 4: You are confident in your assessment, but not absolutely certain. It is unlikely, but not impossible, that you did not understand some parts of the submission or that you are unfamiliar with some pieces of related work.
+&
+置信度 4：您对自己的评估有信心，但不是绝对确定。您不太可能但也并非不可能未理解投稿的某些部分或不熟悉某些相关工作。 \\
+\hline
+\end{longtable}
+
+
+%% ============================================================
+%% REVIEWER ooNF
+%% ============================================================
+\newpage
+\section{Reviewer ooNF --- Overall: 4 (Weak Accept), Confidence: 3}
+
+\subsection{Summary / 摘要}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+This paper studies online learning and inference for the Cox proportional hazards model under streaming setting. As the standard partial likelihood is problematic for online updating, the paper proposes COLSA, which replaces the partial likelihood with a full-likelihood formulation using a sieve approximation of the log-baseline hazard via Bernstein polynomials, and then performs renewable second-order updates. A key technical component is a dynamic basis-expansion mechanism that allows the sieve dimension to grow with sample size. The paper establishes consistency and asymptotic normality results. Empirically, the method has closed efficiency to oracle and outperforms other online benchmarks.
+&
+本文研究了流数据场景下Cox比例风险模型的在线学习和推断。由于标准偏似然在在线更新中存在问题，本文提出了COLSA，它用基于Bernstein多项式的sieve近似对log-baseline hazard的全似然公式替代偏似然，然后进行可更新的二阶更新。一个关键技术组件是动态基扩展机制，允许sieve维度随样本量增长。本文建立了一致性和渐近正态性结果。实验表明，该方法与Oracle效率接近，并优于其他在线基准方法。 \\
+\hline
+\end{longtable}
+
+\subsection{Strengths And Weaknesses / 优点与缺点}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+Strengths: This paper addresses an important challenge in survival analysis under streaming settings, namely the non-decomposability of the Cox partial likelihood. The reformulation based on a sieve full likelihood is interesting and well motivated. The theoretical results are strong, and the empirical findings are also encouraging.
+&
+优点：本文解决了流数据场景下生存分析中的一个重要挑战，即Cox偏似然的不可分解性。基于sieve全似然的重新表述有趣且动机充分。理论结果很强，实验结果也令人鼓舞。 \\
+\hline
+Weakness 1: Regarding technical novelty, the proposed method appears to build substantially on [1] and [2]. It would strengthen the paper if the authors could more clearly articulate the precise methodological advances beyond these prior works. In particular, what are the key differences between the proposed two-stage update mechanism and the approach in [1]? What specific challenges prevent the method in [1] from being directly applied to the present setting? A clearer discussion of these points would make the contribution more convincing.
+&
+缺点1：关于技术新颖性，所提方法似乎在很大程度上建立在[1]和[2]的基础上。如果作者能更清楚地阐明超越这些先前工作的确切方法论进步，将增强论文的说服力。特别是，所提出的两阶段更新机制与[1]中方法的关键区别是什么？具体是什么挑战阻止了[1]中的方法直接应用于当前场景？对这些问题的更清晰讨论将使贡献更具说服力。 \\
+\hline
+Weakness 2: The empirical evaluation feels somewhat limited for an ICML submission. In particular, the paper includes only one real-data application. If time and space permit, it would be valuable to include additional real-world datasets to further demonstrate the practical effectiveness and robustness of the proposed method.
+&
+缺点2：对于ICML投稿而言，实验评估略显不足。特别是，本文仅包含一个真实数据应用。如果时间和篇幅允许，纳入更多真实数据集以进一步展示所提方法的实际有效性和鲁棒性将是有价值的。 \\
+\hline
+{[1] Luo, L., \& Song, P. X. K. (2020). Renewable estimation and incremental inference in generalized linear models with streaming data sets. \textit{Journal of the Royal Statistical Society Series B: Statistical Methodology}, 82(1), 69--97.}
+
+{[2] Quan, M., \& Lin, Z. (2024). Optimal one-pass nonparametric estimation under memory constraint. \textit{Journal of the American Statistical Association}, 119(545), 285--296.}
+&
+（参考文献同左） \\
+\hline
+\end{longtable}
+
+\noindent Soundness: 3: good \quad|\quad Presentation: 3: good \quad|\quad Significance: 3: good \quad|\quad Originality: 2: fair
+
+\noindent Soundness: 3: 好 \quad|\quad Presentation: 3: 好 \quad|\quad Significance: 3: 好 \quad|\quad Originality: 2: 一般
+
+\subsection{Key Questions For Authors / 作者需回答的关键问题}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+Question 1: COLSA's storage is $O(C^2)$, which may become substantial as sieve size grows. The abstract's ``only requiring constant memory'' wording seems too strong, since the retained state grows with the pre-estimation degree $C$. Could the authors clarify this claim and better explain the practical memory requirements of the method?
+&
+问题1：COLSA的存储为$O(C^2)$，随sieve规模增长可能变得相当大。摘要中"仅需常数内存"的措辞似乎过强，因为保留的状态随预估计阶数$C$增长。作者能否澄清这一说法并更好地解释该方法的实际内存需求？ \\
+\hline
+Question 2: The paper highlights potential privacy benefits in distributed or federated settings. Could the authors elaborate on how the proposed approach would be deployed in such settings in practice? A more concrete discussion of the workflow and privacy-related advantages would be very interesting.
+&
+问题2：本文强调了在分布式或联邦场景中的潜在隐私优势。作者能否详细说明所提方法在实践中如何在这些场景中部署？对工作流程和隐私相关优势的更具体讨论将非常有趣。 \\
+\hline
+Question 3: How sensitive is the empirical performance of the method to the choice of hyperparameters? Some discussion or ablation on this point would help assess the robustness of the approach.
+&
+问题3：该方法的实验表现对超参数选择的敏感度如何？对此的一些讨论或消融实验将有助于评估方法的鲁棒性。 \\
+\hline
+Question 4: Could the authors provide more intuition for Condition 5 and explain what role it plays in the theoretical analysis? A brief interpretation would make the assumptions easier to understand.
+&
+问题4：作者能否对Condition 5提供更多直觉解释，并说明它在理论分析中扮演什么角色？简要的解读将使假设更容易理解。 \\
+\hline
+\end{longtable}
+
+\subsection{Overall Recommendation / 总体推荐}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+4: Weak accept: Technically solid paper that advances at least one sub-area of AI, with a contribution that others are likely to build on, but with some weaknesses that limit its impact (e.g., limited evaluation). Please use sparingly.
+&
+4: Weak accept：技术扎实的论文，推进了至少一个AI子领域，贡献可被后续工作引用，但存在一些限制其影响力的弱点（如评估有限）。请谨慎使用此评分。 \\
+\hline
+Confidence: 3: You are fairly confident in your assessment. It is possible that you did not understand some parts of the submission or that you are unfamiliar with some pieces of related work. Math/other details were not carefully checked.
+&
+置信度3：您对自己的评估较有信心。您有可能未理解投稿的某些部分或不熟悉某些相关工作。数学/其他细节未仔细检查。 \\
+\hline
+\end{longtable}
+
+
+%% ============================================================
+%% REVIEWER 2G2B
+%% ============================================================
+\newpage
+\section{Reviewer 2G2B --- Overall: 5 (Accept), Confidence: 3}
+
+\subsection{Summary / 摘要}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+This paper focuses on an online learning framework for survival analysis, and propose a new method for estimating the parameters of the Cox proportional hazards model. Their approach uses Bernstein basis polynomials to approximate the log-baseline hazard. They show that under certain regularity conditions their estimator is consistent and asymptotically normal. They then assess the performance of their model---against other proposed models---via simulations. They show that their model outperforms existing models.
+&
+本文聚焦于生存分析的在线学习框架，提出了一种估计Cox比例风险模型参数的新方法。他们的方法使用Bernstein基多项式来近似log-baseline hazard。他们证明了在特定正则条件下，其估计量是一致的且渐近正态的。然后通过模拟评估了模型性能——与其他模型进行对比。结果表明其模型优于现有模型。 \\
+\hline
+\end{longtable}
+
+\subsection{Strengths And Weaknesses / 优点与缺点}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+The paper does a good job at explaining the limitations of existing methods and how their method addresses those limitations. Nonetheless, their discussion about the computational and memory tradeoffs with existing methods is only found in the Experiments section. It would be nice to see this discussion earlier in the paper. I would also suggest that they have some discussion on why the incremental score equation is the right mathematical object of interest.
+&
+本文很好地解释了现有方法的局限性以及他们的方法如何解决这些局限性。然而，与现有方法在计算和内存方面的权衡讨论仅出现在实验部分。希望能在论文更早的位置看到这一讨论。我还建议他们讨论一下为什么增量score equation是正确的数学研究对象。 \\
+\hline
+I appreciate the author's theoretical results and their experiments. Nonetheless, I would've liked to see a further discussion on the regularity conditions and what they would imply for practitioners. I know there is a space constraint, but maybe the authors could move the formal presentation of the algorithm to the appendix, I think the authors do a good enough job at describing the algorithm throughout the paper such that the formally stated algorithm is not fully necessary.
+&
+我赞赏作者的理论结果和实验。然而，我希望看到对正则条件及其对实践者意味着什么的进一步讨论。我知道有篇幅限制，但也许作者可以将算法的形式化表述移至附录——我认为作者在全文中对算法的描述已经足够好，使得形式化的算法陈述并非完全必要。 \\
+\hline
+Some minor comments:
+
+Equation (2), consider moving $\tau$ to before $\beta$. Since $\tau$ is function of $\beta$ this ordering confuses the reader (notice that I'm not including the tilde in the notation from Eq. 2).
+&
+一些小的意见：
+
+公式(2)，考虑将$\tau$移到$\beta$之前。由于$\tau$是$\beta$的函数，这种顺序会让读者困惑（注意我没有包含公式2中的波浪号标记）。 \\
+\hline
+\end{longtable}
+
+\noindent Soundness: 3: good \quad|\quad Presentation: 3: good \quad|\quad Significance: 3: good \quad|\quad Originality: 3: good
+
+\noindent Soundness: 3: 好 \quad|\quad Presentation: 3: 好 \quad|\quad Significance: 3: 好 \quad|\quad Originality: 3: 好
+
+\subsection{Key Questions For Authors / 作者需回答的关键问题}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+(1) Why is the incremental score equation the thing we want to be after? (2) You should consider defining the truncation time before you reference it in section 3.2. (3) Could you provide more simulations to assess how your method compares against existing methods? A semi-synthetic experiment would further improve this paper.
+&
+(1) 为什么增量score equation是我们要追求的目标？(2) 你们应该在Section 3.2中引用截断时间之前先定义它。(3) 你们能否提供更多模拟实验来评估你们的方法与现有方法的对比？一个半合成实验将进一步改善本文。 \\
+\hline
+\end{longtable}
+
+\subsection{Overall Recommendation / 总体推荐}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+5: Accept: Technically solid paper, with high impact on at least one sub-area of AI or moderate-to-high impact on more than one area of AI, with good-to-excellent evaluation, resources, reproducibility, and no unaddressed ethical considerations.
+&
+5: Accept：技术扎实的论文，对至少一个AI子领域有高影响力或对多个AI领域有中高影响力，具有良好到优秀的评估、资源、可复现性，且无未解决的伦理问题。 \\
+\hline
+Confidence: 3: You are fairly confident in your assessment. It is possible that you did not understand some parts of the submission or that you are unfamiliar with some pieces of related work. Math/other details were not carefully checked.
+&
+置信度3：您对自己的评估较有信心。您有可能未理解投稿的某些部分或不熟悉某些相关工作。数学/其他细节未仔细检查。 \\
+\hline
+\end{longtable}
+
+
+%% ============================================================
+%% REVIEWER dFi9
+%% ============================================================
+\newpage
+\section{Reviewer dFi9 --- Overall: 5 (Accept), Confidence: 4}
+
+\subsection{Summary / 摘要}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+This study proposes the COLSA online learning framework. It uses dynamically expanding polynomials to approximate the Cox baseline hazard. The method maintains sufficient statistics for a higher-order basis and employs data-driven basis projection to adaptively scale model complexity to the effective sample size. It achieves Oracle-level inference without storing historical data.
+&
+本研究提出了COLSA在线学习框架。它使用动态扩展的多项式来近似Cox baseline hazard。该方法维护高阶基的充分统计量，并采用数据驱动的基投影来自适应地将模型复杂度调整到有效样本量。在不存储历史数据的情况下实现了Oracle级别的推断。 \\
+\hline
+\end{longtable}
+
+\subsection{Strengths And Weaknesses / 优点与缺点}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+Strengths: The study updates survival models online while strictly protecting privacy. It avoids global risk sets. It retains statistical testing capabilities. It addresses the pain point that the Cox model cannot be decomposed. The step-up and step-down matrix projection algorithm (Algorithm 1) is detailed. It provides a hyperparameter selection strategy. It proves the consistency and Oracle-level theoretical properties of the renewable sieve estimator.
+
+Weaknesses: 1. High-dimensional feature scenarios are important in practice. This article lacks a discussion on the method's applicability in this context. 2. Detailed discussions are needed.
+&
+优点：本研究在严格保护隐私的同时在线更新生存模型。避免了全局风险集。保留了统计检验能力。解决了Cox模型不可分解的痛点。升阶和降阶矩阵投影算法（Algorithm 1）描述详细。提供了超参数选择策略。证明了可更新sieve估计量的一致性和Oracle级别的理论性质。
+
+缺点：1. 高维特征场景在实践中很重要。本文缺乏对方法在该背景下适用性的讨论。2. 需要更详细的讨论。 \\
+\hline
+\end{longtable}
+
+\noindent Soundness: 4: excellent \quad|\quad Presentation: 3: good \quad|\quad Significance: 3: good \quad|\quad Originality: 4: excellent
+
+\noindent Soundness: 4: 优秀 \quad|\quad Presentation: 3: 好 \quad|\quad Significance: 3: 好 \quad|\quad Originality: 4: 优秀
+
+\subsection{Key Questions For Authors / 作者需回答的关键问题}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+This article uses a ``Shadow Hessian'' and the Moore-Penrose pseudoinverse to convert polynomial degrees. Will this cause the Hessian matrix to lose positive definiteness in real streaming data? If so, how should this be handled?
+&
+本文使用``Shadow Hessian''和Moore-Penrose伪逆来转换多项式阶数。在真实流数据中，这是否会导致Hessian矩阵失去正定性？如果是，应如何处理？ \\
+\hline
+This article outlines the model complexity. When data streams reach massive scales, will the storage overhead and inversion computation of the Hessian matrix break the resource limits of edge nodes? Please discuss this in detail. Should a ``pruning'' mechanism be introduced to fix the upper limit of model complexity?
+&
+本文概述了模型复杂度。当数据流达到大规模时，Hessian矩阵的存储开销和求逆计算是否会突破边缘节点的资源限制？请详细讨论。是否应引入"剪枝"机制来固定模型复杂度的上限？ \\
+\hline
+How does the method ensure stability if extreme values occur in the data? What preprocessing is needed to limit the data characteristics applicable to this method?
+&
+如果数据中出现极端值，该方法如何保证稳定性？需要什么预处理来限制该方法适用的数据特征？ \\
+\hline
+\end{longtable}
+
+\subsection{Limitations / 局限性}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+This is mentioned in the future work section. However, the discussion and analysis on small sample sizes and high-dimensional feature scenarios could be more detailed.
+&
+在future work部分有提及。然而，对小样本量和高维特征场景的讨论和分析可以更详细。 \\
+\hline
+\end{longtable}
+
+\subsection{Overall Recommendation / 总体推荐}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+5: Accept: Technically solid paper, with high impact on at least one sub-area of AI or moderate-to-high impact on more than one area of AI, with good-to-excellent evaluation, resources, reproducibility, and no unaddressed ethical considerations.
+&
+5: Accept：技术扎实的论文，对至少一个AI子领域有高影响力或对多个AI领域有中高影响力，具有良好到优秀的评估、资源、可复现性，且无未解决的伦理问题。 \\
+\hline
+Confidence: 4: You are confident in your assessment, but not absolutely certain. It is unlikely, but not impossible, that you did not understand some parts of the submission or that you are unfamiliar with some pieces of related work.
+&
+置信度4：您对自己的评估有信心，但不是绝对确定。您不太可能但也并非不可能未理解投稿的某些部分或不熟悉某些相关工作。 \\
+\hline
+\end{longtable}
+
+
+%% ============================================================
+%% REVIEWER D2Tu
+%% ============================================================
+\newpage
+\section{Reviewer D2Tu --- Overall: 3 (Weak Reject), Confidence: 3}
+
+\subsection{Summary / 摘要}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+This paper addresses the challenge of performing online learning and rigorous statistical inference for the Cox Proportional Hazards model in streaming data environments. The core difficulty lies in the non-decomposable nature of the Cox partial likelihood, which traditionally requires access to full historical data to construct global risk sets, thereby creating bottlenecks for memory efficiency and data privacy. To overcome this, the authors propose COLSA (Collaborative Operation of Linked Survival Analysis), a framework that utilizes renewable sieve estimation.
+&
+本文解决了在流数据环境中对Cox比例风险模型进行在线学习和严格统计推断的挑战。核心困难在于Cox偏似然的不可分解性，传统上需要访问完整的历史数据来构建全局风险集，从而在内存效率和数据隐私方面造成瓶颈。为克服这一问题，作者提出了COLSA（Collaborative Operation of Linked Survival Analysis），一个利用可更新sieve估计的框架。 \\
+\hline
+The method approximates the infinite-dimensional log-baseline hazard function using Bernstein basis polynomials. A key innovation is the algorithm's ability to dynamically adapt model complexity; as the data stream grows, the polynomial degree increases via a two-stage projection mechanism (Progressive Activation and Pre-estimation) that maps historical summary statistics to higher-dimensional spaces without accessing raw data. Theoretically, the authors prove that COLSA achieves asymptotic consistency and normality, matching the statistical efficiency of a centralized ``Oracle'' estimator. Empirically, the approach is validated through simulations and an application to the SRTR kidney transplant database, demonstrating superior bias reduction and inference accuracy compared to existing online approximations.
+&
+该方法使用Bernstein基多项式近似无穷维的log-baseline hazard函数。一个关键创新是算法能够动态调整模型复杂度；随着数据流增长，多项式阶数通过两阶段投影机制（Progressive Activation和Pre-estimation）增加，该机制将历史汇总统计量映射到更高维空间而无需访问原始数据。理论上，作者证明COLSA实现了渐近一致性和正态性，匹配集中式"Oracle"估计量的统计效率。实验上，该方法通过模拟和SRTR肾移植数据库应用得到验证，展示了相比现有在线近似方法更优的偏差减少和推断精度。 \\
+\hline
+\end{longtable}
+
+\subsection{Strengths And Weaknesses / 优点与缺点}
+
+\subsubsection{Strengths / 优点}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+1.1. Theoretical Soundness: The paper is theoretically strong. The authors provide rigorous proofs (Theorems 4.1 and 4.2) showing that their estimator achieves asymptotic normality and efficiency equivalent to the full-data partial likelihood estimator. This is a significant step up from many heuristic online approximations.
+&
+1.1. 理论健全性：本文理论很强。作者提供了严格的证明（Theorem 4.1和4.2），表明其估计量实现了与全数据偏似然估计量等价的渐近正态性和效率。这比许多启发式在线近似方法有显著提升。 \\
+\hline
+1.2. Presentation: The paper is generally well-written and structured. The transition from the standard Cox model to the sieve approximation is logical.
+&
+1.2. 表述：论文总体上写得好且结构良好。从标准Cox模型到sieve近似的过渡是合乎逻辑的。 \\
+\hline
+1.3. Significance: The work addresses a critical bottleneck in healthcare and industrial reliability: performing rigorous survival analysis on streaming data without violating privacy or memory constraints. By eliminating the need for global risk sets, COLSA theoretically enables privacy-preserving, distributed inference that matches centralized ``Oracle'' performance. This has high potential impact for federated learning applications in medical research where data cannot be centralized.
+&
+1.3. 意义：该工作解决了医疗保健和工业可靠性中的关键瓶颈：在不违反隐私或内存约束的情况下对流数据进行严格的生存分析。通过消除对全局风险集的需求，COLSA理论上能够实现匹配集中式"Oracle"性能的隐私保护分布式推断。这对于数据无法集中的医学研究中的联邦学习应用具有很高的潜在影响力。 \\
+\hline
+1.4. Originality: The paper demonstrates high originality by innovatively combining renewable estimation with sieve maximum likelihood estimation to solve the non-decomposable loss problem in Cox models. The specific contribution of the ``two-stage'' update mechanism---utilizing the recursive structure of Bernstein polynomials to dynamically expand the parameter space (degree $C$) without accessing historical data---is a novel technical advancement. The introduction of ``shadow'' sufficient statistics to prepare for future dimension expansion is a creative solution to the stability issues often found in online learning.
+&
+1.4. 原创性：本文展示了高度原创性，创新性地将可更新估计与sieve最大似然估计相结合，解决了Cox模型中的不可分解损失问题。"两阶段"更新机制的具体贡献——利用Bernstein多项式的递归结构动态扩展参数空间（阶数$C$）而无需访问历史数据——是一项新颖的技术进步。引入"shadow"充分统计量为未来维度扩展做准备，是对在线学习中常见稳定性问题的创造性解决方案。 \\
+\hline
+\end{longtable}
+
+\subsubsection{Weaknesses / 缺点}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+2.1. Empirical Soundness: This is the primary weakness. The experimental validation is somewhat thin for a top-tier conference. The method is evaluated on only one real-world dataset (SRTR), whereas standard practice typically requires 2--3 diverse datasets to demonstrate generalization. Furthermore, there is a concerning discrepancy in the real-world application (Table 2) where in Ref: white the COLSA estimator for the ``Hispanic'' coefficient (Z-statistics=) differs notably in magnitude from the Oracle (Z-statistics=), suggesting potential difference between the asymptotic distribution of Oracle estimator and COLSA estimator. The simulation settings are also somewhat limited (only mixture Weibull distributions).
+&
+2.1. 实验健全性：这是主要弱点。对于顶级会议而言，实验验证略显薄弱。该方法仅在一个真实数据集（SRTR）上进行了评估，而标准做法通常需要2--3个不同的数据集来展示泛化能力。此外，在真实应用中（Table 2）存在一个令人担忧的差异，其中在Ref: white条件下，"Hispanic"系数的COLSA估计量（Z-statistics=）与Oracle（Z-statistics=）在量级上有明显不同，暗示Oracle估计量和COLSA估计量的渐近分布之间存在潜在差异。模拟设置也有一定局限（仅使用了混合Weibull分布）。 \\
+\hline
+2.2. Presentation: The notation regarding the dynamic degree updates (switching between active degree $C$ and pre-estimation degree $C'$) is dense and requires significant effort to parse. The algorithmic description (Algorithm 1) helps, but the complexity of the matrix projections could be clarified with a schematic diagram illustrating the information flow between batches.
+&
+2.2. 表述：关于动态阶数更新的符号（在激活阶数$C$和预估计阶数$C'$之间切换）比较密集，需要花费大量精力来解读。算法描述（Algorithm 1）有所帮助，但矩阵投影的复杂性可以通过一个示意图来说明批次间的信息流以使其更清晰。 \\
+\hline
+2.3. Significance: The practical significance is slightly tempered by the computational overhead compared to simpler SGD methods, which might limit its use in ultra-high-frequency trading or monitoring systems.
+&
+2.3. 意义：与更简单的SGD方法相比，计算开销略微削弱了其实际意义，这可能限制其在超高频交易或监控系统中的使用。 \\
+\hline
+\end{longtable}
+
+\noindent Soundness: 2: fair \quad|\quad Presentation: 3: good \quad|\quad Significance: 3: good \quad|\quad Originality: 3: good
+
+\noindent Soundness: 2: 一般 \quad|\quad Presentation: 3: 好 \quad|\quad Significance: 3: 好 \quad|\quad Originality: 3: 好
+
+\subsection{Key Questions For Authors / 作者需回答的关键问题}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+\textbf{Discrepancy in Real-World Results:} In Table 2, the COLSA estimator for the ``Hispanic'' recipient coefficient () deviates noticeably from the Oracle estimator () in terms of Z-statistics, despite the claim of asymptotic equivalence to the Oracle. Could you explain the theoretical or numerical source of this specific divergence? Does this suggest potential instability in the sieve approximation when dealing with sparse subgroups or specific covariate distributions? A clarification here is crucial for assessing the reliability of the method in diverse real-world scenarios.
+&
+\textbf{真实数据结果的差异：}在Table 2中，"Hispanic"受者系数的COLSA估计量在Z-statistics方面与Oracle估计量有明显偏差，尽管声称与Oracle渐近等价。您能否解释这一特定差异的理论或数值来源？这是否暗示sieve近似在处理稀疏子群或特定协变量分布时存在潜在不稳定性？对此的澄清对于评估该方法在多样化真实场景中的可靠性至关重要。 \\
+\hline
+\textbf{Computational Bottleneck \& Optimization:} The runtime analysis indicates that COLSA is significantly slower (28s for $K=200$) compared to existing online SGD methods (1.6s). The paper attributes this to numerical integration. Have you explored or analyzed the trade-off of using faster approximation techniques (e.g., quadrature methods or discrete approximations) for the integral term? If the computational cost can be reduced without significantly violating the ``Oracle'' efficiency bounds, it would greatly enhance the practical applicability of the framework.
+&
+\textbf{计算瓶颈与优化：}运行时间分析表明，COLSA比现有在线SGD方法慢得多（$K=200$时为28秒 vs 1.6秒）。本文将此归因于数值积分。您是否探索或分析过使用更快近似技术（如求积方法或离散近似）处理积分项的权衡？如果能在不显著违反"Oracle"效率界的情况下降低计算成本，将大大增强该框架的实际适用性。 \\
+\hline
+\textbf{Hyperparameter Sensitivity in Streaming:} The dynamic degree expansion relies on hyperparameters $\nu$ (growth rate) and $\rho$ (scaling constant). In a true online streaming setting where future data distributions are unknown, performing grid search is often infeasible. Can you provide a sensitivity analysis or a heuristic guideline for selecting these parameters robustly in a one-pass setting? Understanding the method's stability with suboptimal hyperparameters would strengthen the claim of its utility in automated monitoring systems. To be honest, I don't completely understand that how the authors choose $\nu$ and $\rho$.
+&
+\textbf{流数据中的超参数敏感性：}动态阶数扩展依赖超参数$\nu$（增长率）和$\rho$（缩放常数）。在未来数据分布未知的真正在线流场景中，网格搜索通常不可行。您能否提供敏感性分析或启发式指南，以在单次遍历设置中稳健地选择这些参数？了解方法在次优超参数下的稳定性将增强其在自动化监控系统中的实用性声明。说实话，我并不完全理解作者是如何选择$\nu$和$\rho$的。 \\
+\hline
+\textbf{Generalization to Other Datasets:} The empirical validation is currently limited to the SRTR dataset. Given the complexity of the proposed two-stage update mechanism, demonstrating robustness across different data structures is important. Do you have results on other standard survival analysis datasets that confirm the consistency of the findings, particularly regarding the variance reduction capabilities compared to mini-batch SGD?
+&
+\textbf{在其他数据集上的泛化：}实验验证目前仅限于SRTR数据集。鉴于所提两阶段更新机制的复杂性，展示在不同数据结构上的鲁棒性很重要。您是否有其他标准生存分析数据集上的结果来确认发现的一致性，特别是关于与mini-batch SGD相比的方差减少能力？ \\
+\hline
+\end{longtable}
+
+\subsection{Limitations / 局限性}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+The authors should explicitly discuss the computational trade-offs of COLSA. While theoretically efficient, the method is significantly slower (approx.\ 26x in experiments) than standard online SGD due to numerical integration; acknowledging this runtime overhead and defining the specific scenarios where this latency is acceptable (e.g., daily updates vs.\ millisecond trading) would strengthen the paper. Additionally, the authors should address the hyperparameter sensitivity in true online settings. Since grid search is often infeasible in one-pass streaming, discussing the robustness of the method to suboptimal choices of the growth rate ($\nu$) and scaling constant ($\rho$), or the lack of an automated selection mechanism, is a necessary limitation to disclose. Finally, the assumption of a fixed covariate dimension ($d$) should be highlighted as a constraint that currently prevents the method's application to high-dimensional data (e.g., genomics), which is common in survival analysis.
+&
+作者应明确讨论COLSA的计算权衡。虽然理论上高效，但由于数值积分，该方法比标准在线SGD慢得多（实验中约26倍）；承认这一运行时间开销并定义该延迟可接受的具体场景（如每日更新 vs 毫秒级交易）将增强论文的说服力。此外，作者应讨论真正在线场景中的超参数敏感性。由于在单次遍历流中网格搜索通常不可行，讨论方法对增长率（$\nu$）和缩放常数（$\rho$）次优选择的鲁棒性，或缺乏自动选择机制，是需要披露的必要局限性。最后，固定协变量维度（$d$）的假设应被强调为目前阻止该方法应用于高维数据（如基因组学）的约束，而这在生存分析中很常见。 \\
+\hline
+\end{longtable}
+
+\subsection{Overall Recommendation / 总体推荐}
+
+\begin{longtable}{L{0.48\textwidth}|L{0.48\textwidth}}
+\hline
+\textbf{English (Original)} & \textbf{中文翻译} \\
+\hline
+3: Weak reject: A paper with clear merits, but also some weaknesses, which overall outweigh the merits. Papers in this category require revisions before they can be meaningfully built upon by others. Please use sparingly.
+&
+3: Weak reject：论文有明确优点，但也有一些缺点，总体上缺点大于优点。此类论文需要修改后才能被他人有意义地引用。请谨慎使用此评分。 \\
+\hline
+Confidence: 3: You are fairly confident in your assessment. It is possible that you did not understand some parts of the submission or that you are unfamiliar with some pieces of related work. Math/other details were not carefully checked.
+&
+置信度3：您对自己的评估较有信心。您有可能未理解投稿的某些部分或不熟悉某些相关工作。数学/其他细节未仔细检查。 \\
+\hline
+\end{longtable}
+
+\end{document}

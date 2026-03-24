@@ -35,9 +35,10 @@ library(latex2exp)
 
 ```{r function, echo=FALSE}
 .solve_simple_biomarker_ode <- function(
-    times = seq(0, 100, by = 0.1),
-    init = c(-1, 0),
-    configurations = list()) {
+  times = seq(0, 100, by = 0.1),
+  init = c(-1, 0),
+  configurations = list()
+) {
   .calculate_acceleration <- function(t, biomarker, velocity, parms) {
     omega <- 2 * pi / parms$period
     -2 *

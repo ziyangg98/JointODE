@@ -8,10 +8,9 @@ using namespace Rcpp;
 using namespace arma;
 
 // ============================================================================
-// Objective: M-step negative log-likelihood w.r.t. fixed effects theta
+// Joint: M-step objective w.r.t. fixed effects theta
 // ============================================================================
 
-// Per-subject AD tape: builds tape for theta, evaluates and accumulates
 static void eval_subject_nll(
     const std::vector<double>& theta_vec,
     const List& subject_data,
@@ -31,17 +30,19 @@ static void eval_subject_nll(
   const int n_baseline = params_template.baseline_coefs.size();
   const int n_hazard = params_template.hazard_coefs.size();
   const int n_long = params_template.longitudinal_coefs.size();
-  const int n_params = n_baseline + n_hazard + n_long;
+  const int n_init = 2;  // initial_state [m(0), v(0)]
+  const int n_params = n_baseline + n_hazard + n_long + n_init;
   const int n_re = inv_sigma_b.n_rows;
 
-  // Update branch and sub-steps with random effects (before Independent)
+  // RE layout: [b_m0, b_v0, b_coef...]
   NumericVector long_coefs = as<List>(parameters["coefficients"])["longitudinal"];
+  NumericVector coef_re(random_effect.begin() + 2, random_effect.end());
   MatExpBranch branch = params_template.branch;
-  update_branch(branch, long_coefs, random_effect,
+  update_branch(branch, long_coefs, coef_re,
                 params_template.biomarker_random,
                 params_template.velocity_random);
 
-  // Build AD tape: theta as independent variable
+  // theta = [baseline, hazard, longitudinal, initial_state]
   ADvector ad_theta(n_params);
   std::copy(theta_vec.begin(), theta_vec.end(), ad_theta.begin());
   CppAD::Independent(ad_theta);
@@ -50,23 +51,27 @@ static void eval_subject_nll(
   ode.baseline_coefs.resize(n_baseline);
   ode.hazard_coefs.resize(n_hazard);
   ode.longitudinal_coefs.resize(n_long);
+  ode.initial_state_coefs.resize(n_init);
   std::copy_n(ad_theta.begin(), n_baseline, ode.baseline_coefs.begin());
   std::copy_n(ad_theta.begin() + n_baseline, n_hazard,
               ode.hazard_coefs.begin());
   std::copy_n(ad_theta.begin() + n_baseline + n_hazard, n_long,
               ode.longitudinal_coefs.begin());
+  std::copy_n(ad_theta.begin() + n_baseline + n_hazard + n_long, n_init,
+              ode.initial_state_coefs.begin());
   load_config(ode, parameters);
   ode.branch = branch;
+  // Only pass coef RE (skip front 2 state RE)
   load_subject(ode.subject, subject_data,
-      std::vector<ADdouble>(random_effect.begin(), random_effect.end()));
+      std::vector<ADdouble>(random_effect.begin() + 2, random_effect.end()));
 
-  // Solve ODE and compute log-likelihood
   const auto times = time_grid(ode.subject.longitudinal_times,
                                   ode.subject.event_time);
+  // y0 = [H=0, initial_state[0] + b_m0, initial_state[1] + b_v0]
   const std::vector<ADdouble> y0 = {ADdouble(0.0),
-      ADdouble(ode.subject.initial_state[0]),
-      ADdouble(ode.subject.initial_state[1])};
-  const auto sol = ode_solve(y0, times, ode);
+      ode.initial_state_coefs[0] + ADdouble(random_effect[0]),
+      ode.initial_state_coefs[1] + ADdouble(random_effect[1])};
+  const auto sol = ode_solve_joint(y0, times, ode);
 
   BSplineWorkspace ws;
   bspline_basis(0.0, ode.spline_degree, ode.spline_knots,
@@ -74,7 +79,6 @@ static void eval_subject_nll(
   ADdouble ll = joint_loglik(sol, times, ode, ws,
                                       inv_sigma_e2, log_2pi_sigma_e2);
 
-  // Add random effect prior (constant w.r.t. theta)
   double qf = 0.0;
   for (int j = 0; j < n_re; j++) {
     double s = 0.0;
@@ -83,7 +87,6 @@ static void eval_subject_nll(
   }
   ll -= ADdouble(0.5 * qf + re_const);
 
-  // Evaluate tape
   CppAD::ADFun<double> tape;
   tape.Dependent(ad_theta, ADvector{-ll});
   tape.optimize();
@@ -103,8 +106,8 @@ static void eval_subject_nll(
   tape.capacity_order(0);
 }
 
-// [[Rcpp::export(.compute_objective_cppad)]]
-NumericVector compute_objective_cppad(
+// [[Rcpp::export(.compute_joint_objective)]]
+NumericVector compute_joint_objective(
     const NumericVector& params, const List& data_list,
     const NumericMatrix& random_effects, const List& parameters,
     Nullable<NumericVector> weights = R_NilValue,
@@ -121,7 +124,8 @@ NumericVector compute_objective_cppad(
   const int n_baseline = params_template.baseline_coefs.size();
   const int n_hazard = params_template.hazard_coefs.size();
   const int n_long = params_template.longitudinal_coefs.size();
-  const int n_params = n_baseline + n_hazard + n_long;
+  const int n_init = params_template.initial_state_coefs.size();
+  const int n_params = n_baseline + n_hazard + n_long + n_init;
 
   const double sigma_e = params_template.measurement_error_sd;
   const double inv_sigma_e2 = 1.0 / (sigma_e * sigma_e);
@@ -163,27 +167,28 @@ NumericVector compute_objective_cppad(
 }
 
 // ============================================================================
-// Posterior: E-step log-posterior w.r.t. random effects b
+// Joint: E-step log-posterior w.r.t. random effects b
 // ============================================================================
 
-// [[Rcpp::export(.compute_logpost_cppad)]]
-NumericVector compute_logpost_cppad(
+// [[Rcpp::export(.compute_joint_logpost)]]
+NumericVector compute_joint_logpost(
     const NumericVector& random_effect,
     const List& data, const List& parameters,
     bool gradient = true, bool hessian = false) {
   const int n_re = random_effect.size();
 
-  // Build AD tape: random effects as independent variable
   ADvector ad_re(n_re);
   std::copy(random_effect.begin(), random_effect.end(), ad_re.begin());
   CppAD::Independent(ad_re);
 
+  // b = [b_m0, b_v0, b_coef...]: front 2 are state RE
   ODEParams<ADdouble> ode;
-  load_subject(ode.subject, data,
-      std::vector<ADdouble>(ad_re.begin(), ad_re.end()));
+  std::vector<ADdouble> coef_re(ad_re.begin() + 2, ad_re.end());
+  load_subject(ode.subject, data, coef_re);
   load_params(ode, parameters);
   NumericVector long_coefs = as<List>(parameters["coefficients"])["longitudinal"];
-  update_branch(ode.branch, long_coefs, random_effect,
+  NumericVector coef_re_dbl(random_effect.begin() + 2, random_effect.end());
+  update_branch(ode.branch, long_coefs, coef_re_dbl,
                 ode.biomarker_random, ode.velocity_random);
 
   const double sigma_e = ode.measurement_error_sd;
@@ -197,13 +202,13 @@ NumericVector compute_logpost_cppad(
   log_det(log_det_val, sign, ode.random_effect_sigma);
   const double re_const = 0.5 * (n_re * std::log(2.0 * M_PI) + log_det_val);
 
-  // Solve ODE and compute log-likelihood
   const auto times = time_grid(ode.subject.longitudinal_times,
                                   ode.subject.event_time);
+  // y0 = [H=0, mu_m + b_m0, mu_v + b_v0]
   const std::vector<ADdouble> y0 = {ADdouble(0.0),
-      ADdouble(ode.subject.initial_state[0]),
-      ADdouble(ode.subject.initial_state[1])};
-  const auto sol = ode_solve(y0, times, ode);
+      ode.initial_state_coefs[0] + ad_re[0],
+      ode.initial_state_coefs[1] + ad_re[1]};
+  const auto sol = ode_solve_joint(y0, times, ode);
 
   BSplineWorkspace ws;
   bspline_basis(0.0, ode.spline_degree, ode.spline_knots,
@@ -211,7 +216,6 @@ NumericVector compute_logpost_cppad(
   ADdouble log_post = joint_loglik(sol, times, ode, ws,
                                             inv_sigma_e2, log_2pi_sigma_e2);
 
-  // Add random effect prior: -0.5 * b' * inv(Sigma_b) * b - const
   std::vector<ADdouble> Sb(n_re, ADdouble(0.0));
   for (int i = 0; i < n_re; i++)
     for (int j = 0; j < n_re; j++)
@@ -228,18 +232,17 @@ NumericVector compute_logpost_cppad(
 }
 
 // ============================================================================
-// State: log-likelihood w.r.t. initial state [m(0), v(0)]
+// Joint: state optimization w.r.t. initial state [m(0), v(0)]
 // ============================================================================
 
-// [[Rcpp::export(.compute_state_loglik_cppad)]]
-NumericVector compute_state_loglik_cppad(
+// [[Rcpp::export(.compute_joint_state)]]
+NumericVector compute_joint_state(
     const NumericVector& initial_state,
     const List& data,
     const NumericVector& random_effect,
     const List& parameters,
     bool gradient = true, bool hessian = false) {
 
-  // Build AD tape: initial state as independent variable
   ADvector ad_state(2);
   std::copy(initial_state.begin(), initial_state.end(), ad_state.begin());
   CppAD::Independent(ad_state);
@@ -256,11 +259,10 @@ NumericVector compute_state_loglik_cppad(
   const double inv_sigma_e2 = 1.0 / (sigma_e * sigma_e);
   const double log_2pi_sigma_e2 = std::log(2.0 * M_PI * sigma_e * sigma_e);
 
-  // Solve ODE and compute log-likelihood
   const auto times = time_grid(ode.subject.longitudinal_times,
                                   ode.subject.event_time);
   const std::vector<ADdouble> y0 = {ADdouble(0.0), ad_state[0], ad_state[1]};
-  const auto sol = ode_solve(y0, times, ode);
+  const auto sol = ode_solve_joint(y0, times, ode);
 
   BSplineWorkspace ws;
   bspline_basis(0.0, ode.spline_degree, ode.spline_knots,
@@ -276,13 +278,13 @@ NumericVector compute_state_loglik_cppad(
 }
 
 // ============================================================================
-// Batch ODE solver: trajectories for diagnostics (no AD)
+// Joint: batch solver for prediction (no AD)
 // ============================================================================
 
-// [[Rcpp::export(.solve_batch_ode_cppad)]]
-List solve_batch_ode_cppad(const List& data_list,
-                           const NumericMatrix& random_effects,
-                           const List& parameters) {
+// [[Rcpp::export(.solve_batch_joint)]]
+List solve_batch_joint(const List& data_list,
+                       const NumericMatrix& random_effects,
+                       const List& parameters) {
   const int n_subjects = data_list.size();
 
   ODEParams<double> params;
@@ -297,17 +299,21 @@ List solve_batch_ode_cppad(const List& data_list,
 
   for (int i = 0; i < n_subjects; i++) {
     NumericVector re = random_effects(i, _);
+    // RE layout: [b_m0, b_v0, b_coef...]
+    NumericVector coef_re(re.begin() + 2, re.end());
     load_subject(params.subject, data_list[i],
-        std::vector<double>(re.begin(), re.end()));
+        std::vector<double>(coef_re.begin(), coef_re.end()));
     NumericVector long_coefs = as<List>(parameters["coefficients"])["longitudinal"];
-    update_branch(params.branch, long_coefs, re,
+    update_branch(params.branch, long_coefs, coef_re,
                   params.biomarker_random, params.velocity_random);
 
-    const std::vector<double> y0 = {0.0, params.subject.initial_state[0],
-                                    params.subject.initial_state[1]};
+    // y0 = [H=0, initial_state[0] + b_m0, initial_state[1] + b_v0]
+    const std::vector<double> y0 = {0.0,
+        params.initial_state_coefs[0] + re[0],
+        params.initial_state_coefs[1] + re[1]};
     const auto times = time_grid(params.subject.longitudinal_times,
                                     params.subject.event_time);
-    const auto sol = ode_solve(y0, times, params);
+    const auto sol = ode_solve_joint(y0, times, params);
 
     const int n_times = times.size();
     NumericVector t_out(n_times), m_out(n_times), v_out(n_times);
@@ -337,6 +343,144 @@ List solve_batch_ode_cppad(const List& data_list,
         Named("times") = t_out, Named("biomarker") = m_out,
         Named("velocity") = v_out, Named("acceleration") = a_out,
         Named("cum_hazard") = H_out, Named("log_hazard") = lh_out);
+  }
+  return results;
+}
+
+// ============================================================================
+// Marginal: objective w.r.t. theta (AD over theta)
+// ============================================================================
+
+// [[Rcpp::export(.compute_marginal_objective)]]
+NumericVector compute_marginal_objective(
+    const NumericVector& params,
+    const List& data_list,
+    double biomarker_clamp = 50.0,
+    bool gradient = true,
+    bool hessian = false) {
+
+  const int n_params = params.size();
+  const MatExpBranch branch = classify_disc(params[0], params[1]);
+
+  ADvector ad_theta(n_params);
+  std::copy(params.begin(), params.end(), ad_theta.begin());
+  CppAD::Independent(ad_theta);
+
+  std::vector<ADdouble> theta_vec(ad_theta.begin(), ad_theta.end());
+  MarginalParams<ADdouble> mp;
+  load_marginal_params(mp, theta_vec, branch, biomarker_clamp);
+
+  ADdouble total(0.0);
+  const int n_subjects = data_list.size();
+
+  for (int i = 0; i < n_subjects; i++) {
+    load_subject(mp.subject, data_list[i], std::vector<ADdouble>{});
+    if (mp.subject.longitudinal_measurements.empty()) continue;
+
+    std::vector<ADdouble> y0 = {
+      ADdouble(mp.subject.initial_state[0]),
+      ADdouble(mp.subject.initial_state[1])
+    };
+    const auto sol = ode_solve_marginal(
+        y0, mp.subject.longitudinal_times, mp);
+    total -= marginal_loglik(sol, mp);
+  }
+
+  CppAD::ADFun<double> tape;
+  tape.Dependent(ad_theta, ADvector{total});
+  return eval_tape(tape, std::vector<double>(params.begin(), params.end()),
+                   n_params, gradient, hessian);
+}
+
+// ============================================================================
+// Marginal: state optimization (AD over [m(0), v(0)])
+// ============================================================================
+
+// [[Rcpp::export(.compute_marginal_state)]]
+NumericVector compute_marginal_state(
+    const NumericVector& initial_state,
+    const List& subject_data,
+    const NumericVector& parameters,
+    double biomarker_clamp = 50.0,
+    bool gradient = true,
+    bool hessian = false) {
+
+  if (initial_state.size() != 2) stop("initial_state must have length 2");
+
+  const MatExpBranch branch = classify_disc(parameters[0], parameters[1]);
+
+  MarginalParams<ADdouble> mp;
+  std::vector<ADdouble> theta_ad(parameters.begin(), parameters.end());
+  load_marginal_params(mp, theta_ad, branch, biomarker_clamp);
+
+  ADvector ad_state(2);
+  std::copy(initial_state.begin(), initial_state.end(), ad_state.begin());
+  CppAD::Independent(ad_state);
+
+  load_subject(mp.subject, subject_data, std::vector<ADdouble>{});
+  if (mp.subject.longitudinal_measurements.empty())
+    stop("subject must have at least one observation");
+
+  std::vector<ADdouble> y0 = {ad_state[0], ad_state[1]};
+  const auto sol = ode_solve_marginal(
+      y0, mp.subject.longitudinal_times, mp);
+  ADdouble ll = marginal_loglik(sol, mp);
+
+  CppAD::ADFun<double> tape;
+  tape.Dependent(ad_state, ADvector{ll});
+  return eval_tape(tape,
+      std::vector<double>(initial_state.begin(), initial_state.end()),
+      2, gradient, hessian);
+}
+
+// ============================================================================
+// Marginal: batch solver for prediction (no AD)
+// ============================================================================
+
+// [[Rcpp::export(.solve_batch_marginal)]]
+List solve_batch_marginal(
+    const List& data_list,
+    const NumericVector& parameters,
+    double biomarker_clamp = 50.0) {
+
+  const int n_subjects = data_list.size();
+  std::vector<double> pvec(parameters.begin(), parameters.end());
+  const MatExpBranch branch = classify_disc(pvec[0], pvec[1]);
+  MarginalParams<double> mp;
+  load_marginal_params(mp, pvec, branch, biomarker_clamp);
+  const double b1 = pvec[0], b2 = pvec[1];
+  std::vector<double> fc(pvec.begin() + 2, pvec.end());
+
+  List results(n_subjects);
+
+  for (int i = 0; i < n_subjects; i++) {
+    load_subject(mp.subject, data_list[i], std::vector<double>{});
+
+    const auto& times = mp.subject.longitudinal_times;
+    const int nt = times.size();
+    std::vector<double> y0 = {
+      mp.subject.initial_state[0], mp.subject.initial_state[1]
+    };
+    const auto sol = ode_solve_marginal(y0, times, mp);
+
+    NumericVector biomarker(nt), velocity(nt), accel(nt);
+    for (int t = 0; t < nt; t++) {
+      biomarker[t] = sol[t][0];
+      velocity[t] = sol[t][1];
+
+      std::vector<double> cf;
+      covariates_at(times[t], times,
+                    mp.subject.longitudinal_covariates_fixed, cf);
+      accel[t] = b1 * sol[t][0] + b2 * sol[t][1];
+      for (size_t c = 0; c < cf.size(); c++)
+        accel[t] += cf[c] * fc[c];
+    }
+
+    results[i] = List::create(
+        Named("times") = wrap(times),
+        Named("biomarker") = biomarker,
+        Named("velocity") = velocity,
+        Named("acceleration") = accel);
   }
   return results;
 }

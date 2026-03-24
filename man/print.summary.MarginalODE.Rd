@@ -2,7 +2,7 @@
 % Please edit documentation in R/MarginalODE.R
 \name{print.summary.MarginalODE}
 \alias{print.summary.MarginalODE}
-\title{Print Summary of MarginalODE Fit}
+\title{Print Summary of MarginalODE Model}
 \usage{
 \method{print}{summary.MarginalODE}(
   x,
@@ -12,17 +12,18 @@
 )
 }
 \arguments{
-\item{x}{An object of class \code{summary.MarginalODE}}
+\item{x}{A summary.MarginalODE object}
 
-\item{digits}{Number of digits to display
-(default: max(3L, getOption("digits") - 3L))}
+\item{digits}{Number of digits to display}
 
-\item{signif.stars}{Logical; show significance stars
-(default: getOption("show.signif.stars"))}
+\item{signif.stars}{Logical; show significance stars}
 
 \item{...}{Additional arguments passed to \code{printCoefmat}}
 }
+\value{
+Invisibly returns the object
+}
 \description{
-Print Summary of MarginalODE Fit
+Print Summary of MarginalODE Model
 }
 \concept{model-summary}

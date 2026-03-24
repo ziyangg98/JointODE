@@ -10,7 +10,6 @@ JointODE(
   longitudinal_data,
   survival_data,
   gamma = 1,
-  state = NULL,
   spline_baseline = list(degree = 2, n_knots = 0, knot_placement = "equal",
     boundary_knots = NULL),
   init = "default",
@@ -43,11 +42,6 @@ and baseline covariates.}
 effect in the hazard function. When \code{gamma = 0}, velocity has no
 effect; \code{gamma = 1} uses linear velocity; \code{gamma = 2} uses
 squared velocity. Default is 1 (default: 1).}
-
-\item{state}{A matrix specifying initial conditions for the ODE system with
-two columns: initial biomarker values and their first derivatives. Each row
-corresponds to one subject. If \code{NULL}, defaults to a zero matrix with
-appropriate dimensions (default: \code{NULL}).}
 
 \item{spline_baseline}{A list controlling the B-spline representation of the
 baseline hazard function with the following components:
@@ -108,6 +102,11 @@ If 0, automatically detects available cores (default: 0)}
 See \code{\link{JointODE.control}} for complete details and examples.}
 
 \item{...}{Additional arguments passed to internal optimization routines.}
+
+\item{state}{A matrix specifying initial conditions for the ODE system with
+two columns: initial biomarker values and their first derivatives. Each row
+corresponds to one subject. If \code{NULL}, defaults to a zero matrix with
+appropriate dimensions (default: \code{NULL}).}
 }
 \value{
 An S3 object of class \code{"JointODE"} containing fitted model
@@ -134,7 +133,7 @@ discrimination ability for survival prediction}
 \item{\code{convergence}}{List containing convergence diagnostics:
 \itemize{
 \item \code{converged}: Logical indicating convergence status
-\item \code{em_iterations}: Number of EM iterations performed
+\item \code{iterations}: Number of EM iterations performed
 \item \code{message}: Descriptive convergence message
 }}
 \item{\code{random_effects}}{List containing random effects estimates:

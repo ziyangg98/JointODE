@@ -143,16 +143,16 @@ plot(fit)
 plot(fit, type = "overview")
 
 # Individual trajectory plots
-plot(fit, type = "trajectory_biomarker")  # Shows all subjects
+plot(fit, type = "trajectory_biomarker") # Shows all subjects
 plot(fit, type = "trajectory_biomarker", subject_ids = c("1", "2", "3"))
-plot(fit, type = "trajectory_velocity")  # Velocity trajectories
+plot(fit, type = "trajectory_velocity") # Velocity trajectories
 
 # Phase space plots
 plot(fit, type = "phase_biomarker_velocity")
 plot(fit, type = "phase_velocity_acceleration")
 
 # Group-stratified plots by survival covariates
-plot(fit, type = "survival", by = "w1")  # Continuous variable (auto-grouped)
+plot(fit, type = "survival", by = "w1") # Continuous variable (auto-grouped)
 plot(fit, type = "trajectory_biomarker", by = "w2")
 plot(fit, type = "trajectory_velocity", by = "w2")
 plot(fit, type = "phase_biomarker_velocity", by = "w1")
@@ -171,8 +171,8 @@ plot(fit, type = "diagnostic_random_effects")
 plot(fit, type = "survival", cols = c("red", "blue", "green"))
 
 # Adjust smoothing
-plot(fit, type = "overview", span = 0.5)  # Less smooth
-plot(fit, type = "survival", span = 1.0)  # More smooth
+plot(fit, type = "overview", span = 0.5) # Less smooth
+plot(fit, type = "survival", span = 1.0) # More smooth
 }
 
 }

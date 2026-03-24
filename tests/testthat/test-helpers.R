@@ -112,8 +112,9 @@ test_that(".compute_metrics computes correctly at iter > 1", {
       baseline = c(0.1, 0.2),
       hazard = c(0.5),
       longitudinal = c(-0.01),
+      initial_state = c(0, 0),
       measurement_error_sd = 0.5,
-      random_effect_sigma = diag(2)
+      random_effect_sigma = diag(4)
     ))
   )
   prev <- list(
@@ -122,13 +123,14 @@ test_that(".compute_metrics computes correctly at iter > 1", {
       baseline = c(0.1, 0.2),
       hazard = c(0.5),
       longitudinal = c(-0.01),
+      initial_state = c(0, 0),
       measurement_error_sd = 0.5,
-      random_effect_sigma = diag(2)
+      random_effect_sigma = diag(4)
     ))
   )
 
   m <- .compute_metrics(curr, prev, iter = 2)
-  expect_equal(m$delta_l, 10) # -100 - (-110) = 10
+  expect_equal(m$delta_l, 10)
   expect_true(m$rel_l > 0)
 })
 

@@ -27,12 +27,11 @@ load_test_data <- function(n_subjects = NULL) {
   # sim is loaded from package data (data/sim.rda)
   # nolint start: object_usage_linter
   # Process data using sim dataset
-  data_processed <- .process(
+  data_processed <- .process_joint(
     longitudinal_formula = observed ~ x1 + x2,
     survival_formula = Surv(time, status) ~ w1 + w2,
     longitudinal_data = sim$data$longitudinal_data,
-    survival_data = sim$data$survival_data,
-    state = NULL
+    survival_data = sim$data$survival_data
   )
 
   parameters <- sim$init

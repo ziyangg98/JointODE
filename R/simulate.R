@@ -242,7 +242,7 @@
 #' head(sim_basic$random_effects)
 #'
 #' # Population parameters (mean and covariance)
-#' attr(sim_basic$random_effects, "mu")    # Mean of dynamics distribution
+#' attr(sim_basic$random_effects, "mu") # Mean of dynamics distribution
 #' attr(sim_basic$random_effects, "sigma") # Covariance matrix
 #'
 #' # Example 2: Heterogeneous patient dynamics
@@ -250,11 +250,11 @@
 #' sim_hetero <- simulate(
 #'   n_subjects = 20,
 #'   longitudinal = list(
-#'     xi = c(mean = 0.5, sd = 0.2),      # Mean damping ratio with variation
-#'     period = c(mean = 8, sd = 2),      # Mean period with variation
+#'     xi = c(mean = 0.5, sd = 0.2), # Mean damping ratio with variation
+#'     period = c(mean = 8, sd = 2), # Mean period with variation
 #'     excitation = list(
-#'       offset = 4.0,                    # Constant external force
-#'       covariates = c(x1 = 0.8, x2 = -0.5)  # Covariate effects
+#'       offset = 4.0, # Constant external force
+#'       covariates = c(x1 = 0.8, x2 = -0.5) # Covariate effects
 #'     ),
 #'     initial = list(
 #'       offset = c(biomarker = 3.8, velocity = -0.1),
@@ -280,8 +280,8 @@
 #' sim_uniform <- simulate(
 #'   n_subjects = 20,
 #'   longitudinal = list(
-#'     xi = c(mean = 0.707, sd = 0.01),    # Very small variation
-#'     period = c(mean = 5, sd = 0.1),     # Very small variation
+#'     xi = c(mean = 0.707, sd = 0.01), # Very small variation
+#'     period = c(mean = 5, sd = 0.1), # Very small variation
 #'     excitation = list(offset = 0, covariates = numeric(0)),
 #'     initial = list(
 #'       offset = c(biomarker = -2, velocity = 0),
@@ -319,9 +319,9 @@
 #'   ),
 #'   survival = list(
 #'     baseline = list(type = "weibull", shape = 3.0, scale = 23),
-#'     value = 0.4,      # Effect of biomarker value on hazard
-#'     slope = 1.5,      # Effect of biomarker velocity on hazard
-#'     gamma = 1,        # Linear velocity effect
+#'     value = 0.4, # Effect of biomarker value on hazard
+#'     slope = 1.5, # Effect of biomarker velocity on hazard
+#'     gamma = 1, # Linear velocity effect
 #'     covariates = c(w1 = 0.4, w2 = -0.6)
 #'   ),
 #'   covariates = list(
@@ -349,16 +349,20 @@
 #' ggplot(dynamics_df, aes(x = xi_implied)) +
 #'   geom_histogram(bins = 30, fill = "steelblue", alpha = 0.7) +
 #'   geom_vline(xintercept = 0.4, color = "red", linetype = "dashed") +
-#'   labs(title = "Distribution of Patient Damping Ratios",
-#'        x = "Damping Ratio (xi)", y = "Count") +
+#'   labs(
+#'     title = "Distribution of Patient Damping Ratios",
+#'     x = "Damping Ratio (xi)", y = "Count"
+#'   ) +
 #'   theme_minimal()
 #'
 #' # Joint distribution of xi and period
 #' ggplot(dynamics_df, aes(x = period_implied, y = xi_implied)) +
 #'   geom_point(alpha = 0.5) +
 #'   geom_density_2d(color = "steelblue") +
-#'   labs(title = "Patient-Specific Dynamics",
-#'        x = "Period", y = "Damping Ratio (xi)") +
+#'   labs(
+#'     title = "Patient-Specific Dynamics",
+#'     x = "Period", y = "Damping Ratio (xi)"
+#'   ) +
 #'   theme_minimal()
 #'
 #' # Compare trajectories for patients with different dynamics
@@ -379,16 +383,20 @@
 #'
 #' ggplot(plot_data, aes(x = time, y = biomarker, color = xi_group)) +
 #'   geom_line(linewidth = 1) +
-#'   labs(title = "Biomarker Trajectories by Damping Ratio",
-#'        x = "Time", y = "Biomarker Value",
-#'        color = "Patient Group") +
+#'   labs(
+#'     title = "Biomarker Trajectories by Damping Ratio",
+#'     x = "Time", y = "Biomarker Value",
+#'     color = "Patient Group"
+#'   ) +
 #'   theme_minimal()
 #'
 #' # Kaplan-Meier survival curve
 #' library(survival)
 #' km_fit <- survfit(Surv(time, status) ~ 1, data = sim_full$survival_data)
-#' plot(km_fit, xlab = "Time", ylab = "Survival Probability",
-#'      main = "Kaplan-Meier Survival Curve")
+#' plot(km_fit,
+#'   xlab = "Time", ylab = "Survival Probability",
+#'   main = "Kaplan-Meier Survival Curve"
+#' )
 #' }
 #' @concept data-simulation
 #'
@@ -647,14 +655,22 @@ simulate <- function(
 
   mu <- attr(dynamics, "mu")
   sigma <- attr(dynamics, "sigma")
-  random_effects <- dynamics[, c("dyn_value", "dyn_slope"), drop = FALSE]
-  random_effects <- sweep(
-    random_effects,
-    2,
-    mu[c("dyn_value", "dyn_slope")],
-    "-"
+  # ODE coefficient RE: deviations from population mean
+  coef_re <- dynamics[, c("dyn_value", "dyn_slope"), drop = FALSE]
+  coef_re <- sweep(coef_re, 2, mu[c("dyn_value", "dyn_slope")], "-")
+  coef_re <- as.matrix(coef_re)
+
+  # State RE: per-subject initial state deviations from population mean
+  pop_m0 <- mean(init_final[, 1])
+  pop_v0 <- mean(init_final[, 2])
+  state_re <- cbind(
+    init_final[, 1] - pop_m0,
+    init_final[, 2] - pop_v0
   )
-  random_effects <- as.matrix(random_effects)
+
+  # Full RE: [b_m0, b_v0, b_coef...]
+  random_effects <- cbind(state_re, coef_re)
+  colnames(random_effects) <- c("m0", "v0", "dyn_value", "dyn_slope")
   attr(random_effects, "mu") <- mu[c("dyn_value", "dyn_slope")]
   attr(random_effects, "sigma") <- sigma[1:2, 1:2]
 
@@ -662,6 +678,7 @@ simulate <- function(
     longitudinal_data = long_data,
     survival_data = surv_data,
     state = init_final,
+    initial_state_mean = c(m0 = pop_m0, v0 = pop_v0),
     random_effects = random_effects
   )
 }
@@ -682,8 +699,7 @@ simulate <- function(
   )
   f0 <- function(t) {
     baseline_type <- eval(coef_args$survival$baseline$type)
-    res <- switch(
-      baseline_type,
+    res <- switch(baseline_type,
       weibull = {
         shape <- eval(coef_args$survival$baseline$shape)
         scale <- eval(coef_args$survival$baseline$scale)
@@ -723,13 +739,53 @@ simulate <- function(
     eval(coef_args$survival$slope),
     eval(coef_args$survival$covariates)
   )
+  # Full RE sigma: [state(2), coef(2)]
+  # State RE variance from simulation parameters:
+  # Var(m(0)) = sum(beta_biomarker^2 * Var(X_j))
+  # Var(v(0)) = sum(beta_velocity^2 * Var(X_j))
+  cov_defs <- eval(coef_args$covariates)
+  init_covs <- long_params$initial$covariates
+  # Compute Var(X_j) for each covariate
+  cov_variance <- function(nm, cov_defs) {
+    d <- cov_defs[[nm]]
+    if (d$type == "normal") d$sd^2
+    else if (d$type == "binary") d$prob * (1 - d$prob)
+    else 1
+  }
+  # State RE covariance: Cov(m0, v0) = sum(beta_m_j * beta_v_j * Var(X_j))
+  beta_m <- init_covs$biomarker
+  beta_v <- init_covs$velocity
+  shared_covs <- intersect(names(beta_m), names(beta_v))
+  all_covs <- union(names(beta_m), names(beta_v))
+
+  var_m0 <- sum(vapply(names(beta_m), function(nm) {
+    beta_m[nm]^2 * cov_variance(nm, cov_defs)
+  }, numeric(1)))
+  var_v0 <- sum(vapply(names(beta_v), function(nm) {
+    beta_v[nm]^2 * cov_variance(nm, cov_defs)
+  }, numeric(1)))
+  cov_m0_v0 <- sum(vapply(shared_covs, function(nm) {
+    beta_m[nm] * beta_v[nm] * cov_variance(nm, cov_defs)
+  }, numeric(1)))
+
+  # Full RE sigma: [state(2), coef(2)]
+  # State-coef cross-covariance = 0 (independent)
+  n_coef_re <- nrow(random_effect_sigma)
+  n_re_total <- n_coef_re + 2
+  full_sigma <- matrix(0, n_re_total, n_re_total)
+  full_sigma[1, 1] <- var_m0
+  full_sigma[2, 2] <- var_v0
+  full_sigma[1, 2] <- full_sigma[2, 1] <- cov_m0_v0
+  full_sigma[3:n_re_total, 3:n_re_total] <- random_effect_sigma
+
   parameters <- list(
     coefficients = list(
       baseline = baseline_coef,
       hazard = hazard_coef,
       longitudinal = longitudinal_coef,
+      initial_state = data$initial_state_mean,
       measurement_error_sd = eval(coef_args$longitudinal$error_sd),
-      random_effect_sigma = random_effect_sigma
+      random_effect_sigma = full_sigma
     ),
     configurations = list(
       baseline = spline_config,
@@ -915,8 +971,7 @@ simulate <- function(
   maxt
 ) {
   hazard_function <- function(t, x, betas, ...) {
-    h0 <- switch(
-      survival$baseline$type,
+    h0 <- switch(survival$baseline$type,
       weibull = {
         shape <- survival$baseline$shape
         scale <- survival$baseline$scale

@@ -103,6 +103,7 @@ struct ODEParams {
   std::vector<Scalar> longitudinal_coefs;
   std::vector<Scalar> baseline_coefs;
   std::vector<Scalar> hazard_coefs;
+  std::vector<Scalar> initial_state_coefs;  // population mean [m(0), v(0)]
   double measurement_error_sd;
   arma::mat random_effect_sigma;
 
@@ -115,6 +116,15 @@ struct ODEParams {
   bool biomarker_random;
   bool velocity_fixed;
   bool velocity_random;
+  MatExpBranch branch;
+  double biomarker_clamp;
+};
+
+// Marginal ODE parameters (longitudinal only, no survival)
+template <typename Scalar>
+struct MarginalParams {
+  SubjectData<Scalar> subject;
+  std::vector<Scalar> parameters;  // [b1, b2, cov_coefs...]
   MatExpBranch branch;
   double biomarker_clamp;
 };
@@ -251,6 +261,11 @@ inline void load_params(ODEParams<Scalar>& params,
   for (int i = 0; i < longitudinal.size(); i++)
     params.longitudinal_coefs[i] = Scalar(longitudinal[i]);
 
+  NumericVector initial_state = coefficients["initial_state"];
+  params.initial_state_coefs.resize(initial_state.size());
+  for (int i = 0; i < initial_state.size(); i++)
+    params.initial_state_coefs[i] = Scalar(initial_state[i]);
+
   params.measurement_error_sd =
       as<double>(coefficients["measurement_error_sd"]);
   params.random_effect_sigma =
@@ -260,6 +275,19 @@ inline void load_params(ODEParams<Scalar>& params,
 
   // Branch from fixed effects (longitudinal[0]=b1, longitudinal[1]=b2)
   params.branch = classify_disc(longitudinal[0], longitudinal[1]);
+}
+
+// Fill marginal ODE parameters from flat theta vector
+// Branch must be pre-classified with classify_disc() using double values
+template <typename Scalar>
+inline void load_marginal_params(
+    MarginalParams<Scalar>& params,
+    const std::vector<Scalar>& theta,
+    MatExpBranch branch,
+    double biomarker_clamp = BIOMARKER_CLAMP_DEFAULT) {
+  params.parameters = theta;
+  params.branch = branch;
+  params.biomarker_clamp = biomarker_clamp;
 }
 
 // Update branch when random effects shift b1 or b2
@@ -559,9 +587,9 @@ inline Scalar eval_hazard(Scalar biomarker, Scalar velocity,
   return clamp(lh, Scalar(HAZARD_CLAMP_MIN), Scalar(HAZARD_CLAMP_MAX));
 }
 
-// Solve ODE: matexp for biomarker, log-linear for cumulative hazard
+// Solve joint ODE: matexp for biomarker, log-linear for cumulative hazard
 template <typename Scalar>
-inline std::vector<std::vector<Scalar>> ode_solve(
+inline std::vector<std::vector<Scalar>> ode_solve_joint(
     const std::vector<Scalar>& y0, const std::vector<double>& times,
     const ODEParams<Scalar>& params) {
   const int nt = times.size();
@@ -622,8 +650,59 @@ inline std::vector<std::vector<Scalar>> ode_solve(
 }
 
 // ============================================================================
-// Shared log-likelihood and tape evaluation
+// Solve marginal ODE: [m, v] only, no hazard integration
 // ============================================================================
+
+// Mirrors ode_solve_joint(y0, times, params)
+template <typename Scalar>
+inline std::vector<std::vector<Scalar>> ode_solve_marginal(
+    const std::vector<Scalar>& y0,
+    const std::vector<double>& times,
+    const MarginalParams<Scalar>& params) {
+  const Scalar b1 = params.parameters[0], b2 = params.parameters[1];
+  const double bc = params.biomarker_clamp;
+  const int nt = times.size();
+
+  std::vector<std::vector<Scalar>> sol(nt, std::vector<Scalar>(2));
+  Scalar m = y0[0], v = y0[1];
+  sol[0] = {m, v};
+
+  for (int i = 1; i < nt; i++) {
+    const double dt = times[i] - times[i - 1];
+
+    std::vector<double> cf;
+    covariates_at(times[i - 1], params.subject.longitudinal_times,
+                  params.subject.longitudinal_covariates_fixed, cf);
+    Scalar f(0);
+    for (size_t j = 0; j < cf.size(); j++)
+      f += params.parameters[j + 2] * Scalar(cf[j]);
+
+    ode_step(m, v, b1, b2, f, Scalar(dt), params.branch);
+    m = clamp(m, Scalar(-bc), Scalar(bc));
+    v = clamp(v, Scalar(-bc), Scalar(bc));
+    sol[i] = {m, v};
+  }
+  return sol;
+}
+
+// ============================================================================
+// Shared objective functions
+// ============================================================================
+
+// Marginal log-likelihood: longitudinal only (-SSE)
+// Mirrors joint_loglik(sol, times, params, ...)
+template <typename Scalar>
+inline Scalar marginal_loglik(
+    const std::vector<std::vector<Scalar>>& sol,
+    const MarginalParams<Scalar>& params) {
+  Scalar ll(0);
+  const int n_obs = params.subject.longitudinal_measurements.size();
+  for (int i = 0; i < n_obs; i++) {
+    Scalar r = Scalar(params.subject.longitudinal_measurements[i]) - sol[i][0];
+    ll -= r * r;
+  }
+  return ll;
+}
 
 // Joint log-likelihood: longitudinal (Gaussian) + survival (Cox)
 // Used by objective.cpp, posterior.cpp, state.cpp

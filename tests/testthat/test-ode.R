@@ -14,15 +14,12 @@ long_sub <- sim$data$longitudinal_data[
 surv_sub <- sim$data$survival_data[
   sim$data$survival_data$id %in% test_ids,
 ]
-state_sub <- as.matrix(sim$data$state)[seq_len(n_test), ]
-
-data_processed <- .process(
+data_processed <- .process_joint(
   longitudinal_data = long_sub,
   longitudinal_formula = observed ~
     biomarker + velocity + x1 + x2 + (biomarker + velocity | id),
   survival_data = surv_sub,
-  survival_formula = Surv(time, status) ~ w1 + w2,
-  state = state_sub
+  survival_formula = Surv(time, status) ~ w1 + w2
 )
 
 parameters <- sim$init
@@ -33,19 +30,19 @@ n_subjects <- length(data_processed)
 # Test 1: CppAD basic mode - structure, sanity checks, and accuracy
 # ==========================================================================
 
-test_that(".solve_batch_ode_cppad - basic mode structure and accuracy", {
+test_that(".solve_batch_joint - basic mode structure and accuracy", {
   # Compute batch ODE using CppAD
-  batch_cppad <- .solve_batch_ode_cppad(
+  batch_sol <- .solve_batch_joint(
     data_list = data_processed,
     random_effects = random_effects,
     parameters = parameters
   )
 
   # Check that we got results for all subjects
-  expect_equal(length(batch_cppad), n_subjects)
+  expect_equal(length(batch_sol), n_subjects)
 
   # Check output structure for first subject
-  result_basic <- batch_cppad[[1]]
+  result_basic <- batch_sol[[1]]
 
   basic_fields <- c(
     "times",
@@ -79,15 +76,15 @@ test_that(".solve_batch_ode_cppad - basic mode structure and accuracy", {
   # Check all results have finite values
   for (i in seq_len(n_subjects)) {
     expect_true(
-      all(is.finite(batch_cppad[[i]]$cum_hazard)),
+      all(is.finite(batch_sol[[i]]$cum_hazard)),
       label = sprintf("Subject %d: finite cum_hazard", i)
     )
     expect_true(
-      all(is.finite(batch_cppad[[i]]$log_hazard)),
+      all(is.finite(batch_sol[[i]]$log_hazard)),
       label = sprintf("Subject %d: finite log_hazard", i)
     )
     expect_true(
-      all(is.finite(batch_cppad[[i]]$biomarker)),
+      all(is.finite(batch_sol[[i]]$biomarker)),
       label = sprintf("Subject %d: finite biomarker", i)
     )
   }
@@ -95,7 +92,7 @@ test_that(".solve_batch_ode_cppad - basic mode structure and accuracy", {
   # Test accuracy against true simulation values
   # Verify that ODE solutions match the true biomarker/velocity/acceleration
   # from the simulation. This confirms the ODE solver is correct.
-  for (i in seq_len(length(data_processed))) {
+  for (i in seq_along(data_processed)) {
     subject_id <- names(data_processed)[i]
 
     # Get true values from simulation at observation times
@@ -104,19 +101,19 @@ test_that(".solve_batch_ode_cppad - basic mode structure and accuracy", {
     obs_times <- biomarker_data$time
 
     # Match ODE solution times with observation times
-    result_times <- batch_cppad[[i]]$times
+    result_times <- batch_sol[[i]]$times
     match_idx <- match(obs_times, result_times)
 
     biomarker_true <- biomarker_data$biomarker
-    biomarker_pred <- batch_cppad[[i]]$biomarker[match_idx]
+    biomarker_pred <- batch_sol[[i]]$biomarker[match_idx]
     names(biomarker_pred) <- NULL
 
     velocity_true <- biomarker_data$velocity
-    velocity_pred <- batch_cppad[[i]]$velocity[match_idx]
+    velocity_pred <- batch_sol[[i]]$velocity[match_idx]
     names(velocity_pred) <- NULL
 
     acceleration_true <- biomarker_data$acceleration
-    acceleration_pred <- batch_cppad[[i]]$acceleration[match_idx]
+    acceleration_pred <- batch_sol[[i]]$acceleration[match_idx]
     names(acceleration_pred) <- NULL
 
     # Check accuracy (matrix exponential is exact; sim data used RK45

@@ -8,10 +8,9 @@
     (biomarker + velocity | id)
   surv_formula <- Surv(time, status) ~ w1 + w2
 
-  .process(
+  .process_joint(
     longitudinal_data = sim$data$longitudinal_data,
     survival_data = sim$data$survival_data,
-    state = sim$data$state,
     survival_formula = surv_formula,
     longitudinal_formula = long_formula
   )
@@ -45,6 +44,10 @@ create_mock_jointode <- function(n_subjects = 20L) {
     paste0(
       "longitudinal:",
       names(parameters$coefficients$longitudinal)
+    ),
+    paste0(
+      "initial state:",
+      names(parameters$coefficients$initial_state)
     )
   )
   n_coef <- length(coef_names_expanded)
@@ -60,8 +63,8 @@ create_mock_jointode <- function(n_subjects = 20L) {
       cindex = 0.65,
       convergence = list(
         converged = TRUE,
-        em_iterations = 10,
-        message = "EM algorithm converged after 10 iterations"
+        iterations = 10,
+        message = "Converged after 10 iterations"
       ),
       random_effects = list(
         estimates = random_effects,

@@ -16,12 +16,11 @@ test_that(".process structures data correctly", {
     w1 = rnorm(2)
   )
 
-  result <- .process(
+  result <- .process_joint(
     longitudinal_formula = v ~ x1 + (1 | id),
     survival_formula = Surv(obstime, status) ~ w1,
     longitudinal_data = long_data,
     survival_data = surv_data,
-    state = NULL
   )
 
   # Check structure
@@ -34,9 +33,6 @@ test_that(".process structures data correctly", {
   expect_equal(s1$time, 3)
   expect_equal(s1$status, 1)
   expect_equal(as.numeric(s1$covariates), as.numeric(surv_data[1, "w1"]))
-  m0 <- long_data$v[1]
-  v0 <- (long_data$v[2] - long_data$v[1]) / (1 - 0)
-  expect_equal(as.numeric(s1$initial_state), c(m0, v0))
   expect_equal(length(s1$longitudinal$times), 3)
   expect_equal(s1$longitudinal$times, 0:2)
   expect_equal(as.numeric(s1$longitudinal$measurements), long_data$v[1:3])
@@ -54,31 +50,6 @@ test_that(".process structures data correctly", {
   )
 })
 
-test_that(".process handles state parameter", {
-  long_data <- data.frame(
-    id = 1,
-    obstime = 0,
-    v = 1
-  )
-
-  surv_data <- data.frame(
-    id = 1,
-    obstime = 1,
-    status = 1
-  )
-
-  # With state matrix
-  state <- matrix(c(2, 3), nrow = 1)
-  result <- .process(
-    longitudinal_formula = v ~ 1 + (1 | id),
-    survival_formula = Surv(obstime, status) ~ 1,
-    longitudinal_data = long_data,
-    survival_data = surv_data,
-    state = state
-  )
-  expect_equal(result[[1]]$initial_state, c(2, 3))
-})
-
 test_that(".process handles missing longitudinal data", {
   # Subject 2 has no longitudinal data
   long_data <- data.frame(
@@ -93,12 +64,11 @@ test_that(".process handles missing longitudinal data", {
     status = c(1, 0)
   )
 
-  result <- .process(
+  result <- .process_joint(
     longitudinal_formula = v ~ 1 + (1 | id),
     survival_formula = Surv(obstime, status) ~ 1,
     longitudinal_data = long_data,
-    survival_data = surv_data,
-    state = NULL
+    survival_data = surv_data
   )
 
   # Subject 2 should have no observations
@@ -120,12 +90,11 @@ test_that(".process handles unordered time data", {
     status = c(1, 0)
   )
 
-  result <- .process(
+  result <- .process_joint(
     longitudinal_formula = v ~ x1 + (1 | id),
     survival_formula = Surv(obstime, status) ~ 1,
     longitudinal_data = long_data,
-    survival_data = surv_data,
-    state = NULL
+    survival_data = surv_data
   )
 
   # Check that data is correctly ordered by time

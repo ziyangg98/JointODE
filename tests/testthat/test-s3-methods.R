@@ -78,11 +78,12 @@ test_that("coef.JointODE returns named vector", {
 
   n_expected <- length(mock$parameters$coefficients$baseline) +
     length(mock$parameters$coefficients$hazard) +
-    length(mock$parameters$coefficients$longitudinal)
+    length(mock$parameters$coefficients$longitudinal) +
+    length(mock$parameters$coefficients$initial_state)
   expect_equal(length(cf), n_expected)
 
   # Check prefix naming
-  expect_true(all(grepl("^(baseline|hazard|longitudinal):", names(cf))))
+  expect_true(all(grepl("^(baseline|hazard|longitudinal|initial state):", names(cf))))
 })
 
 test_that("coef.JointODE preserves values", {

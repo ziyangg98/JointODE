@@ -158,7 +158,7 @@
 #'       nrow(patient_params_valid),
 #'       nrow(patient_params)
 #'     ),
-#'     x = expression("Damping Ratio ("*xi*")"),
+#'     x = expression("Damping Ratio (" * xi * ")"),
 #'     y = "Period (T)"
 #'   ) +
 #'   theme_minimal()
@@ -180,8 +180,8 @@
 #'   labs(
 #'     title = "ODE Parameter Space",
 #'     subtitle = "Green cross: population mean",
-#'     x = expression(beta[1]~"(value coefficient)"),
-#'     y = expression(beta[2]~"(slope coefficient)")
+#'     x = expression(beta[1] ~ "(value coefficient)"),
+#'     y = expression(beta[2] ~ "(slope coefficient)")
 #'   ) +
 #'   theme_minimal()
 #'
@@ -190,8 +190,10 @@
 #'
 #' # Select example patients across the distribution (only valid ones)
 #' set.seed(123)
-#' example_ids <- sample(patient_params_valid$id,
-#'   min(6, nrow(patient_params_valid)))
+#' example_ids <- sample(
+#'   patient_params_valid$id,
+#'   min(6, nrow(patient_params_valid))
+#' )
 #' plot_data <- sim$data$longitudinal_data %>%
 #'   filter(id %in% example_ids) %>%
 #'   left_join(patient_params_valid, by = "id") %>%
@@ -201,7 +203,7 @@
 #' p2 <- ggplot(plot_data, aes(x = time, y = biomarker)) +
 #'   geom_line(linewidth = 1) +
 #'   geom_point(aes(y = observed), alpha = 0.4, size = 0.8) +
-#'   facet_wrap(~ label, scales = "free_y", ncol = 2) +
+#'   facet_wrap(~label, scales = "free_y", ncol = 2) +
 #'   labs(
 #'     title = "Example Patient Trajectories",
 #'     subtitle = "Lines: true values, Points: observed with error",

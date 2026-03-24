@@ -1,9 +1,8 @@
-.validate <- function(
+.validate_joint <- function(
   longitudinal_formula,
   survival_formula,
   longitudinal_data,
   survival_data,
-  state,
   gamma,
   spline_baseline,
   init,
@@ -24,7 +23,6 @@
   )
 
   .validate_data(longitudinal_data, survival_data, parsed_long, parsed_surv)
-  .validate_state(state, survival_data)
   .validate_gamma(gamma)
   .validate_spline(spline_baseline)
 
@@ -470,6 +468,7 @@
       "baseline",
       "hazard",
       "longitudinal",
+      "initial_state",
       "measurement_error_sd",
       "random_effect_sigma"
     )
@@ -655,4 +654,27 @@
   }
 
   invisible(TRUE)
+}
+
+#' @noRd
+.validate_marginal <- function(formula, data, time, id, state) {
+  stopifnot(
+    "formula must be a formula" = inherits(formula, "formula"),
+    "data must be a data.frame or matrix" =
+      is.data.frame(data) || is.matrix(data),
+    "time must be a character string" = is.character(time),
+    "id must be a character string" = is.character(id)
+  )
+  if (is.data.frame(data) || is.matrix(data)) {
+    stopifnot(
+      "time column not found in data" = time %in% names(data),
+      "id column not found in data" = id %in% names(data)
+    )
+  }
+  if (!is.null(state)) {
+    stopifnot(
+      "state must be a matrix with 2 columns" =
+        is.matrix(state) && ncol(state) == 2
+    )
+  }
 }

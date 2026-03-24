@@ -26,7 +26,7 @@ test_that("JointODE.control overrides individual parameters", {
 test_that("JointODE.control .list merges with defaults", {
   ctrl <- JointODE.control(.list = list(maxit = 100, verbose = TRUE))
   expect_equal(ctrl$maxit, 100)
-  expect_equal(ctrl$verbose, 1) # TRUE -> 1
+  expect_equal(ctrl$verbose, 1)
   expect_equal(ctrl$tol, 1e-4) # default preserved
 })
 

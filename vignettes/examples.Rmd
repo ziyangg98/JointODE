@@ -69,10 +69,13 @@ ids20 <- sample(unique(longitudinal_data$id), 20)
 longitudinal_data |>
   filter(id %in% ids20) |>
   left_join(
-    survival_data |> select(id, status), by = "id"
+    survival_data |> select(id, status),
+    by = "id"
   ) |>
-  ggplot(aes(time, observed, group = id,
-             color = factor(status))) +
+  ggplot(aes(time, observed,
+    group = id,
+    color = factor(status)
+  )) +
   geom_line(alpha = 0.6) +
   geom_point(alpha = 0.6, size = 0.8) +
   scale_color_manual(
@@ -95,7 +98,7 @@ longitudinal_data |>
 fit_ode <- JointODE(
   longitudinal_formula =
     observed ~ biomarker + velocity + drug +
-    (biomarker + velocity | id),
+      (biomarker + velocity | id),
   survival_formula = Surv(time, status) ~ drug + age + sex,
   longitudinal_data = longitudinal_data,
   survival_data = survival_data,
@@ -153,16 +156,22 @@ lme_ns <- lme(
 )
 
 jm_fit <- function(lme_obj, ff) {
-  jm(cox_fit, lme_obj, time_var = "time",
-     functional_forms = list("observed" = ff))
+  jm(cox_fit, lme_obj,
+    time_var = "time",
+    functional_forms = list("observed" = ff)
+  )
 }
 
-fit_lin_val  <- jm_fit(lme_lin, ~ value(observed))
-fit_lin_both <- jm_fit(lme_lin,
-  ~ value(observed) + slope(observed))
-fit_ns_val   <- jm_fit(lme_ns,  ~ value(observed))
-fit_ns_both  <- jm_fit(lme_ns,
-  ~ value(observed) + slope(observed))
+fit_lin_val <- jm_fit(lme_lin, ~ value(observed))
+fit_lin_both <- jm_fit(
+  lme_lin,
+  ~ value(observed) + slope(observed)
+)
+fit_ns_val <- jm_fit(lme_ns, ~ value(observed))
+fit_ns_both <- jm_fit(
+  lme_ns,
+  ~ value(observed) + slope(observed)
+)
 ```
 
 # Results
@@ -249,13 +258,17 @@ dt <- 2
 landmark_auc <- function(risk_scores, event_ids,
                          surv_data, tl, dt) {
   alive <- surv_data$id[surv_data$time > tl]
-  if (length(alive) < 10) return(NA)
+  if (length(alive) < 10) {
+    return(NA)
+  }
   risk <- risk_scores[match(alive, event_ids)]
   event <- as.numeric(
     surv_data$time[match(alive, surv_data$id)] <= tl + dt &
-    surv_data$status[match(alive, surv_data$id)] == 1
+      surv_data$status[match(alive, surv_data$id)] == 1
   )
-  if (sum(event) < 2) return(NA)
+  if (sum(event) < 2) {
+    return(NA)
+  }
   survival::concordance(
     Surv(rep(1, length(event)), event) ~ risk,
     reverse = TRUE
@@ -271,44 +284,35 @@ jm_nd <- longitudinal_data |>
 jm_aucs <- sapply(landmarks, function(tl) {
   tryCatch(
     tvAUC(tvROC(
-      fit_ns_both, newdata = jm_nd,
+      fit_ns_both,
+      newdata = jm_nd,
       Tstart = tl, Dt = dt, cores = 1L
     ))$auc,
     error = function(e) NA_real_
   )
 })
 
-# JointODE
+# JointODE: conditional cumulative hazard H(tl+dt) - H(tl)
 pred_ode <- predict(fit_ode)
-ode_risk <- sapply(
-  unique(pred_ode$id),
-  function(sid) {
-    p <- pred_ode[pred_ode$id == sid, ]
-    p$cumhaz[nrow(p)]
-  }
-)
 ode_aucs <- sapply(landmarks, function(tl) {
-  scores <- sapply(
-    unique(pred_ode$id),
-    function(sid) {
-      p <- pred_ode[pred_ode$id == sid, ]
-      idx <- which.min(abs(p$time - tl))
-      p$cumhaz[idx]
-    }
-  )
-  landmark_auc(
-    scores, unique(pred_ode$id),
-    survival_data, tl, dt
-  )
+  ids <- unique(pred_ode$id)
+  scores <- sapply(ids, function(sid) {
+    p <- pred_ode[pred_ode$id == sid, ]
+    h1 <- p$cumhaz[which.min(abs(p$time - tl))]
+    h2 <- p$cumhaz[which.min(abs(p$time - (tl + dt)))]
+    h2 - h1
+  })
+  landmark_auc(scores, ids, survival_data, tl, dt)
 })
 
-# Extended Cox
+# Extended Cox: conditional cumulative hazard
 cox_aucs <- sapply(landmarks, function(tl) {
   ids <- unique(longitudinal_data$id)
   scores <- sapply(ids, function(sid) {
     p <- longitudinal_data[
       longitudinal_data$id == sid &
-        longitudinal_data$time <= tl, ]
+        longitudinal_data$time <= tl,
+    ]
     if (nrow(p) == 0) return(0)
     predict(cox_td, type = "lp", newdata = tail(p, 1))
   })

@@ -1,6 +1,45 @@
 # Utility Functions for JointODE Package
 
-# Package Constants ============================================================
+# Shared Helpers ===============================================================
+
+#' @noRd
+.n_obs <- function(data_list) {
+  sum(vapply(
+    data_list,
+    function(s) length(s$longitudinal$measurements),
+    integer(1)
+  ))
+}
+
+#' @noRd
+.coef_table <- function(estimates, std_errors) {
+  z <- estimates / std_errors
+  cbind(
+    Estimate = estimates, `Std. Error` = std_errors,
+    `z value` = z, `Pr(>|z|)` = 2 * pnorm(-abs(z))
+  )
+}
+
+#' @noRd
+.print_coefmat <- function(x, digits = 4, signif.stars = TRUE, ...) {
+  x[, 1:2] <- round(x[, 1:2], digits)
+  printCoefmat(x, digits = digits, signif.stars = signif.stars, ...)
+}
+
+#' @noRd
+.extend_covariates <- function(cov_mat, orig_times, pred_times) {
+  if (is.null(cov_mat)) {
+    return(NULL)
+  }
+  if (is.matrix(cov_mat) && length(cov_mat) == 0) {
+    return(matrix(numeric(0), nrow = length(pred_times), ncol = 0))
+  }
+  indices <- findInterval(pred_times, orig_times)
+  indices[indices == 0L] <- 1L
+  if (is.matrix(cov_mat)) cov_mat[indices, , drop = FALSE] else cov_mat[indices]
+}
+
+# Constants ====================================================================
 
 .default_spline <- list(
   degree = 2,
@@ -60,11 +99,7 @@
 #' @importFrom future.apply future_lapply
 #' @noRd
 .parallel_apply <- function(
-  indices,
-  fn,
-  parallel = TRUE,
-  n_cores = 0,
-  setup = TRUE
+  indices, fn, parallel = TRUE, n_cores = 0, setup = TRUE
 ) {
   if (parallel) {
     if (setup) {
@@ -206,10 +241,14 @@
 #' @noRd
 .compute_dimensions <- function(parsed_long, parsed_surv, spline_config) {
   n_longitudinal_fixed <- length(parsed_long$fixed_terms)
-  n_longitudinal_random <- if (is.null(parsed_long$random_terms)) 0 else {
+  n_longitudinal_random <- if (is.null(parsed_long$random_terms)) {
+    0
+  } else {
     length(parsed_long$random_terms)
   }
-  n_survival_covariates <- if (is.null(parsed_surv$covariate_terms)) 0 else {
+  n_survival_covariates <- if (is.null(parsed_surv$covariate_terms)) {
+    0
+  } else {
     length(parsed_surv$covariate_terms)
   }
 
@@ -222,7 +261,7 @@
 
   list(
     n_longitudinal_coef = n_longitudinal_fixed + n_biomarker_velocity_fixed,
-    n_random_effects = n_longitudinal_random + n_biomarker_velocity_random,
+    n_random_effects = n_longitudinal_random + n_biomarker_velocity_random + 2,
     n_survival_covariates = n_survival_covariates,
     n_spline_basis = spline_config$degree + spline_config$n_knots + 1,
     spline_config = spline_config
@@ -263,283 +302,37 @@
   )
 }
 
-# Variance-Covariance ==========================================================
-
-#' @noRd
-.update_random_effect_sigma <- function(posterior_moments, n_subjects) {
-  n_re <- length(posterior_moments[[1]]$mean)
-  sigma_sum <- matrix(0, n_re, n_re)
-  for (i in seq_len(n_subjects)) {
-    sigma_sum <- sigma_sum + posterior_moments[[i]]$second_moment
-  }
-  sigma_sum / n_subjects
-}
-
-#' Fast M-step mapping for SEM Jacobian (fixed posteriors, no loglik eval)
-#' @noRd
-.m_step_map <- function(
-  theta_input, data_list, posteriors, posterior_moments, parameters, control
-) {
-  params_input <- .vector_to_coef(parameters, theta_input)
-  n_subjects <- length(data_list)
-
-  random_effect_sigma <- .update_random_effect_sigma(
-    posterior_moments, n_subjects
-  )
-  measurement_error_sd <- .update_measurement_error_sd(
-    data_list, params_input, posteriors
-  )
-  params_input$coefficients$measurement_error_sd <- measurement_error_sd
-  params_input$coefficients$random_effect_sigma <- random_effect_sigma
-
-  theta <- .coef_to_vector(params_input)
-  obj <- .compute_objective_expected(
-    theta, data_list, posteriors, params_input,
-    gradient = TRUE, hessian = TRUE,
-    parallel = control$parallel, n_cores = control$n_cores
-  )
-  theta - solve(attr(obj, "hessian"), attr(obj, "gradient"))
-}
-
-#' @noRd
-.compute_vcov_sem <- function(
-  data_list,
-  posteriors,
-  posterior_moments,
-  parameters,
-  random_effects,
-  control
-) {
-  theta <- .coef_to_vector(parameters)
-  n_coef <- length(theta)
-
-  if (control$verbose > 0) {
-    cli::cli_alert_info("Computing SEM vcov...")
-  }
-
-  obj <- .compute_objective_expected(
-    theta,
-    data_list,
-    posteriors,
-    parameters,
-    gradient = FALSE,
-    hessian = TRUE,
-    parallel = control$parallel,
-    n_cores = control$n_cores
-  )
-  info_complete_inv <- solve(attr(obj, "hessian"))
-
-  # Use fast M-step mapping with fixed posteriors (valid at convergence)
-  em_map <- function(theta_input) {
-    .m_step_map(
-      theta_input, data_list, posteriors, posterior_moments,
-      parameters, control
-    )
-  }
-
-  eps_weight <- sqrt(diag(info_complete_inv))
-  eps_weight <- eps_weight / min(eps_weight) * sqrt(.Machine$double.eps)
-
-  dm_matrix <- numDeriv::jacobian(
-    func = em_map,
-    x = theta,
-    method = "simple",
-    method.args = list(eps = eps_weight)
-  )
-
-  info_observed_inv <- info_complete_inv %*% solve(diag(n_coef) - t(dm_matrix))
-
-  asymmetry <- max(abs(info_observed_inv - t(info_observed_inv)))
-  if (control$verbose > 0 && asymmetry > 1e-4) {
-    cli::cli_alert_warning(sprintf(
-      "Vcov matrix asymmetry: %.2e (numerical instability detected)",
-      asymmetry
-    ))
-  }
-  vcov_sym <- (info_observed_inv + t(info_observed_inv)) / 2
-
-  eigenvalues <- eigen(vcov_sym, symmetric = TRUE, only.values = TRUE)$values
-  if (any(eigenvalues <= 0) && control$verbose > 0) {
-    n_neg <- sum(eigenvalues <= 0)
-    min_eigen <- min(eigenvalues)
-    cli::cli_alert_warning(sprintf(
-      "%d non-positive eigenvalue%s (min: %.2e)",
-      n_neg,
-      if (n_neg > 1) "s" else "",
-      min_eigen
-    ))
-  }
-
-  diag_ratio <- diag(vcov_sym) / diag(info_complete_inv)
-  if (any(diag_ratio < 1 - 1e-6) && control$verbose > 0) {
-    n_violate <- sum(diag_ratio < 1 - 1e-6)
-    min_ratio <- min(diag_ratio)
-    cli::cli_alert_warning(sprintf(
-      "%d parameter%s violate missing information principle (min ratio: %.3f)",
-      n_violate,
-      if (n_violate > 1) "s" else "",
-      min_ratio
-    ))
-  }
-
-  vcov_sym
-}
-
-# Parameter Counting ===========================================================
+# Parameter Counting & Conversion =============================================
 
 #' @noRd
 .count_params <- function(parameters) {
   cf <- parameters$coefficients
   p <- nrow(cf$random_effect_sigma)
   length(cf$baseline) + length(cf$hazard) + length(cf$longitudinal) +
-    1 + p * (p + 1) / 2
+    length(cf$initial_state) + 1 + p * (p + 1) / 2
 }
-
-# Parameter Vector Conversion =================================================
 
 #' @noRd
 .coef_to_vector <- function(parameters) {
-  with(parameters$coefficients, c(baseline, hazard, longitudinal))
+  with(parameters$coefficients,
+    c(baseline, hazard, longitudinal, initial_state))
 }
 
 #' @noRd
 .vector_to_coef <- function(parameters, theta) {
-  n_base <- length(parameters$coefficients$baseline)
-  n_haz <- length(parameters$coefficients$hazard)
-  idx <- cumsum(c(n_base, n_haz, length(theta) - n_base - n_haz))
+  cf <- parameters$coefficients
+  n <- c(length(cf$baseline), length(cf$hazard),
+         length(cf$longitudinal), length(cf$initial_state))
+  idx <- cumsum(n)
 
   parameters$coefficients$baseline <- theta[1:idx[1]]
   parameters$coefficients$hazard <- theta[(idx[1] + 1):idx[2]]
   parameters$coefficients$longitudinal <- theta[(idx[2] + 1):idx[3]]
+  parameters$coefficients$initial_state <- theta[(idx[3] + 1):idx[4]]
   parameters
 }
 
-# State Optimization ===========================================================
-
-#' Compute state log-likelihood and derivatives
-#'
-#' @noRd
-.compute_state_objective <- function(
-  initial_state,
-  data,
-  random_effect,
-  parameters
-) {
-  result <- .compute_state_loglik_cppad(
-    initial_state = initial_state,
-    data = data,
-    random_effect = random_effect,
-    parameters = parameters,
-    gradient = TRUE,
-    hessian = TRUE
-  )
-
-  value <- -as.numeric(result)
-  attr(value, "gradient") <- -as.vector(attr(result, "gradient"))
-  attr(value, "hessian") <- -as.matrix(attr(result, "hessian"))
-  value
-}
-
-#' Estimate initial state
-#'
-#' @noRd
-.estimate_state <- function(
-  initial_guess,
-  data,
-  random_effect,
-  parameters,
-  max_iter = 100,
-  tol = 1e-6
-) {
-  objective <- function(state) {
-    .compute_state_objective(state, data, random_effect, parameters)
-  }
-
-  obj_initial <- as.numeric(objective(initial_guess))
-
-  fit <- nlm(
-    f = objective,
-    p = initial_guess,
-    iterlim = max_iter,
-    gradtol = tol,
-    hessian = FALSE,
-    check.analyticals = FALSE
-  )
-
-  list(
-    state = fit$estimate,
-    converged = fit$code <= 2,
-    iterations = fit$iterations,
-    obj_change = fit$minimum - obj_initial
-  )
-}
-
-# EM Algorithm =================================================================
-
-#' @noRd
-.em_step <- function(data_list, parameters, random_effects, control) {
-  # E-step: Compute posteriors
-  posteriors <- .compute_posteriors(
-    data_list,
-    parameters,
-    random_effects,
-    control$parallel,
-    control$n_cores,
-    control$quad_level,
-    setup = FALSE
-  )
-
-  # Update random effects from posterior
-  n_subjects <- length(data_list)
-  posterior_moments <- lapply(seq_len(n_subjects), function(i) {
-    .compute_posterior_moments(
-      list(nodes = posteriors$nodes[[i]], weights = posteriors$weights[[i]])
-    )
-  })
-  n_re <- length(posterior_moments[[1]]$mean)
-  random_effects <- t(vapply(posterior_moments, `[[`, numeric(n_re), "mean"))
-
-  random_effect_sigma <- .update_random_effect_sigma(
-    posterior_moments, n_subjects
-  )
-
-  measurement_error_sd <- .update_measurement_error_sd(
-    data_list,
-    parameters,
-    posteriors
-  )
-  parameters$coefficients$measurement_error_sd <- measurement_error_sd
-  parameters$coefficients$random_effect_sigma <- random_effect_sigma
-
-  # M-step: Newton step for fixed effects
-  theta <- .coef_to_vector(parameters)
-
-  obj <- .compute_objective_expected(
-    theta,
-    data_list,
-    posteriors,
-    parameters,
-    gradient = TRUE,
-    hessian = TRUE,
-    parallel = control$parallel,
-    n_cores = control$n_cores
-  )
-
-  loglik_value <- -as.numeric(obj)
-  grad <- attr(obj, "gradient")
-  hess <- attr(obj, "hessian")
-
-  direction <- solve(hess, grad)
-  parameters <- .vector_to_coef(parameters, theta - direction)
-
-  list(
-    parameters = parameters,
-    random_effects = random_effects,
-    loglik = loglik_value,
-    posteriors = posteriors,
-    posterior_moments = posterior_moments
-  )
-}
+# EM Progress Tracking =========================================================
 
 #' @noRd
 .compute_metrics <- function(curr, prev, iter) {
@@ -550,11 +343,8 @@
     delta_l <- curr$loglik
     rel_l <- 1
   }
-
   list(delta_l = delta_l, rel_l = rel_l)
 }
-
-# Progress Tracking ============================================================
 
 #' @noRd
 .print_iteration <- function(iter, curr, metrics, control) {
@@ -562,11 +352,8 @@
 
   cli::cli_text(sprintf(
     "[%3d/%3d] L=%10.2f | dL=%.3e (%.2e)",
-    iter,
-    control$maxit,
-    curr$loglik,
-    metrics$delta_l,
-    metrics$rel_l
+    iter, control$maxit, curr$loglik,
+    metrics$delta_l, metrics$rel_l
   ))
 
   if (control$verbose >= 2) {
@@ -577,8 +364,7 @@
     cli::cli_text(sprintf("    baseline: %s", .format_vector(cf$baseline)))
     cli::cli_text(sprintf("    hazard: %s", .format_vector(cf$hazard)))
     cli::cli_text(sprintf(
-      "    longitudinal: %s",
-      .format_vector(cf$longitudinal, 6)
+      "    longitudinal: %s", .format_vector(cf$longitudinal, 6)
     ))
   }
 }
@@ -587,17 +373,21 @@
 .track <- function(iter, curr, prev, control) {
   metrics <- .compute_metrics(curr, prev, iter)
 
+  if (is.na(metrics$delta_l) || is.na(metrics$rel_l)) {
+    if (control$verbose > 0) {
+      cli::cli_alert_warning("Log-likelihood is NA at iteration {iter}")
+    }
+    return(list(converged = FALSE))
+  }
+
   if (iter > 1 && metrics$delta_l < -1e-6 && control$verbose > 0) {
     cli::cli_alert_warning(sprintf(
       "Log-likelihood decreased by %.4e at iteration %d",
-      abs(metrics$delta_l),
-      iter
+      abs(metrics$delta_l), iter
     ))
   }
 
-  converged <- iter > 1 &&
-    metrics$rel_l < control$tol
-
+  converged <- iter > 1 && metrics$rel_l < control$tol
   is_final <- iter == control$maxit
 
   if (control$verbose > 0 && !(is_final && !converged)) {
@@ -609,95 +399,19 @@
       cli::cli_text("")
       cli::cli_alert_success(sprintf(
         "Converged in %d iterations (rel dL=%.2e)",
-        iter,
-        metrics$rel_l
+        iter, metrics$rel_l
       ))
     } else if (is_final) {
       cli::cli_text("")
-      msg <- sprintf(
-        "Not converged after %d iterations (rel dL=%.2e > %.2e)", # nolint: line_length_linter.
-        control$maxit,
-        metrics$rel_l,
-        control$tol
-      )
-      cli::cli_alert_warning(msg)
+      cli::cli_alert_warning(sprintf(
+        "Not converged after %d iterations (rel dL=%.2e > %.2e)",
+        control$maxit, metrics$rel_l, control$tol
+      ))
       cli::cli_alert_info(
-        "Try increasing maxit, relaxing tolerances, or adjusting initial values" # nolint: line_length_linter.
+        "Try increasing maxit, relaxing tolerances, or adjusting initial values"
       )
     }
   }
 
   list(converged = converged)
-}
-
-# Model Finalization ===========================================================
-
-#' @noRd
-.finalize <- function(
-  data_list,
-  parameters,
-  loglik,
-  control,
-  coef_names,
-  converged,
-  posteriors,
-  posterior_moments
-) {
-  n_subjects <- length(data_list)
-  n_re <- length(posterior_moments[[1]]$mean)
-  random_effects <- t(vapply(posterior_moments, `[[`, numeric(n_re), "mean"))
-
-  names(parameters$coefficients$baseline) <- coef_names$baseline
-  names(parameters$coefficients$hazard) <- coef_names$hazard
-  names(parameters$coefficients$longitudinal) <- coef_names$longitudinal
-
-  coef_names_expanded <- c(
-    paste0("baseline:", coef_names$baseline),
-    paste0("hazard:", coef_names$hazard),
-    paste0("longitudinal:", coef_names$longitudinal)
-  )
-
-  vcov_matrix <- .compute_vcov_sem(
-    data_list,
-    posteriors,
-    posterior_moments,
-    parameters,
-    random_effects,
-    control
-  )
-  dimnames(vcov_matrix) <- list(coef_names_expanded, coef_names_expanded)
-
-  n_params <- .count_params(parameters)
-  aic <- -2 * loglik + 2 * n_params
-  bic <- -2 * loglik + n_params * log(n_subjects)
-
-  ode_solutions <- .solve_batch_ode_cppad(data_list, random_effects, parameters)
-  # nolint start: object_usage_linter
-  risk_scores <- vapply(
-    ode_solutions,
-    function(x) tail(x$log_hazard, 1),
-    numeric(1)
-  )
-  event_times <- vapply(data_list, `[[`, numeric(1), "time")
-  event_status <- vapply(data_list, `[[`, numeric(1), "status")
-
-  # Compute concordance index (C-index) for model discrimination
-  cindex <- survival::concordance(
-    Surv(event_times, event_status) ~ risk_scores,
-    reverse = TRUE
-  )$concordance
-  # nolint end
-
-  if (control$verbose > 0) {
-    cli::cli_alert_info(sprintf("C-index (concordance): %.3f", cindex))
-  }
-
-  list(
-    random_effects = random_effects,
-    vcov = vcov_matrix,
-    loglik = loglik,
-    aic = aic,
-    bic = bic,
-    cindex = cindex
-  )
 }

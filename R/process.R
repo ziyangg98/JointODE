@@ -1,9 +1,10 @@
+# Data Processing ==============================================================
+
 #' @importFrom stats na.pass
 #' @noRd
-.process <- function(
+.process_joint <- function(
   longitudinal_data,
   survival_data,
-  state,
   parsed_long = NULL,
   parsed_surv = NULL,
   survival_formula = NULL,
@@ -90,25 +91,11 @@
     } else {
       data.frame()
     }
-    initial_state <- if (!is.null(state)) {
-      state[i, , drop = TRUE]
-    } else {
-      m0 <- long_measurements[1]
-      v0 <- if (length(long_measurements) >= 2) {
-        (long_measurements[2] - long_measurements[1]) /
-          (long_times[2] - long_times[1])
-      } else {
-        0
-      }
-      c(m0, v0)
-    }
-
     data_process[[i]] <- list(
       id = unique_ids[i],
       time = event_time,
       status = event_status,
       covariates = covariates,
-      initial_state = initial_state,
       longitudinal = list(
         times = long_times,
         measurements = long_measurements,
@@ -120,4 +107,53 @@
     )
   }
   data_process
+}
+
+#' @importFrom stats model.frame model.matrix model.response
+#' @noRd
+.process_marginal <- function(formula, data, time, id, state) {
+  if (is.matrix(data)) data <- as.data.frame(data)
+  stopifnot(
+    "Data cannot be empty" = nrow(data) > 0,
+    "Data must contain a time column" = time %in% names(data),
+    "Data must contain an id column" = id %in% names(data)
+  )
+
+  mf <- model.frame(formula, data = data, na.action = na.omit)
+  y <- model.response(mf)
+  X <- model.matrix(formula, data = mf) # nolint: object_name_linter
+  stopifnot("Formula must include a response" = !is.null(y))
+
+  row_idx <- as.numeric(rownames(mf))
+  times <- data[[time]][row_idx]
+  ids <- data[[id]][row_idx]
+  subjects <- unique(ids)
+
+  subject_data <- lapply(seq_along(subjects), function(i) {
+    idx <- which(ids == subjects[i])
+    idx <- idx[order(times[idx])]
+    t_subj <- times[idx]
+    list(
+      time = max(t_subj),
+      initial_state = if (!is.null(state)) {
+        c(state[i, 1], state[i, 2])
+      } else {
+        c(0, 0)
+      },
+      longitudinal = list(
+        times = t_subj,
+        measurements = y[idx],
+        covariates = list(
+          fixed = X[idx, , drop = FALSE],
+          random = matrix(nrow = length(idx), ncol = 0)
+        )
+      )
+    )
+  })
+
+  names(subject_data) <- as.character(subjects)
+  attr(subject_data, "n_covariates") <- ncol(X)
+  attr(subject_data, "covariate_names") <- colnames(X)
+  attr(subject_data, "biomarker_clamp") <- max(abs(y)) * 5
+  subject_data
 }

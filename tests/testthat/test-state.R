@@ -3,15 +3,16 @@ test_that("State optimization with single random effect", {
 
   n_test <- 50
   test_ids <- unique(sim$data$longitudinal_data$id)[seq_len(n_test)]
-  data_list <- .process(
+  data_list <- .process_joint(
     longitudinal_formula = observed ~ biomarker +
       velocity + x1 + x2 + (biomarker + velocity | id),
     survival_formula = Surv(time, status) ~ w1 + w2,
     longitudinal_data = sim$data$longitudinal_data[
-      sim$data$longitudinal_data$id %in% test_ids, ],
+      sim$data$longitudinal_data$id %in% test_ids,
+    ],
     survival_data = sim$data$survival_data[
-      sim$data$survival_data$id %in% test_ids, ],
-    state = as.matrix(sim$data$state)[seq_len(n_test), ]
+      sim$data$survival_data$id %in% test_ids,
+    ]
   )
 
   n_subjects <- length(data_list)
@@ -20,21 +21,15 @@ test_that("State optimization with single random effect", {
   for (i in 1:n_subjects) {
     subj_data <- data_list[[i]]
     params <- sim$init
-    random_effect <- sim$data$random_effects[i, ]
+    # Pass only covariate RE (cols 3-4), skip state RE (cols 1-2)
+    random_effect <- sim$data$random_effects[i, 3:4]
 
-    opt_result <- .estimate_state(
+    results[i, ] <- .estimate_joint_state(
       initial_guess = c(0, 0),
       data = subj_data,
       random_effect = random_effect,
       parameters = params
     )
-
-    # Single Newton step should decrease objective
-    expect_true(opt_result$obj_change <= 1e-6,
-      info = sprintf("subject %d: obj increased by %.4e", i,
-                     opt_result$obj_change))
-
-    results[i, ] <- opt_result$state
   }
 
   errors <- results - sim$data$state[seq_len(n_test), ]
@@ -42,7 +37,9 @@ test_that("State optimization with single random effect", {
   rmse <- sqrt(colMeans(errors^2))
 
   expect_true(all(abs(bias) < 0.05),
-    info = paste("bias too large:", paste(round(bias, 4), collapse = ", ")))
+    info = paste("bias too large:", paste(round(bias, 4), collapse = ", "))
+  )
   expect_true(all(rmse < 0.1),
-    info = paste("rmse too large:", paste(round(rmse, 4), collapse = ", ")))
+    info = paste("rmse too large:", paste(round(rmse, 4), collapse = ", "))
+  )
 })
