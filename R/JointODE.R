@@ -50,7 +50,7 @@
 #'   \itemize{
 #'     \item \code{"default"} (default): Use zero/default initial values.
 #'     \item \code{"marginal"}: Use \code{\link{MarginalODE}} to compute
-#'       data-driven initial estimates. Falls back to defaults on failure.
+#'       data-driven initial estimates.
 #'     \item A list with the same structure as the fitted model's
 #'       \code{parameters} component for full manual control.
 #'   }
@@ -306,8 +306,8 @@ JointODE <- function(
   converged <- FALSE
 
   for (em_iter in seq_len(control$maxit)) {
-    # State optimization (every 20 iterations)
-    if (!has_state && (em_iter - 1) %% 20 == 0) {
+    # State optimization
+    if (!has_state) {
       opt_results <- .parallel_apply(
         seq_along(data_list),
         function(i) {

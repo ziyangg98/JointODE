@@ -15,11 +15,6 @@
 #'   If 0, uses all available cores (default: 0)
 #' @param quad_level Integer; quadrature level for numerical integration
 #'   (default: 4)
-#' @param trim Numeric; trimming proportion for robust estimation of
-#'   random effect variance-covariance matrix. Specifies the fraction of
-#'   extreme values to trim from each tail when computing the mean of
-#'   posterior second moments. 0 for standard mean (default), 0.5 for
-#'   median. Must be in [0, 0.5] (default: 0)
 #' @param .list Optional list of control parameters to process
 #' @param ... Additional control parameters
 #'
@@ -42,9 +37,6 @@
 #' # Parallel computation
 #' control <- JointODE.control(parallel = TRUE, n_cores = 4)
 #'
-#' # Robust estimation for data with potential outliers
-#' control <- JointODE.control(trim = 0.05)
-#'
 #' # Process an existing list
 #' my_list <- list(maxit = 200)
 #' control <- JointODE.control(.list = my_list)
@@ -58,71 +50,35 @@ JointODE.control <- function(
   parallel = FALSE,
   n_cores = 0,
   quad_level = 4,
-  trim = 0,
   .list = NULL,
   ...
 ) {
-  # Define defaults (use function arguments as source of truth)
   defaults <- list(
-    maxit = maxit,
-    tol = tol,
-    verbose = verbose,
-    parallel = parallel,
-    n_cores = n_cores,
-    quad_level = quad_level,
-    trim = trim
+    maxit = maxit, tol = tol, verbose = verbose,
+    parallel = parallel, n_cores = n_cores, quad_level = quad_level
   )
 
-  # If a list is provided, merge with defaults
   if (!is.null(.list)) {
-    if (!is.list(.list)) {
-      stop(".list must be a list or NULL")
-    }
+    if (!is.list(.list)) stop(".list must be a list or NULL")
     control <- defaults
-    for (name in names(.list)) {
-      control[[name]] <- .list[[name]]
-    }
+    for (name in names(.list)) control[[name]] <- .list[[name]]
   } else {
     control <- defaults
   }
 
-  # Add any additional parameters
   dots <- list(...)
-  if (length(dots) > 0) {
-    for (name in names(dots)) {
-      control[[name]] <- dots[[name]]
-    }
-  }
+  for (name in names(dots)) control[[name]] <- dots[[name]]
 
-  # Process verbose parameter - ensure it's numeric
-  if (!is.null(control$verbose)) {
-    if (is.logical(control$verbose)) {
-      control$verbose <- as.numeric(control$verbose)
-    } else if (!is.numeric(control$verbose)) {
-      stop("verbose must be logical (TRUE/FALSE) or numeric (0, 1, 2)")
-    }
-  } else {
-    control$verbose <- 0
-  }
+  control$verbose <- as.numeric(control$verbose)
 
-  # Validate parameters
-  if (control$maxit <= 0) {
-    stop("maxit must be positive")
-  }
-  if (control$tol <= 0) {
-    stop("tol must be positive")
-  }
-  if (!is.logical(control$parallel)) {
-    stop("parallel must be TRUE or FALSE")
-  }
+  if (control$maxit <= 0) stop("maxit must be positive")
+  if (control$tol <= 0) stop("tol must be positive")
+  if (!is.logical(control$parallel)) stop("parallel must be TRUE or FALSE")
   if (!is.numeric(control$n_cores) || control$n_cores < 0) {
     stop("n_cores must be a non-negative integer")
   }
   if (!is.numeric(control$quad_level) || control$quad_level < 1) {
     stop("quad_level must be a positive integer")
-  }
-  if (!is.numeric(control$trim) || control$trim < 0 || control$trim > 0.5) {
-    stop("trim must be a number in [0, 0.5]")
   }
 
   control

@@ -150,11 +150,8 @@ NULL
 ) {
   objective <- function(theta) {
     result <- .compute_logpost_cppad(
-      random_effect = theta,
-      data = data,
-      parameters = parameters,
-      gradient = TRUE,
-      hessian = TRUE
+      random_effect = theta, data = data,
+      parameters = parameters, gradient = TRUE, hessian = TRUE
     )
     value <- -as.numeric(result)
     attr(value, "gradient") <- -as.vector(attr(result, "gradient"))
@@ -162,72 +159,32 @@ NULL
     value
   }
 
-  fit <- tryCatch(
-    suppressWarnings(
-      nlm(
-        f = objective,
-        p = random_effect,
-        hessian = FALSE,
-        check.analyticals = FALSE
-      )
-    ),
-    error = function(e) {
-      # nlm failed (e.g., non-finite value); fall back to initial estimate
-      list(estimate = random_effect, minimum = NA_real_, code = 5)
-    }
+  fit <- nlm(
+    f = objective, p = random_effect,
+    hessian = FALSE, check.analyticals = FALSE
   )
 
   result_at_mode <- .compute_logpost_cppad(
-    random_effect = fit$estimate,
-    data = data,
-    parameters = parameters,
-    gradient = FALSE,
-    hessian = TRUE
+    random_effect = fit$estimate, data = data,
+    parameters = parameters, gradient = FALSE, hessian = TRUE
   )
   hessian_neglogpost <- -attr(result_at_mode, "hessian")
 
-  # Compute Cholesky factor for AGHQ
-  # If direct solve fails, try regularization to ensure positive definiteness
-  chol_factor <- tryCatch(
-    {
-      t(chol(solve(hessian_neglogpost)))
-    },
-    error = function(e) {
-      # Fallback 1: Add small diagonal regularization
-      tryCatch(
-        {
-          diag_reg <- mean(diag(hessian_neglogpost)) * 1e-6
-          regularized_hess <- hessian_neglogpost +
-            diag(diag_reg, nrow(hessian_neglogpost))
-          t(chol(solve(regularized_hess)))
-        },
-        error = function(e2) {
-          # Fallback 2: Use eigenvalue decomposition for more stable inverse
-          tryCatch(
-            {
-              eig <- eigen(hessian_neglogpost, symmetric = TRUE)
-              # Threshold small eigenvalues
-              eig$values[eig$values < max(eig$values) * 1e-10] <- max(
-                eig$values
-              ) *
-                1e-10
-              hess_inv <- eig$vectors %*%
-                diag(1 / eig$values) %*%
-                t(eig$vectors)
-              t(chol(hess_inv))
-            },
-            error = function(e3) {
-              # Last resort: use identity scaled by Hessian trace
-              warning(
-                "Cholesky decomposition failed, using diagonal approximation"
-              )
-              diag(1 / sqrt(diag(hessian_neglogpost)))
-            }
-          )
-        }
-      )
+  # Gill-Murray: find minimal tau s.t. H + tau*I is positive definite
+  n <- nrow(hessian_neglogpost)
+  tau <- 0
+  ds <- max(abs(diag(hessian_neglogpost)), 1, na.rm = TRUE)
+  if (!is.finite(ds)) ds <- 1
+  chol_factor <- NULL
+  for (k in seq_len(20)) {
+    R <- try(chol(hessian_neglogpost + diag(tau, n)), silent = TRUE)
+    if (!inherits(R, "try-error")) {
+      chol_factor <- t(backsolve(R, diag(n)))
+      break
     }
-  )
+    tau <- if (tau == 0) 1e-4 * ds else tau * 10
+  }
+  if (is.null(chol_factor)) chol_factor <- diag(1e-4, n)
 
   quad <- .get_quad_grid(length(fit$estimate), level)
   quad_nodes <- quad$nodes
@@ -250,10 +207,7 @@ NULL
     as.numeric(result)
   }, numeric(1))
 
-  # Compute Jacobian factor for coordinate transformation
-  # When transforming from standard GHN points z to posterior space
-  # theta = m + L*z, where L = chol(solve(H)), the weights need to
-  # be multiplied by |det(L)|
+  # AGHQ change-of-variables: |det(L)| Jacobian factor
   det_result <- determinant(hessian_neglogpost, logarithm = TRUE)
   log_jacobian <- -0.5 * as.numeric(det_result$modulus)
 

@@ -68,7 +68,7 @@ range of observed event times (default: \code{NULL})}
 \itemize{
 \item \code{"default"} (default): Use zero/default initial values.
 \item \code{"marginal"}: Use \code{\link{MarginalODE}} to compute
-data-driven initial estimates. Falls back to defaults on failure.
+data-driven initial estimates.
 \item A list with the same structure as the fitted model's
 \code{parameters} component for full manual control.
 }

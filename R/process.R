@@ -93,7 +93,14 @@
     initial_state <- if (!is.null(state)) {
       state[i, , drop = TRUE]
     } else {
-      c(0, 0)
+      m0 <- long_measurements[1]
+      v0 <- if (length(long_measurements) >= 2) {
+        (long_measurements[2] - long_measurements[1]) /
+          (long_times[2] - long_times[1])
+      } else {
+        0
+      }
+      c(m0, v0)
     }
 
     data_process[[i]] <- list(

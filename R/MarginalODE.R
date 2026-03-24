@@ -41,14 +41,12 @@ NULL
     .marginal_state_objective(state, subject_data, theta)
   }
 
-  fit <- suppressWarnings(
-    nlm(
-      f = objective,
-      p = initial_guess,
-      iterlim = 10,
-      hessian = FALSE,
-      check.analyticals = FALSE
-    )
+  fit <- nlm(
+    f = objective,
+    p = initial_guess,
+    iterlim = 10,
+    hessian = FALSE,
+    check.analyticals = FALSE
   )
 
   list(
@@ -190,11 +188,11 @@ MarginalODE <- function(
       opt_results <- .parallel_apply(
         seq_along(data_list),
         function(i) {
-          suppressWarnings(.estimate_marginal_state(
+          .estimate_marginal_state(
             data_list[[i]]$initial,
             data_list[[i]],
             theta
-          ))
+          )
         },
         control$parallel,
         control$n_cores,
@@ -205,7 +203,7 @@ MarginalODE <- function(
       }
 
       # Step 2: Optimize theta given initial states
-      res_theta <- suppressWarnings(nlm(
+      res_theta <- nlm(
         function(theta) {
           .compute_marginal_objective_cppad(theta, data_list, TRUE, TRUE)
         },
@@ -213,7 +211,7 @@ MarginalODE <- function(
         print.level = if (control$verbose > 1) 2 else 0,
         hessian = FALSE,
         check.analyticals = FALSE
-      ))
+      )
 
       theta <- res_theta$estimate
       curr_obj <- res_theta$minimum
@@ -290,32 +288,9 @@ MarginalODE <- function(
     hessian = TRUE
   )
 
-  vcov_matrix <- tryCatch(
-    {
-      hess <- attr(final_result, "hessian")
-      inv_h <- solve(hess)
-      if (any(eigen(inv_h, symmetric = TRUE, only.values = TRUE)$values <= 0)) {
-        if (control$verbose > 0) {
-          cli::cli_alert_warning("Hessian inverse not positive definite")
-        }
-        matrix(
-          NA,
-          n_params,
-          n_params,
-          dimnames = list(param_names, param_names)
-        )
-      } else {
-        dimnames(inv_h) <- list(param_names, param_names)
-        inv_h
-      }
-    },
-    error = function(e) {
-      if (control$verbose > 0) {
-        cli::cli_alert_warning("Failed to compute vcov: {e$message}")
-      }
-      matrix(NA, n_params, n_params, dimnames = list(param_names, param_names))
-    }
-  )
+  hess <- attr(final_result, "hessian")
+  vcov_matrix <- solve(hess)
+  dimnames(vcov_matrix) <- list(param_names, param_names)
 
   n_obs <- sum(vapply(data_list, function(s) length(s$response), integer(1)))
   residual_sd <- sqrt(res$minimum / (n_obs - n_params))

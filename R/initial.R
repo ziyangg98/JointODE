@@ -58,34 +58,11 @@
     response = parsed_long$response
   )
 
-  marginal_fit <- tryCatch(
-    {
-      MarginalODE(
-        fixed_formula,
-        longitudinal_data,
-        time,
-        id,
-        state,
-        control_opts
-      )
-    },
-    error = function(e) {
-      if (verbose > 0) {
-        cli::cli_alert_warning(
-          "MarginalODE failed with error: {e$message}"
-        )
-        cli::cli_alert_warning("Using default initial values")
-      }
-      NULL
-    }
+  marginal_fit <- MarginalODE(
+    fixed_formula, longitudinal_data, time, id, state, control_opts
   )
-
-  # Check if MarginalODE failed or didn't converge
-  if (is.null(marginal_fit) || !marginal_fit$convergence$converged) {
-    if (!is.null(marginal_fit) && verbose > 0) {
-      cli::cli_alert_warning("MarginalODE failed to converge, using defaults")
-    }
-    return(default_init)
+  if (!marginal_fit$convergence$converged) {
+    stop("MarginalODE failed to converge", call. = FALSE)
   }
 
   longitudinal <- marginal_fit$parameters
@@ -155,17 +132,7 @@
   )
   cox_data <- merged_data[, c("start", "stop", "event", cox_predictors)]
 
-  cox_fit <- tryCatch(
-    survival::coxph(cox_formula, data = cox_data),
-    error = function(e) {
-      stop(
-        "Cox model fit failed: ",
-        e$message,
-        "\nCheck for sufficient events and covariate variation.",
-        call. = FALSE
-      )
-    }
-  )
+  cox_fit <- survival::coxph(cox_formula, data = cox_data)
 
   required_coefs <- c("biomarker", "velocity", surv_cov_names)
   missing_coefs <- setdiff(required_coefs, names(coef(cox_fit)))
@@ -233,28 +200,10 @@
     ") ~ 1"
   ))
 
-  weibull_fit <- tryCatch(
-    survival::survreg(weibull_formula, data = survival_data, dist = "weibull"),
-    error = function(e) {
-      if (verbose > 0) {
-        cli::cli_alert_warning("Weibull fit failed: {e$message}")
-      }
-      NULL
-    }
+  weibull_fit <- survival::survreg(
+    weibull_formula, data = survival_data, dist = "weibull"
   )
 
-  if (is.null(weibull_fit)) {
-    if (verbose > 0) {
-      cli::cli_alert_warning("Using constant baseline hazard")
-    }
-    n_events <- sum(survival_data[[status_var]])
-    total_time <- sum(survival_data[[time_var]])
-    const_hazard <- log(pmax(n_events / total_time, 0.01))
-    return(rep(const_hazard, spline_config$df))
-  }
-
-  # Weibull parameterization: log(T) = μ + σ*ε
-  # Hazard: λ_0(t) = (γ/α) * (t/α)^(γ-1), α = exp(μ), γ = 1/σ
   mu <- coef(weibull_fit)[1]
   sigma <- weibull_fit$scale
   alpha <- exp(mu)
@@ -268,10 +217,7 @@
 
   event_times <- survival_data[[time_var]][survival_data[[status_var]] == 1]
   if (length(event_times) < 2) {
-    if (verbose > 0) {
-      cli::cli_alert_warning("Insufficient events, using constant baseline")
-    }
-    return(rep(log(0.01), spline_config$df))
+    stop("Insufficient events for baseline hazard estimation", call. = FALSE)
   }
 
   max_time <- max(survival_data[[time_var]])
@@ -288,22 +234,7 @@
     degree = spline_config$degree,
     intercept = TRUE
   )
-  qr_decomp <- qr(basis)
-
-  if (qr_decomp$rank < ncol(basis)) {
-    if (verbose > 0) {
-      cli::cli_alert_warning("Spline basis rank-deficient, using constant")
-    }
-    coef <- rep(mean(log_hazard), ncol(basis))
-  } else {
-    coef <- qr.coef(qr_decomp, log_hazard)
-    if (anyNA(coef)) {
-      if (verbose > 0) {
-        cli::cli_alert_warning("QR produced NA, using mean log-hazard")
-      }
-      coef <- rep(mean(log_hazard), ncol(basis))
-    }
-  }
+  coef <- qr.coef(qr(basis), log_hazard)
 
   if (verbose > 0) {
     cli::cli_alert_success("Baseline initialized via Weibull")
@@ -440,6 +371,10 @@
   # Ensure baseline config always uses the computed spline configuration
   # (.compute_initial() fallback may use raw config without knots/boundary)
   parameters$configurations$baseline <- spline_baseline_config
+
+  # Data-adaptive biomarker clamp: 5x max observed value (standardized)
+  response <- model.response(long_fixed_frame)
+  parameters$configurations$biomarker_clamp <- max(abs(response)) * 5
 
   # Set correct names after initialization
   names(parameters$coefficients$baseline) <- coef_names$baseline

@@ -266,21 +266,13 @@
 # Variance-Covariance ==========================================================
 
 #' @noRd
-.update_random_effect_sigma <- function(posterior_moments, n_subjects, control) {
+.update_random_effect_sigma <- function(posterior_moments, n_subjects) {
   n_re <- length(posterior_moments[[1]]$mean)
-  if (control$trim == 0) {
-    sigma_sum <- matrix(0, n_re, n_re)
-    for (i in seq_len(n_subjects)) {
-      sigma_sum <- sigma_sum + posterior_moments[[i]]$second_moment
-    }
-    sigma <- sigma_sum / n_subjects
-  } else {
-    all_second_moments <- simplify2array(
-      lapply(posterior_moments, `[[`, "second_moment")
-    )
-    sigma <- apply(all_second_moments, 1:2, mean, trim = control$trim)
+  sigma_sum <- matrix(0, n_re, n_re)
+  for (i in seq_len(n_subjects)) {
+    sigma_sum <- sigma_sum + posterior_moments[[i]]$second_moment
   }
-  sigma
+  sigma_sum / n_subjects
 }
 
 #' Fast M-step mapping for SEM Jacobian (fixed posteriors, no loglik eval)
@@ -291,27 +283,22 @@
   params_input <- .vector_to_coef(parameters, theta_input)
   n_subjects <- length(data_list)
 
-  # Update sigma from fixed posterior moments
   random_effect_sigma <- .update_random_effect_sigma(
-    posterior_moments, n_subjects, control
+    posterior_moments, n_subjects
   )
-
-  # Update measurement error from fixed posteriors
   measurement_error_sd <- .update_measurement_error_sd(
     data_list, params_input, posteriors
   )
   params_input$coefficients$measurement_error_sd <- measurement_error_sd
   params_input$coefficients$random_effect_sigma <- random_effect_sigma
 
-  # Newton M-step (gradient + hessian only)
   theta <- .coef_to_vector(params_input)
   obj <- .compute_objective_expected(
     theta, data_list, posteriors, params_input,
     gradient = TRUE, hessian = TRUE,
     parallel = control$parallel, n_cores = control$n_cores
   )
-  direction <- solve(attr(obj, "hessian"), attr(obj, "gradient"))
-  theta - direction
+  theta - solve(attr(obj, "hessian"), attr(obj, "gradient"))
 }
 
 #' @noRd
@@ -447,7 +434,6 @@
     hessian = TRUE
   )
 
-  # Return negative for minimization
   value <- -as.numeric(result)
   attr(value, "gradient") <- -as.vector(attr(result, "gradient"))
   attr(value, "hessian") <- -as.matrix(attr(result, "hessian"))
@@ -471,15 +457,13 @@
 
   obj_initial <- as.numeric(objective(initial_guess))
 
-  fit <- suppressWarnings(
-    nlm(
-      f = objective,
-      p = initial_guess,
-      iterlim = max_iter,
-      gradtol = tol,
-      hessian = FALSE,
-      check.analyticals = FALSE
-    )
+  fit <- nlm(
+    f = objective,
+    p = initial_guess,
+    iterlim = max_iter,
+    gradtol = tol,
+    hessian = FALSE,
+    check.analyticals = FALSE
   )
 
   list(
@@ -516,7 +500,7 @@
   random_effects <- t(vapply(posterior_moments, `[[`, numeric(n_re), "mean"))
 
   random_effect_sigma <- .update_random_effect_sigma(
-    posterior_moments, n_subjects, control
+    posterior_moments, n_subjects
   )
 
   measurement_error_sd <- .update_measurement_error_sd(
@@ -545,22 +529,8 @@
   grad <- attr(obj, "gradient")
   hess <- attr(obj, "hessian")
 
-  if (any(!is.finite(grad)) || any(!is.finite(hess))) {
-    warning("Non-finite gradient/hessian detected, skipping Newton step",
-      call. = FALSE
-    )
-  } else {
-    direction <- tryCatch(
-      solve(hess, grad),
-      error = function(e) NULL
-    )
-    if (!is.null(direction) && all(is.finite(direction))) {
-      theta_new <- theta - direction
-      parameters <- .vector_to_coef(parameters, theta_new)
-    } else {
-      warning("Singular Hessian, skipping Newton step", call. = FALSE)
-    }
-  }
+  direction <- solve(hess, grad)
+  parameters <- .vector_to_coef(parameters, theta - direction)
 
   list(
     parameters = parameters,
