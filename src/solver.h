@@ -1,5 +1,5 @@
-#ifndef UTILS_HPP
-#define UTILS_HPP
+#ifndef SOLVER_H
+#define SOLVER_H
 
 #include <RcppArmadillo.h>
 
@@ -21,10 +21,31 @@ typedef CppAD::vector<ADdouble> ADvector;
 
 const double HAZARD_CLAMP_MAX = 20.0;
 const double HAZARD_CLAMP_MIN = -20.0;
+const double BIOMARKER_CLAMP_DEFAULT = 50.0;  // fallback if not set from data
 const double SPLINE_DENOM_TOL = 1e-8;
 const double TIME_MATCH_TOL = 1e-10;
-const size_t MIN_ODE_STEPS = 2;
-const double STEPS_PER_UNIT_TIME = 5.0;
+const double DISC_TOL = 1e-12;
+
+// Branch type for matrix exponential
+// ODE root types for d2m/dt2 = b1*m + b2*m' + f
+// Roots of r^2 - b2*r - b1 = 0, discriminant D = b2^2 + 4*b1
+//   REAL:       D > 0, |b1| > eps (both roots well-separated from 0)
+//   FIRST_ORD:  |b1| ~ 0 (degenerates to first-order ODE v' = b2*v + f)
+//   COMPLEX:    D < 0
+//   REPEATED:   D ~ 0, |b2| > eps (double root at b2/2)
+//   ZERO:       D ~ 0, |b2| ~ 0 (trivial: m'' ≈ f)
+enum class MatExpBranch { REAL, FIRST_ORD, COMPLEX, REPEATED, ZERO };
+
+inline MatExpBranch classify_disc(double b1, double b2) {
+  if (std::abs(b1) < 1e-8) {
+    return std::abs(b2) > 1e-8 ? MatExpBranch::FIRST_ORD : MatExpBranch::ZERO;
+  }
+  double D = b2 * b2 + 4.0 * b1;
+  if (D > DISC_TOL) return MatExpBranch::REAL;
+  if (D < -DISC_TOL) return MatExpBranch::COMPLEX;
+  return MatExpBranch::REPEATED;
+}
+
 
 // ============================================================================
 // Basic utility functions
@@ -43,7 +64,7 @@ inline double get_value<double>(const double& x) {
 
 // Clamp value using CppAD conditional expressions
 template <typename Scalar>
-inline Scalar clamp_value(const Scalar& value, const Scalar& min_val,
+inline Scalar clamp(const Scalar& value, const Scalar& min_val,
                           const Scalar& max_val) {
   return CppAD::CondExpGt(value, max_val, max_val,
                           CppAD::CondExpLt(value, min_val, min_val, value));
@@ -94,29 +115,14 @@ struct ODEParams {
   bool biomarker_random;
   bool velocity_fixed;
   bool velocity_random;
+  MatExpBranch branch;
+  double biomarker_clamp;
 };
 
 // Workspace for B-spline computation
 class BSplineWorkspace {
  public:
-  std::vector<double> basis;
-  std::vector<double> knots;
-  std::vector<double> work1;
-  std::vector<double> work2;
-  BSplineWorkspace() {
-    basis.reserve(20);
-    knots.reserve(50);
-    work1.reserve(20);
-    work2.reserve(20);
-  }
-
-  // Explicitly clear memory when workspace is no longer needed
-  void clear() {
-    std::vector<double>().swap(basis);
-    std::vector<double>().swap(knots);
-    std::vector<double>().swap(work1);
-    std::vector<double>().swap(work2);
-  }
+  std::vector<double> basis, knots, work1, work2;
 };
 
 // ============================================================================
@@ -125,7 +131,7 @@ class BSplineWorkspace {
 
 // Fill subject data from R List
 template <typename Scalar>
-inline void fill_subject_data(SubjectData<Scalar>& subj, const List& data,
+inline void load_subject(SubjectData<Scalar>& subj, const List& data,
                               const std::vector<Scalar>& random_effects) {
   subj = SubjectData<Scalar>();
   subj.event_time = data["time"];
@@ -196,7 +202,7 @@ inline void fill_subject_data(SubjectData<Scalar>& subj, const List& data,
 
 // Fill ODE configuration from R List
 template <typename Scalar>
-inline void fill_ode_config(ODEParams<Scalar>& params, const List& parameters) {
+inline void load_config(ODEParams<Scalar>& params, const List& parameters) {
   List configurations = parameters["configurations"];
   List baseline_config = configurations["baseline"];
 
@@ -219,11 +225,15 @@ inline void fill_ode_config(ODEParams<Scalar>& params, const List& parameters) {
   params.biomarker_random = as<bool>(biomarker_config["random"]);
   params.velocity_fixed = as<bool>(velocity_config["fixed"]);
   params.velocity_random = as<bool>(velocity_config["random"]);
+
+  params.biomarker_clamp = configurations.containsElementNamed("biomarker_clamp")
+    ? as<double>(configurations["biomarker_clamp"])
+    : BIOMARKER_CLAMP_DEFAULT;
 }
 
 // Fill all ODE parameters from R List
 template <typename Scalar>
-inline void fill_ode_parameters(ODEParams<Scalar>& params,
+inline void load_params(ODEParams<Scalar>& params,
                                 const List& parameters) {
   List coefficients = parameters["coefficients"];
   NumericVector baseline = coefficients["baseline"];
@@ -246,7 +256,22 @@ inline void fill_ode_parameters(ODEParams<Scalar>& params,
   params.random_effect_sigma =
       as<arma::mat>(coefficients["random_effect_sigma"]);
 
-  fill_ode_config(params, parameters);
+  load_config(params, parameters);
+
+  // Branch from fixed effects (longitudinal[0]=b1, longitudinal[1]=b2)
+  params.branch = classify_disc(longitudinal[0], longitudinal[1]);
+}
+
+// Update branch when random effects shift b1 or b2
+inline void update_branch(MatExpBranch& branch,
+                           const NumericVector& longitudinal,
+                           const NumericVector& re,
+                           bool biomarker_random, bool velocity_random) {
+  double b1 = longitudinal[0], b2 = longitudinal[1];
+  int ri = 0;
+  if (biomarker_random) b1 += re[ri++];
+  if (velocity_random) b2 += re[ri++];
+  branch = classify_disc(b1, b2);
 }
 
 // ============================================================================
@@ -254,7 +279,7 @@ inline void fill_ode_parameters(ODEParams<Scalar>& params,
 // ============================================================================
 
 // Build time points for ODE solving
-inline std::vector<double> build_times(const std::vector<double>& obs_times,
+inline std::vector<double> time_grid(const std::vector<double>& obs_times,
                                        double event_time) {
   std::vector<double> times;
   times.reserve(obs_times.size() + 2);
@@ -272,7 +297,7 @@ inline std::vector<double> build_times(const std::vector<double>& obs_times,
 }
 
 // Find index of target time in sorted time vector
-inline int find_time_idx(const std::vector<double>& times, double target) {
+inline int time_index(const std::vector<double>& times, double target) {
   auto it = std::lower_bound(times.begin(), times.end(), target);
   return (it != times.end() && std::abs(*it - target) < TIME_MATCH_TOL)
              ? std::distance(times.begin(), it)
@@ -280,7 +305,7 @@ inline int find_time_idx(const std::vector<double>& times, double target) {
 }
 
 // Extract covariates at a specific time
-inline void extract_covariates_at_time(
+inline void covariates_at(
     double t, const std::vector<double>& times,
     const std::vector<std::vector<double>>& covariates,
     std::vector<double>& result) {
@@ -302,7 +327,7 @@ inline void extract_covariates_at_time(
 // ============================================================================
 
 // Compute B-spline basis functions
-inline void compute_bspline_basis(double t, int degree,
+inline void bspline_basis(double t, int degree,
                                   const std::vector<double>& interior_knots,
                                   const std::vector<double>& boundary,
                                   std::vector<double>& basis,
@@ -385,7 +410,7 @@ inline void compute_bspline_basis(double t, int degree,
 
 // Compute log hazard function
 template <typename Scalar>
-inline Scalar compute_log_hazard(Scalar biomarker, Scalar velocity,
+inline Scalar log_hazard(Scalar biomarker, Scalar velocity,
                                  const std::vector<double>& basis_lambda,
                                  const std::vector<Scalar>& baseline_coefs,
                                  const std::vector<Scalar>& hazard_coefs,
@@ -416,15 +441,15 @@ inline Scalar compute_log_hazard(Scalar biomarker, Scalar velocity,
 
 // Compute acceleration (biomarker second derivative)
 template <typename Scalar>
-inline Scalar compute_acceleration(
+inline Scalar acceleration(
     Scalar biomarker, Scalar velocity, double t,
     const SubjectData<Scalar>& subj,
     const std::vector<Scalar>& longitudinal_coefs, bool biomarker_fixed,
     bool biomarker_random, bool velocity_fixed, bool velocity_random) {
   std::vector<double> covs_fixed, covs_random;
-  extract_covariates_at_time(t, subj.longitudinal_times,
+  covariates_at(t, subj.longitudinal_times,
                              subj.longitudinal_covariates_fixed, covs_fixed);
-  extract_covariates_at_time(t, subj.longitudinal_times,
+  covariates_at(t, subj.longitudinal_times,
                              subj.longitudinal_covariates_random, covs_random);
 
   Scalar acceleration = Scalar(0.0);
@@ -452,99 +477,218 @@ inline Scalar compute_acceleration(
 }
 
 // ============================================================================
-// ODE solving
+// Matrix Exponential ODE Solver
 // ============================================================================
 
-// ODE functor for Runge-Kutta solver
+// Advance [m, v] by dt. Solves d2m/dt2 = b1*m + b2*m' + f exactly via
+// matrix exponential (Cayley-Hamilton) + integral formulation for forcing.
+// Branch pre-classified from doubles — no CondExp, minimal AD tape.
 template <typename Scalar>
-class ODEFunctor {
- private:
-  const ODEParams<Scalar>& params_;
-  BSplineWorkspace workspace_;
+inline void ode_step(Scalar& m, Scalar& v,
+                          Scalar b1, Scalar b2, Scalar f,
+                          Scalar dt, MatExpBranch br) {
+  const Scalar h = b2 * Scalar(0.5);
+  Scalar a0, a1, J0, J1;
 
- public:
-  explicit ODEFunctor(const ODEParams<Scalar>& params)
-      : params_(params), workspace_() {
-    // Pre-compute knots once (they are constant during ODE solving)
-    compute_bspline_basis(0.0, params_.spline_degree, params_.spline_knots,
-                          params_.spline_boundary, workspace_.basis,
-                          workspace_.knots, workspace_.work1, workspace_.work2,
-                          false);  // Build knots
+  if (br == MatExpBranch::REAL) {
+    // D > 0, |b1| > eps: both roots well-separated from zero
+    const Scalar s = CppAD::sqrt(b2 * b2 + Scalar(4.0) * b1);
+    const Scalar l1 = h + s * Scalar(0.5), l2 = h - s * Scalar(0.5);
+    const Scalar e1 = CppAD::exp(l1 * dt), e2 = CppAD::exp(l2 * dt);
+    a0 = (l1 * e2 - l2 * e1) / s;
+    a1 = (e1 - e2) / s;
+    const Scalar F1 = (e1 - Scalar(1.0)) / l1;
+    const Scalar F2 = (e2 - Scalar(1.0)) / l2;
+    J1 = (F1 - F2) / s;
+    J0 = (l1 * F2 - l2 * F1) / s;
+
+  } else if (br == MatExpBranch::FIRST_ORD) {
+    // b1 ~ 0: m'' = b2*m' + f (first-order in v = m')
+    // v(t) = (v0 + f/b2)*e^{b2t} - f/b2
+    // m(t) = m0 + (v0 + f/b2)*(e^{b2t}-1)/b2 - f*t/b2
+    const Scalar eb = CppAD::exp(b2 * dt);
+    const Scalar Fb = (eb - Scalar(1.0)) / b2;  // b2 != 0 (guaranteed)
+    const Scalar vf = v + f / b2;  // v0 + f/b2
+    m = m + vf * Fb - f * dt / b2;
+    v = vf * eb - f / b2;
+    return;  // skip the general formula below
+
+  } else if (br == MatExpBranch::COMPLEX) {
+    // D < 0: conjugate roots a ± iw, with a²+w² = -b1 > 0
+    const Scalar w = CppAD::sqrt(-(b2 * b2 + Scalar(4.0) * b1)) * Scalar(0.5);
+    const Scalar r2 = h * h + w * w;
+    const Scalar ea = CppAD::exp(h * dt);
+    const Scalar c = CppAD::cos(w * dt), s = CppAD::sin(w * dt);
+    a0 = ea * (c - h * s / w);
+    a1 = ea * s / w;
+    const Scalar Ic = (ea * (h * c + w * s) - h) / r2;
+    const Scalar Is = (ea * (h * s - w * c) + w) / r2;
+    J1 = Is / w;
+    J0 = Ic - (h / w) * Is;
+
+  } else if (br == MatExpBranch::REPEATED) {
+    // D ~ 0, |h| > eps: double root at h
+    const Scalar e = CppAD::exp(h * dt);
+    a0 = e * (Scalar(1.0) - h * dt);
+    a1 = dt * e;
+    const Scalar F = (e - Scalar(1.0)) / h;
+    J1 = (dt * e - F) / h;
+    J0 = Scalar(2.0) * F - dt * e;
+
+  } else {  // ZERO: D ~ 0, h ~ 0
+    a0 = Scalar(1.0);  a1 = dt;
+    J1 = dt * dt * Scalar(0.5);  J0 = dt;
   }
 
-  void Ode(const Scalar& t, const CppAD::vector<Scalar>& y,
-           CppAD::vector<Scalar>& dydt) {
-    const Scalar biomarker = y[1];
-    const Scalar velocity = y[2];
-
-    double t_val = get_value(t);
-    const Scalar acceleration = compute_acceleration(
-        biomarker, velocity, t_val, params_.subject, params_.longitudinal_coefs,
-        params_.biomarker_fixed, params_.biomarker_random,
-        params_.velocity_fixed, params_.velocity_random);
-    compute_bspline_basis(t_val, params_.spline_degree, params_.spline_knots,
-                          params_.spline_boundary, workspace_.basis,
-                          workspace_.knots, workspace_.work1, workspace_.work2,
-                          true);  // Skip knots rebuild (already initialized)
-
-    const Scalar log_hazard =
-        compute_log_hazard(biomarker, velocity, workspace_.basis,
-                           params_.baseline_coefs, params_.hazard_coefs,
-                           params_.subject.survival_covariates, params_.gamma);
-
-    const Scalar clamped_log_hazard = clamp_value(
-        log_hazard, Scalar(HAZARD_CLAMP_MIN), Scalar(HAZARD_CLAMP_MAX));
-
-    const Scalar hazard = CppAD::exp(clamped_log_hazard);
-
-    dydt[0] = hazard;
-    dydt[1] = velocity;
-    dydt[2] = acceleration;
-  }
-};
-
-// Solve ODE system using Runge-Kutta method
-template <typename Scalar>
-inline std::vector<std::vector<Scalar>> solve_ode(
-    const std::vector<Scalar>& y0, const std::vector<double>& times,
-    const ODEParams<Scalar>& params) {
-  const int n_state = y0.size();
-  const int n_times = times.size();
-
-  ODEFunctor<Scalar> ode_fun(params);
-
-  std::vector<std::vector<Scalar>> solution(n_times,
-                                            std::vector<Scalar>(n_state));
-  CppAD::vector<Scalar> yi(n_state);
-
-  // Initialize with initial conditions - copy once
-  std::copy(y0.begin(), y0.end(), yi.begin());
-  std::copy(y0.begin(), y0.end(), solution[0].begin());
-
-  Scalar ti = Scalar(times[0]);
-  Scalar tf, dt;
-
-  for (int idx = 1; idx < n_times; idx++) {
-    tf = Scalar(times[idx]);
-    dt = tf - ti;
-
-    const size_t M = std::max(
-        MIN_ODE_STEPS,
-        static_cast<size_t>(std::ceil(get_value(dt) * STEPS_PER_UNIT_TIME)));
-
-    yi = CppAD::Runge45(ode_fun, M, ti, tf, yi);
-
-    for (int i = 0; i < n_state; ++i) {
-      solution[idx][i] = yi[i];
-    }
-
-    ti = tf;
-  }
-
-  // Clear temporary vector memory explicitly
-  CppAD::vector<Scalar>().swap(yi);
-
-  return solution;
+  const Scalar mn = a0 * m + a1 * v + f * J1;
+  const Scalar vn = b1 * a1 * m + (a0 + b2 * a1) * v + f * (J0 + b2 * J1);
+  m = mn;  v = vn;
 }
 
-#endif  // UTILS_HPP
+// Compute clamped hazard value from log-hazard
+template <typename Scalar>
+inline Scalar eval_hazard(Scalar biomarker, Scalar velocity,
+                          const ODEParams<Scalar>& params,
+                          BSplineWorkspace& ws, double t) {
+  bspline_basis(t, params.spline_degree, params.spline_knots,
+                params.spline_boundary, ws.basis, ws.knots,
+                ws.work1, ws.work2, true);
+  Scalar lh = log_hazard(biomarker, velocity, ws.basis,
+                          params.baseline_coefs, params.hazard_coefs,
+                          params.subject.survival_covariates, params.gamma);
+  return clamp(lh, Scalar(HAZARD_CLAMP_MIN), Scalar(HAZARD_CLAMP_MAX));
+}
+
+// Solve ODE: matexp for biomarker, log-linear for cumulative hazard
+template <typename Scalar>
+inline std::vector<std::vector<Scalar>> ode_solve(
+    const std::vector<Scalar>& y0, const std::vector<double>& times,
+    const ODEParams<Scalar>& params) {
+  const int nt = times.size();
+  BSplineWorkspace ws;
+  bspline_basis(0.0, params.spline_degree, params.spline_knots,
+                params.spline_boundary, ws.basis, ws.knots,
+                ws.work1, ws.work2, false);
+
+  std::vector<std::vector<Scalar>> sol(nt, std::vector<Scalar>(3));
+  Scalar H = y0[0], m = y0[1], v = y0[2];
+  sol[0] = {H, m, v};
+
+  // Cache log-hazard at interval start
+  Scalar lh_prev = eval_hazard(m, v, params, ws, times[0]);
+
+  for (int i = 1; i < nt; i++) {
+    const double t0 = times[i - 1], t1 = times[i], dt = t1 - t0;
+
+    // Extract beta1, beta2, forcing
+    Scalar b1(0), b2(0), f(0);
+    std::vector<double> cf, cr;
+    covariates_at(t0, params.subject.longitudinal_times,
+                  params.subject.longitudinal_covariates_fixed, cf);
+    covariates_at(t0, params.subject.longitudinal_times,
+                  params.subject.longitudinal_covariates_random, cr);
+    size_t fi = 0, ri = 0;
+    if (params.biomarker_fixed) b1 = params.longitudinal_coefs[fi++];
+    if (params.biomarker_random) b1 += params.subject.random_effect[ri++];
+    if (params.velocity_fixed) b2 = params.longitudinal_coefs[fi++];
+    if (params.velocity_random) b2 += params.subject.random_effect[ri++];
+    for (size_t j = 0; j < cf.size(); j++)
+      f += params.longitudinal_coefs[fi++] * Scalar(cf[j]);
+    for (size_t j = 0; j < cr.size(); j++)
+      f += params.subject.random_effect[ri++] * Scalar(cr[j]);
+
+    // Advance biomarker via matexp, clamp to prevent overflow
+    ode_step(m, v, b1, b2, f, Scalar(dt), params.branch);
+    m = clamp(m, Scalar(-params.biomarker_clamp), Scalar(params.biomarker_clamp));
+    v = clamp(v, Scalar(-params.biomarker_clamp), Scalar(params.biomarker_clamp));
+
+    // Cumulative hazard: log-linear integration
+    // Assumes log h(t) linear in [t0, t1], giving exact integral:
+    //   int h(t)dt = dt * h0 * (exp(d) - 1) / d,  d = lh1 - lh0
+    // When d ~ 0, falls back to trapezoidal (same result to first order)
+    Scalar lh_curr = eval_hazard(m, v, params, ws, t1);
+    Scalar h0 = CppAD::exp(lh_prev);
+    Scalar d = lh_curr - lh_prev;
+    Scalar ed = CppAD::exp(d);
+    Scalar abs_d = CppAD::CondExpGe(d, Scalar(0), d, -d);
+    Scalar loglin = Scalar(dt) * h0 * (ed - Scalar(1)) / d;
+    Scalar trap = Scalar(dt * 0.5) * (h0 + h0 * ed);
+    H += CppAD::CondExpGt(abs_d, Scalar(1e-8), loglin, trap);
+
+    lh_prev = lh_curr;
+    sol[i] = {H, m, v};
+  }
+  return sol;
+}
+
+// ============================================================================
+// Shared log-likelihood and tape evaluation
+// ============================================================================
+
+// Joint log-likelihood: longitudinal (Gaussian) + survival (Cox)
+// Used by objective.cpp, posterior.cpp, state.cpp
+template <typename Scalar>
+inline Scalar joint_loglik(
+    const std::vector<std::vector<Scalar>>& sol,
+    const std::vector<double>& times,
+    const ODEParams<Scalar>& params,
+    BSplineWorkspace& ws,
+    double inv_sigma_e2, double log_2pi_sigma_e2) {
+  Scalar ll(0);
+  const int n_obs = params.subject.longitudinal_times.size();
+  const Scalar half_inv(0.5 * inv_sigma_e2);
+
+  // Longitudinal: -0.5 * sum((y - m)^2 / sigma_e^2)
+  for (int i = 0; i < n_obs; i++) {
+    const int idx = time_index(times, params.subject.longitudinal_times[i]);
+    if (idx >= 0) {
+      Scalar r = Scalar(params.subject.longitudinal_measurements[i]) - sol[idx][1];
+      ll -= half_inv * r * r;
+    }
+  }
+  if (n_obs > 0) ll -= Scalar(0.5 * n_obs * log_2pi_sigma_e2);
+
+  // Survival: -H(T) + delta * log h(T)
+  const int ei = time_index(times, params.subject.event_time);
+  if (ei >= 0) {
+    ll -= sol[ei][0];
+    if (params.subject.status == 1) {
+      bspline_basis(params.subject.event_time, params.spline_degree,
+                            params.spline_knots, params.spline_boundary,
+                            ws.basis, ws.knots, ws.work1, ws.work2, true);
+      ll += log_hazard(sol[ei][1], sol[ei][2], ws.basis,
+                                params.baseline_coefs, params.hazard_coefs,
+                                params.subject.survival_covariates, params.gamma);
+    }
+  }
+  return ll;
+}
+
+// Evaluate CppAD tape: optimize, forward, reverse, hessian, cleanup
+inline NumericVector eval_tape(CppAD::ADFun<double>& tape,
+                                    const std::vector<double>& x,
+                                    int n, bool grad, bool hess) {
+  tape.optimize();
+  tape.check_for_nan(false);
+  std::vector<double> y = tape.Forward(0, x);
+
+  NumericVector result(1);
+  result[0] = y[0];
+
+  if (grad || hess) {
+    std::vector<double> g = tape.Reverse(1, std::vector<double>(1, 1.0));
+    if (grad) result.attr("gradient") = wrap(g);
+    if (hess) {
+      std::vector<double> h = tape.Hessian(x, 0);
+      NumericMatrix hm(n, n);
+      for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+          hm(i, j) = h[i * n + j];
+      result.attr("hessian") = hm;
+    }
+  }
+  tape.capacity_order(0);
+  return result;
+}
+
+#endif  // SOLVER_H

@@ -11,6 +11,67 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// compute_objective_cppad
+NumericVector compute_objective_cppad(const NumericVector& params, const List& data_list, const NumericMatrix& random_effects, const List& parameters, Nullable<NumericVector> weights, bool gradient, bool hessian);
+RcppExport SEXP _JointODE_compute_objective_cppad(SEXP paramsSEXP, SEXP data_listSEXP, SEXP random_effectsSEXP, SEXP parametersSEXP, SEXP weightsSEXP, SEXP gradientSEXP, SEXP hessianSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const NumericVector& >::type params(paramsSEXP);
+    Rcpp::traits::input_parameter< const List& >::type data_list(data_listSEXP);
+    Rcpp::traits::input_parameter< const NumericMatrix& >::type random_effects(random_effectsSEXP);
+    Rcpp::traits::input_parameter< const List& >::type parameters(parametersSEXP);
+    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type weights(weightsSEXP);
+    Rcpp::traits::input_parameter< bool >::type gradient(gradientSEXP);
+    Rcpp::traits::input_parameter< bool >::type hessian(hessianSEXP);
+    rcpp_result_gen = Rcpp::wrap(compute_objective_cppad(params, data_list, random_effects, parameters, weights, gradient, hessian));
+    return rcpp_result_gen;
+END_RCPP
+}
+// compute_logpost_cppad
+NumericVector compute_logpost_cppad(const NumericVector& random_effect, const List& data, const List& parameters, bool gradient, bool hessian);
+RcppExport SEXP _JointODE_compute_logpost_cppad(SEXP random_effectSEXP, SEXP dataSEXP, SEXP parametersSEXP, SEXP gradientSEXP, SEXP hessianSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const NumericVector& >::type random_effect(random_effectSEXP);
+    Rcpp::traits::input_parameter< const List& >::type data(dataSEXP);
+    Rcpp::traits::input_parameter< const List& >::type parameters(parametersSEXP);
+    Rcpp::traits::input_parameter< bool >::type gradient(gradientSEXP);
+    Rcpp::traits::input_parameter< bool >::type hessian(hessianSEXP);
+    rcpp_result_gen = Rcpp::wrap(compute_logpost_cppad(random_effect, data, parameters, gradient, hessian));
+    return rcpp_result_gen;
+END_RCPP
+}
+// compute_state_loglik_cppad
+NumericVector compute_state_loglik_cppad(const NumericVector& initial_state, const List& data, const NumericVector& random_effect, const List& parameters, bool gradient, bool hessian);
+RcppExport SEXP _JointODE_compute_state_loglik_cppad(SEXP initial_stateSEXP, SEXP dataSEXP, SEXP random_effectSEXP, SEXP parametersSEXP, SEXP gradientSEXP, SEXP hessianSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const NumericVector& >::type initial_state(initial_stateSEXP);
+    Rcpp::traits::input_parameter< const List& >::type data(dataSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type random_effect(random_effectSEXP);
+    Rcpp::traits::input_parameter< const List& >::type parameters(parametersSEXP);
+    Rcpp::traits::input_parameter< bool >::type gradient(gradientSEXP);
+    Rcpp::traits::input_parameter< bool >::type hessian(hessianSEXP);
+    rcpp_result_gen = Rcpp::wrap(compute_state_loglik_cppad(initial_state, data, random_effect, parameters, gradient, hessian));
+    return rcpp_result_gen;
+END_RCPP
+}
+// solve_batch_ode_cppad
+List solve_batch_ode_cppad(const List& data_list, const NumericMatrix& random_effects, const List& parameters);
+RcppExport SEXP _JointODE_solve_batch_ode_cppad(SEXP data_listSEXP, SEXP random_effectsSEXP, SEXP parametersSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const List& >::type data_list(data_listSEXP);
+    Rcpp::traits::input_parameter< const NumericMatrix& >::type random_effects(random_effectsSEXP);
+    Rcpp::traits::input_parameter< const List& >::type parameters(parametersSEXP);
+    rcpp_result_gen = Rcpp::wrap(solve_batch_ode_cppad(data_list, random_effects, parameters));
+    return rcpp_result_gen;
+END_RCPP
+}
 // compute_marginal_objective_cppad
 NumericVector compute_marginal_objective_cppad(const NumericVector& params, const List& data_list, bool gradient, bool hessian);
 RcppExport SEXP _JointODE_compute_marginal_objective_cppad(SEXP paramsSEXP, SEXP data_listSEXP, SEXP gradientSEXP, SEXP hessianSEXP) {
@@ -54,76 +115,15 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// compute_objective_cppad
-NumericVector compute_objective_cppad(const NumericVector& params, const List& data_list, const NumericMatrix& random_effects, const List& parameters, Nullable<NumericVector> weights, bool gradient, bool hessian);
-RcppExport SEXP _JointODE_compute_objective_cppad(SEXP paramsSEXP, SEXP data_listSEXP, SEXP random_effectsSEXP, SEXP parametersSEXP, SEXP weightsSEXP, SEXP gradientSEXP, SEXP hessianSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const NumericVector& >::type params(paramsSEXP);
-    Rcpp::traits::input_parameter< const List& >::type data_list(data_listSEXP);
-    Rcpp::traits::input_parameter< const NumericMatrix& >::type random_effects(random_effectsSEXP);
-    Rcpp::traits::input_parameter< const List& >::type parameters(parametersSEXP);
-    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type weights(weightsSEXP);
-    Rcpp::traits::input_parameter< bool >::type gradient(gradientSEXP);
-    Rcpp::traits::input_parameter< bool >::type hessian(hessianSEXP);
-    rcpp_result_gen = Rcpp::wrap(compute_objective_cppad(params, data_list, random_effects, parameters, weights, gradient, hessian));
-    return rcpp_result_gen;
-END_RCPP
-}
-// solve_batch_ode_cppad
-List solve_batch_ode_cppad(const List& data_list, const NumericMatrix& random_effects, const List& parameters);
-RcppExport SEXP _JointODE_solve_batch_ode_cppad(SEXP data_listSEXP, SEXP random_effectsSEXP, SEXP parametersSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const List& >::type data_list(data_listSEXP);
-    Rcpp::traits::input_parameter< const NumericMatrix& >::type random_effects(random_effectsSEXP);
-    Rcpp::traits::input_parameter< const List& >::type parameters(parametersSEXP);
-    rcpp_result_gen = Rcpp::wrap(solve_batch_ode_cppad(data_list, random_effects, parameters));
-    return rcpp_result_gen;
-END_RCPP
-}
-// compute_logpost_cppad
-NumericVector compute_logpost_cppad(const NumericVector& random_effect, const List& data, const List& parameters, bool gradient, bool hessian);
-RcppExport SEXP _JointODE_compute_logpost_cppad(SEXP random_effectSEXP, SEXP dataSEXP, SEXP parametersSEXP, SEXP gradientSEXP, SEXP hessianSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const NumericVector& >::type random_effect(random_effectSEXP);
-    Rcpp::traits::input_parameter< const List& >::type data(dataSEXP);
-    Rcpp::traits::input_parameter< const List& >::type parameters(parametersSEXP);
-    Rcpp::traits::input_parameter< bool >::type gradient(gradientSEXP);
-    Rcpp::traits::input_parameter< bool >::type hessian(hessianSEXP);
-    rcpp_result_gen = Rcpp::wrap(compute_logpost_cppad(random_effect, data, parameters, gradient, hessian));
-    return rcpp_result_gen;
-END_RCPP
-}
-// compute_state_loglik_cppad
-NumericVector compute_state_loglik_cppad(const NumericVector& initial_state, const List& data, const NumericVector& random_effect, const List& parameters, bool gradient, bool hessian);
-RcppExport SEXP _JointODE_compute_state_loglik_cppad(SEXP initial_stateSEXP, SEXP dataSEXP, SEXP random_effectSEXP, SEXP parametersSEXP, SEXP gradientSEXP, SEXP hessianSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const NumericVector& >::type initial_state(initial_stateSEXP);
-    Rcpp::traits::input_parameter< const List& >::type data(dataSEXP);
-    Rcpp::traits::input_parameter< const NumericVector& >::type random_effect(random_effectSEXP);
-    Rcpp::traits::input_parameter< const List& >::type parameters(parametersSEXP);
-    Rcpp::traits::input_parameter< bool >::type gradient(gradientSEXP);
-    Rcpp::traits::input_parameter< bool >::type hessian(hessianSEXP);
-    rcpp_result_gen = Rcpp::wrap(compute_state_loglik_cppad(initial_state, data, random_effect, parameters, gradient, hessian));
-    return rcpp_result_gen;
-END_RCPP
-}
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_JointODE_compute_objective_cppad", (DL_FUNC) &_JointODE_compute_objective_cppad, 7},
+    {"_JointODE_compute_logpost_cppad", (DL_FUNC) &_JointODE_compute_logpost_cppad, 5},
+    {"_JointODE_compute_state_loglik_cppad", (DL_FUNC) &_JointODE_compute_state_loglik_cppad, 6},
+    {"_JointODE_solve_batch_ode_cppad", (DL_FUNC) &_JointODE_solve_batch_ode_cppad, 3},
     {"_JointODE_compute_marginal_objective_cppad", (DL_FUNC) &_JointODE_compute_marginal_objective_cppad, 4},
     {"_JointODE_solve_marginal_ode_cppad", (DL_FUNC) &_JointODE_solve_marginal_ode_cppad, 4},
     {"_JointODE_compute_marginal_state_loglik", (DL_FUNC) &_JointODE_compute_marginal_state_loglik, 5},
-    {"_JointODE_compute_objective_cppad", (DL_FUNC) &_JointODE_compute_objective_cppad, 7},
-    {"_JointODE_solve_batch_ode_cppad", (DL_FUNC) &_JointODE_solve_batch_ode_cppad, 3},
-    {"_JointODE_compute_logpost_cppad", (DL_FUNC) &_JointODE_compute_logpost_cppad, 5},
-    {"_JointODE_compute_state_loglik_cppad", (DL_FUNC) &_JointODE_compute_state_loglik_cppad, 6},
     {NULL, NULL, 0}
 };
 

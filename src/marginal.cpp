@@ -1,7 +1,7 @@
 #include <RcppArmadillo.h>
 #include <cppad/cppad.hpp>
 #include <algorithm>
-#include "utils.h"
+#include "solver.h"
 
 // [[Rcpp::depends(RcppArmadillo)]]
 
@@ -16,60 +16,35 @@ template <typename Scalar>
 struct MarginalODEParams {
   std::vector<double> times;
   std::vector<std::vector<double>> covariates;
-  std::vector<Scalar> theta;  // [value, slope, beta1, beta2, ...]
+  std::vector<Scalar> theta;  // [value, slope, cov1, cov2, ...]
   int n_cov;
+  MatExpBranch branch;
 
-  MarginalODEParams() : n_cov(0) {}
+  MarginalODEParams() : n_cov(0), branch(MatExpBranch::COMPLEX) {}
 };
 
 // ============================================================================
-// Marginal ODE Functor
+// ODE Solver using Matrix Exponential (exact analytical solution)
 // ============================================================================
 
+// Extract forcing term b at time index
 template <typename Scalar>
-class MarginalODEFunctor {
- private:
-  const MarginalODEParams<Scalar>& params_;
-
- public:
-  explicit MarginalODEFunctor(const MarginalODEParams<Scalar>& params)
-      : params_(params) {}
-
-  void Ode(const Scalar& t, const CppAD::vector<Scalar>& y,
-           CppAD::vector<Scalar>& dydt) const {
-    const Scalar& m = y[0];      // biomarker
-    const Scalar& dmdt = y[1];   // velocity
-
-    // Find time index for covariate lookup (same logic as utils.hpp)
-    double t_val = get_value(t);
-    size_t time_idx;
-    if (t_val >= params_.times.back()) {
-      time_idx = params_.times.size() - 1;
-    } else if (t_val <= params_.times[0]) {
-      time_idx = 0;
-    } else {
-      // Binary search for the interval containing t
-      auto it = std::upper_bound(params_.times.begin(), params_.times.end(), t_val);
-      time_idx = std::distance(params_.times.begin(), it) - 1;
-    }
-
-    // Compute acceleration: d²m/dt² = theta[0]*m + theta[1]*dm/dt + X*beta
-    Scalar d2mdt2 = params_.theta[0] * m + params_.theta[1] * dmdt;
-
-    if (params_.n_cov > 0) {
-      for (int c = 0; c < params_.n_cov; c++) {
-        d2mdt2 += Scalar(params_.covariates[time_idx][c]) * params_.theta[c + 2];
-      }
-    }
-
-    dydt[0] = dmdt;
-    dydt[1] = d2mdt2;
+inline Scalar marginal_forcing(const MarginalODEParams<Scalar>& params,
+                               size_t time_idx) {
+  Scalar b = Scalar(0.0);
+  for (int c = 0; c < params.n_cov; c++) {
+    b += Scalar(params.covariates[time_idx][c]) * params.theta[c + 2];
   }
-};
+  return b;
+}
 
-// ============================================================================
-// ODE Solver (参考 utils.hpp 的 solve_ode 模式)
-// ============================================================================
+// Find time index for covariate lookup
+inline size_t find_cov_idx(double t, const std::vector<double>& times) {
+  if (t >= times.back()) return times.size() - 1;
+  if (t <= times[0]) return 0;
+  auto it = std::upper_bound(times.begin(), times.end(), t);
+  return std::distance(times.begin(), it) - 1;
+}
 
 template <typename Scalar>
 inline std::vector<std::vector<Scalar>> solve_marginal_ode(
@@ -78,43 +53,30 @@ inline std::vector<std::vector<Scalar>> solve_marginal_ode(
     const MarginalODEParams<Scalar>& params) {
 
   const int n_times = times.size();
-
-  MarginalODEFunctor<Scalar> ode_fun(params);
-
   std::vector<std::vector<Scalar>> solution(n_times, std::vector<Scalar>(2));
-  CppAD::vector<Scalar> yi(2);
 
-  // Initialize with initial conditions
-  std::copy(y0.begin(), y0.end(), yi.begin());
-  std::copy(y0.begin(), y0.end(), solution[0].begin());
+  Scalar m = y0[0];
+  Scalar v = y0[1];
+  solution[0] = {m, v};
 
-  Scalar ti = Scalar(times[0]);
-  Scalar tf, dt;
+  const Scalar beta1 = params.theta[0];
+  const Scalar beta2 = params.theta[1];
+  const MatExpBranch branch = params.branch;
 
-  // Solve step by step
   for (int idx = 1; idx < n_times; idx++) {
-    tf = Scalar(times[idx]);
-    dt = tf - ti;
+    const double dt = times[idx] - times[idx - 1];
+    const size_t cov_idx = find_cov_idx(times[idx - 1], params.times);
+    const Scalar b = marginal_forcing(params, cov_idx);
 
-    // Compute ODE steps for this interval (same as utils.hpp)
-    const size_t M = std::max(
-        MIN_ODE_STEPS,
-        static_cast<size_t>(std::ceil(get_value(dt) * STEPS_PER_UNIT_TIME)));
-
-    yi = CppAD::Runge45(ode_fun, M, ti, tf, yi);
-
-    for (int i = 0; i < 2; ++i) {
-      solution[idx][i] = yi[i];
-    }
-
-    ti = tf;
+    ode_step(m, v, beta1, beta2, b, Scalar(dt), branch);
+    solution[idx] = {m, v};
   }
 
   return solution;
 }
 
 // ============================================================================
-// Helper Function (参考 objective.cpp 的 fill_subject_data)
+// Helper Function (参考 objective.cpp 的 load_subject)
 // ============================================================================
 
 template <typename Scalar>
@@ -160,7 +122,10 @@ NumericVector compute_marginal_objective_cppad(
   const int n_subjects = data_list.size();
   const int n_params = params.size();
 
-  // Start recording for automatic differentiation (同 objective.cpp)
+  // Classify branch BEFORE Independent() using double values
+  const MatExpBranch branch = classify_disc(params[0], params[1]);
+
+  // Start recording for automatic differentiation
   ADvector ad_params(n_params);
   std::copy(params.begin(), params.end(), ad_params.begin());
   CppAD::Independent(ad_params);
@@ -173,7 +138,7 @@ NumericVector compute_marginal_objective_cppad(
 
   ADdouble total_sse(0.0);
 
-  // Process each subject (同 objective.cpp 循环模式)
+  // Process each subject
   for (int i = 0; i < n_subjects; i++) {
     List subject_data = data_list[i];
 
@@ -186,6 +151,7 @@ NumericVector compute_marginal_objective_cppad(
     // Setup parameters for this subject
     MarginalODEParams<ADdouble> ode_params;
     ode_params.theta = theta;
+    ode_params.branch = branch;
     fill_marginal_subject_data(ode_params, subject_data);
 
     // Initial conditions [biomarker, velocity]
@@ -269,6 +235,7 @@ List solve_marginal_ode_cppad(
     ode_params.theta[i] = theta[i];
   }
   ode_params.n_cov = n_cov;
+  ode_params.branch = classify_disc(theta[0], theta[1]);
 
   // Copy times
   ode_params.times.resize(n_times);
@@ -347,7 +314,7 @@ NumericVector compute_marginal_state_loglik(
   for (int i = 0; i < theta.size(); i++) {
     ode_params.theta[i] = ADdouble(theta[i]);
   }
-
+  ode_params.branch = classify_disc(theta[0], theta[1]);
   fill_marginal_subject_data(ode_params, subject_data);
 
   NumericVector response = subject_data["response"];
