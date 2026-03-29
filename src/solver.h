@@ -779,4 +779,33 @@ inline NumericVector eval_tape(CppAD::ADFun<double>& tape,
   return result;
 }
 
+// Compute log-posterior for a single subject (shared by AD and non-AD paths)
+template <typename Scalar>
+inline Scalar eval_logpost(
+    const std::vector<Scalar>& re,
+    ODEParams<Scalar>& ode,
+    const arma::mat& inv_sigma_b, double re_const,
+    double inv_sigma_e2, double log_2pi_sigma_e2) {
+  const auto times = time_grid(ode.subject.longitudinal_times,
+                                  ode.subject.event_time);
+  const std::vector<Scalar> y0 = {Scalar(0.0),
+      ode.initial_state_coefs[0] + re[0],
+      ode.initial_state_coefs[1] + re[1]};
+  const auto sol = ode_solve_joint(y0, times, ode);
+
+  BSplineWorkspace ws;
+  bspline_basis(0.0, ode.spline_degree, ode.spline_knots,
+      ode.spline_boundary, ws.basis, ws.knots, ws.work1, ws.work2, false);
+  Scalar lp = joint_loglik(sol, times, ode, ws,
+                                    inv_sigma_e2, log_2pi_sigma_e2);
+
+  const int n_re = re.size();
+  Scalar qf(0.0);
+  for (int i = 0; i < n_re; i++)
+    for (int j = 0; j < n_re; j++)
+      qf += re[i] * Scalar(inv_sigma_b(i, j)) * re[j];
+  lp -= Scalar(0.5) * qf + Scalar(re_const);
+  return lp;
+}
+
 #endif  // SOLVER_H

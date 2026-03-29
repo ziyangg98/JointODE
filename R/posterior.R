@@ -318,7 +318,7 @@ NULL
   }
 
   dm_matrix <- numDeriv::jacobian(
-    func = em_map, x = theta, method.args = list(r = 2)
+    func = em_map, x = theta, method = "simple"
   )
 
   info_observed_inv <- info_complete_inv %*% solve(diag(n_coef) - t(dm_matrix))

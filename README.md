@@ -97,7 +97,7 @@ fit <- JointODE(
   control = list(parallel = TRUE)
 )
 cat(sprintf("Elapsed: %.1f s\n", (proc.time() - t0)["elapsed"]))
-#> Elapsed: 2291.0 s
+#> Elapsed: 1139.6 s
 ```
 
 ``` r
@@ -117,22 +117,22 @@ summary(fit)
 #> Number of Subjects: 200
 #>
 #>        AIC        BIC     logLik
-#> -38935.412 -38852.954  19492.706
+#> -38956.452 -38873.994  19503.226
 #>
 #> Coefficients:
 #> Longitudinal Process: Second-Order ODE Model
-#>             Estimate Std. Error z value Pr(>|z|)
-#> biomarker    -1.0847     0.0059  -183.1   <2e-16 ***
-#> velocity     -0.8122     0.0047  -174.2   <2e-16 ***
-#> (Intercept)   0.0004     0.0009     0.4    0.689
-#> x1            0.5418     0.0033   166.7   <2e-16 ***
-#> x2           -0.4884     0.0029  -167.8   <2e-16 ***
+#>             Estimate Std. Error  z value Pr(>|z|)
+#> biomarker    -1.0845     0.0059 -182.869   <2e-16 ***
+#> velocity     -0.8121     0.0047 -174.075   <2e-16 ***
+#> (Intercept)   0.0004     0.0009    0.391    0.696
+#> x1            0.5417     0.0033  166.501   <2e-16 ***
+#> x2           -0.4883     0.0029 -167.601   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> ODE System Characteristics:
 #>                    Estimate Std. Error z value Pr(>|z|)
-#> T (period)           6.0330     0.0165   366.2   <2e-16 ***
+#> T (period)           6.0336     0.0165   365.7   <2e-16 ***
 #> xi (damping ratio)   0.3899     0.0018   216.4   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
@@ -140,34 +140,34 @@ summary(fit)
 #> Survival Process: Proportional Hazards Model
 #>         Estimate Std. Error z value Pr(>|z|)
 #> alpha_1   0.7226     0.1885   3.834 0.000126 ***
-#> alpha_2   1.9644     0.7780   2.525 0.011567 *
-#> w1        0.6876     0.1246   5.521 3.37e-08 ***
-#> w2       -1.3422     0.2860  -4.693 2.69e-06 ***
+#> alpha_2   1.9642     0.7782   2.524 0.011598 *
+#> w1        0.6876     0.1246   5.521 3.38e-08 ***
+#> w2       -1.3423     0.2860  -4.693 2.69e-06 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Baseline Hazard: B-spline with 3 basis functions
-#> (Coefficients range: [-4.916, -1.955] )
+#> (Coefficients range: [-4.915, -1.955] )
 #>
 #> Initial State: Population Mean
 #>    Estimate Std. Error z value Pr(>|z|)
-#> m0  -0.5116     0.0030 -173.13   <2e-16 ***
+#> m0  -0.5117     0.0030 -173.17   <2e-16 ***
 #> v0  -0.1080     0.0051  -21.06   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Variance Components:
-#> Measurement Error SD: 0.098762
+#> Measurement Error SD: 0.098763
 #> Random Effect Covariance Matrix:
 #>            [,1]       [,2]       [,3]      [,4]
-#> [1,]  0.0108201  0.0314779 -0.0003538 -0.001884
-#> [2,]  0.0314779  0.0915955 -0.0009834 -0.004753
-#> [3,] -0.0003538 -0.0009834  0.0005906  0.001785
-#> [4,] -0.0018843 -0.0047530  0.0017848  0.027303
+#> [1,]  0.0108311  0.0315034 -0.0003535 -0.001876
+#> [2,]  0.0315034  0.0916503 -0.0009829 -0.004741
+#> [3,] -0.0003535 -0.0009829  0.0005893  0.001794
+#> [4,] -0.0018764 -0.0047410  0.0017942  0.027332
 #>
 #> Model Diagnostics:
 #> C-index (Concordance): 0.671
-#> Convergence: Converged after 120 iterations
+#> Convergence: Converged after 119 iterations
 
 # Plot results
 plot(fit)

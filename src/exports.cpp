@@ -173,65 +173,68 @@ NumericVector compute_joint_objective(
 // Joint: E-step log-posterior w.r.t. random effects b
 // ============================================================================
 
+// Shared setup: load params, compute sigma constants, return loaded params
+static ODEParams<double> setup_logpost(
+    const List& parameters, const NumericVector& random_effect,
+    mat& inv_sigma_b, double& inv_sigma_e2,
+    double& log_2pi_sigma_e2, double& re_const) {
+  ODEParams<double> params;
+  load_params(params, parameters);
+  const double se = params.measurement_error_sd;
+  inv_sigma_e2 = 1.0 / (se * se);
+  log_2pi_sigma_e2 = std::log(2.0 * M_PI * se * se);
+  if (!inv(inv_sigma_b, params.random_effect_sigma))
+    stop("Failed to invert random effect covariance matrix");
+  double ld, s;
+  log_det(ld, s, params.random_effect_sigma);
+  re_const = 0.5 * (random_effect.size() * std::log(2.0 * M_PI) + ld);
+  NumericVector lc = as<List>(parameters["coefficients"])["longitudinal"];
+  NumericVector cr(random_effect.begin() + 2, random_effect.end());
+  update_branch(params.branch, lc, cr,
+    params.biomarker_random, params.velocity_random);
+  return params;
+}
+
 // [[Rcpp::export(.compute_joint_logpost)]]
 NumericVector compute_joint_logpost(
     const NumericVector& random_effect,
     const List& data, const List& parameters,
     bool gradient = true, bool hessian = false) {
   const int n_re = random_effect.size();
-
-  ADvector ad_re(n_re);
-  std::copy(random_effect.begin(), random_effect.end(), ad_re.begin());
-  CppAD::Independent(ad_re);
-
-  // b = [b_m0, b_v0, b_coef...]: front 2 are state RE
-  ODEParams<ADdouble> ode;
-  std::vector<ADdouble> coef_re(ad_re.begin() + 2, ad_re.end());
-  load_subject(ode.subject, data, coef_re);
-  load_params(ode, parameters);
-  NumericVector long_coefs = as<List>(parameters["coefficients"])["longitudinal"];
-  NumericVector coef_re_dbl(random_effect.begin() + 2, random_effect.end());
-  update_branch(ode.branch, long_coefs, coef_re_dbl,
-                ode.biomarker_random, ode.velocity_random);
-
-  const double sigma_e = ode.measurement_error_sd;
-  const double inv_sigma_e2 = 1.0 / (sigma_e * sigma_e);
-  const double log_2pi_sigma_e2 = std::log(2.0 * M_PI * sigma_e * sigma_e);
+  const std::vector<double> re_vec(random_effect.begin(), random_effect.end());
 
   mat inv_sigma_b;
-  if (!inv(inv_sigma_b, ode.random_effect_sigma))
-    stop("Failed to invert random effect covariance matrix");
-  double log_det_val, sign;
-  log_det(log_det_val, sign, ode.random_effect_sigma);
-  const double re_const = 0.5 * (n_re * std::log(2.0 * M_PI) + log_det_val);
+  double inv_sigma_e2, log_2pi_sigma_e2, re_const;
+  ODEParams<double> base_params = setup_logpost(parameters, random_effect,
+    inv_sigma_b, inv_sigma_e2, log_2pi_sigma_e2, re_const);
 
-  const auto times = time_grid(ode.subject.longitudinal_times,
-                                  ode.subject.event_time);
-  // y0 = [H=0, mu_m + b_m0, mu_v + b_v0]
-  const std::vector<ADdouble> y0 = {ADdouble(0.0),
-      ode.initial_state_coefs[0] + ad_re[0],
-      ode.initial_state_coefs[1] + ad_re[1]};
-  const auto sol = ode_solve_joint(y0, times, ode);
+  // Value-only: pure double, no AD tape
+  if (!gradient && !hessian) {
+    load_subject(base_params.subject, data,
+        std::vector<double>(re_vec.begin() + 2, re_vec.end()));
+    NumericVector result(1);
+    result[0] = eval_logpost(re_vec, base_params, inv_sigma_b, re_const,
+                             inv_sigma_e2, log_2pi_sigma_e2);
+    return result;
+  }
 
-  BSplineWorkspace ws;
-  bspline_basis(0.0, ode.spline_degree, ode.spline_knots,
-      ode.spline_boundary, ws.basis, ws.knots, ws.work1, ws.work2, false);
-  ADdouble log_post = joint_loglik(sol, times, ode, ws,
-                                            inv_sigma_e2, log_2pi_sigma_e2);
+  // AD path
+  ADvector ad_re(n_re);
+  std::copy(re_vec.begin(), re_vec.end(), ad_re.begin());
+  CppAD::Independent(ad_re);
 
-  std::vector<ADdouble> Sb(n_re, ADdouble(0.0));
-  for (int i = 0; i < n_re; i++)
-    for (int j = 0; j < n_re; j++)
-      Sb[i] += ADdouble(inv_sigma_b(i, j)) * ad_re[j];
-  ADdouble qf(0.0);
-  for (int i = 0; i < n_re; i++) qf += ad_re[i] * Sb[i];
-  log_post -= ADdouble(0.5) * qf + ADdouble(re_const);
+  ODEParams<ADdouble> ode;
+  load_subject(ode.subject, data,
+      std::vector<ADdouble>(ad_re.begin() + 2, ad_re.end()));
+  load_params(ode, parameters);
+  ode.branch = base_params.branch;
+  std::vector<ADdouble> ad_re_vec(ad_re.begin(), ad_re.end());
+  ADdouble lp = eval_logpost(ad_re_vec, ode, inv_sigma_b, re_const,
+                              inv_sigma_e2, log_2pi_sigma_e2);
 
   CppAD::ADFun<double> tape;
-  tape.Dependent(ad_re, ADvector{log_post});
-  return eval_tape(tape,
-      std::vector<double>(random_effect.begin(), random_effect.end()),
-      n_re, gradient, hessian);
+  tape.Dependent(ad_re, ADvector{lp});
+  return eval_tape(tape, re_vec, n_re, gradient, hessian);
 }
 
 // ============================================================================
