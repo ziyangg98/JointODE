@@ -61,3 +61,7 @@ reference:
   desc: "Tools for simulating joint ODE data and example datasets"
   contents:
   - has_concept("data-simulation")
+
+- title: "Re-exports"
+  contents:
+  - Surv

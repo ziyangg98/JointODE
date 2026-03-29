@@ -103,7 +103,7 @@ fit_ode <- JointODE(
   longitudinal_data = longitudinal_data,
   survival_data = survival_data,
   init = "marginal",
-  control = list(verbose = TRUE, maxit = 50)
+  control = list(parallel = TRUE)
 )
 summary(fit_ode)
 ```
@@ -251,84 +251,50 @@ kable(
 ## Dynamic AUC
 
 ```{r predictive-performance}
-landmarks <- c(2, 4, 6, 8)
-dt <- 2
-
-# Helper: concordance-based AUC at landmark
-landmark_auc <- function(risk_scores, event_ids,
-                         surv_data, tl, dt) {
-  alive <- surv_data$id[surv_data$time > tl]
-  if (length(alive) < 10) {
-    return(NA)
-  }
-  risk <- risk_scores[match(alive, event_ids)]
-  event <- as.numeric(
-    surv_data$time[match(alive, surv_data$id)] <= tl + dt &
-      surv_data$status[match(alive, surv_data$id)] == 1
-  )
-  if (sum(event) < 2) {
-    return(NA)
-  }
+cindex <- function(risk) {
   survival::concordance(
-    Surv(rep(1, length(event)), event) ~ risk,
-    reverse = TRUE
+    Surv(time, status) ~ risk[as.character(id)],
+    data = survival_data, reverse = TRUE
   )$concordance
 }
 
-# JMbayes2: tvAUC
-jm_nd <- longitudinal_data |>
-  left_join(
-    survival_data |> transmute(id, event_time = time, status),
-    by = "id"
-  )
-jm_aucs <- sapply(landmarks, function(tl) {
-  tryCatch(
-    tvAUC(tvROC(
-      fit_ns_both,
-      newdata = jm_nd,
-      Tstart = tl, Dt = dt, cores = 1L
-    ))$auc,
-    error = function(e) NA_real_
-  )
-})
-
-# JointODE: conditional cumulative hazard H(tl+dt) - H(tl)
+# JointODE: lp = alpha_1*m + alpha_2*v + W*phi at last obs
 pred_ode <- predict(fit_ode)
-ode_aucs <- sapply(landmarks, function(tl) {
-  ids <- unique(pred_ode$id)
-  scores <- sapply(ids, function(sid) {
-    p <- pred_ode[pred_ode$id == sid, ]
-    h1 <- p$cumhaz[which.min(abs(p$time - tl))]
-    h2 <- p$cumhaz[which.min(abs(p$time - (tl + dt)))]
-    h2 - h1
-  })
-  landmark_auc(scores, ids, survival_data, tl, dt)
-})
+ode_c <- coef(fit_ode)
+last_ode <- pred_ode |>
+  mutate(id = as.integer(id)) |>
+  group_by(id) |> slice_tail(n = 1) |> ungroup() |>
+  left_join(survival_data |> select(id, drug, age, sex), by = "id")
+ode_lp <- ode_c["hazard:alpha_1"] * last_ode$biomarker +
+  ode_c["hazard:alpha_2"] * last_ode$velocity +
+  ode_c["hazard:drug"] * last_ode$drug +
+  ode_c["hazard:age"] * last_ode$age +
+  ode_c["hazard:sex"] * last_ode$sex
+c_ode <- cindex(setNames(ode_lp, last_ode$id))
 
-# Extended Cox: conditional cumulative hazard
-cox_aucs <- sapply(landmarks, function(tl) {
-  ids <- unique(longitudinal_data$id)
-  scores <- sapply(ids, function(sid) {
-    p <- longitudinal_data[
-      longitudinal_data$id == sid &
-        longitudinal_data$time <= tl,
-    ]
-    if (nrow(p) == 0) return(0)
-    predict(cox_td, type = "lp", newdata = tail(p, 1))
-  })
-  landmark_auc(scores, ids, survival_data, tl, dt)
-})
+# Extended Cox: lp at last obs
+last <- longitudinal_data |> group_by(id) |> slice_tail(n = 1) |> ungroup()
+c_cox <- cindex(setNames(predict(cox_td, type = "lp", newdata = last), last$id))
+
+# JMbayes2: lp from lme fitted value/slope + association coefficients
+sc <- summary(fit_ns_both)$Survival[, "Mean"]
+names(sc) <- rownames(summary(fit_ns_both)$Survival)
+last$val <- predict(lme_ns, newdata = last, level = 1)
+eps_t <- last
+eps_t$time <- eps_t$time + 0.01
+last$slp <- (predict(lme_ns, newdata = eps_t, level = 1) - last$val) / 0.01
+jm_lp <- sc["value(observed)"] * last$val +
+  sc["slope(observed)"] * last$slp +
+  sc["drug"] * last$drug + sc["age"] * last$age + sc["sex"] * last$sex
+c_jm <- cindex(setNames(jm_lp, last$id))
 
 kable(
   data.frame(
-    Landmark = sprintf("t = %d", landmarks),
-    Window = sprintf("[%d, %d]", landmarks, landmarks + dt),
-    Ext.Cox = sprintf("%.3f", cox_aucs),
-    JointODE = sprintf("%.3f", ode_aucs),
-    JMbayes2 = sprintf("%.3f", jm_aucs)
+    Model = c("JointODE", "Extended Cox", "JMbayes2 (ns+both)"),
+    C.index = sprintf("%.3f", c(c_ode, c_cox, c_jm))
   ),
-  align = c("l", "l", "r", "r", "r"),
-  caption = "Dynamic AUC at landmark times"
+  align = c("l", "r"),
+  caption = "Concordance index (C-index) for discrimination"
 )
 ```
 
