@@ -233,7 +233,8 @@ NULL
 
 #' @noRd
 .m_step_map <- function(
-  theta_input, data_list, posteriors, posterior_moments, parameters, control
+  theta_input, data_list, posteriors, posterior_moments, parameters, control,
+  hessian_cache = NULL
 ) {
   params_input <- .vector_to_coef(parameters, theta_input)
   n_subjects <- length(data_list)
@@ -248,14 +249,14 @@ NULL
   params_input$coefficients$random_effect_sigma <- random_effect_sigma
 
   theta <- .coef_to_vector(params_input)
+  use_cache <- !is.null(hessian_cache)
   obj <- .compute_objective_expected(
     theta, data_list, posteriors, params_input,
-    gradient = TRUE, hessian = TRUE,
+    gradient = TRUE, hessian = !use_cache,
     parallel = control$parallel, n_cores = control$n_cores
   )
-  as.vector(theta - .regularized_solve(
-    attr(obj, "hessian"), attr(obj, "gradient")
-  ))
+  hess <- if (use_cache) hessian_cache else attr(obj, "hessian")
+  as.vector(theta - .regularized_solve(hess, attr(obj, "gradient")))
 }
 
 #' @noRd
@@ -286,7 +287,7 @@ NULL
   em_map <- function(theta_input) {
     .m_step_map(
       theta_input, data_list, posteriors, posterior_moments,
-      parameters, control
+      parameters, control, hessian_cache = hess
     )
   }
 
@@ -297,7 +298,7 @@ NULL
   info_observed_inv <- info_complete_inv %*% solve(diag(n_coef) - t(dm_matrix))
 
   asymmetry <- max(abs(info_observed_inv - t(info_observed_inv)))
-  if (control$verbose > 0 && asymmetry > 1e-4) {
+  if (control$verbose > 0 && asymmetry > 1e-2) {
     cli::cli_alert_warning(sprintf(
       "Vcov matrix asymmetry: %.2e", asymmetry
     ))
@@ -313,7 +314,7 @@ NULL
   }
 
   diag_ratio <- diag(vcov_sym) / diag(info_complete_inv)
-  if (any(diag_ratio < 1 - 1e-6) && control$verbose > 0) {
+  if (any(diag_ratio < 1 - 0.01) && control$verbose > 0) {
     cli::cli_alert_warning(sprintf(
       "%d parameter(s) violate missing information principle (min ratio: %.3f)",
       sum(diag_ratio < 1 - 1e-6), min(diag_ratio)

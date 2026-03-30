@@ -138,7 +138,7 @@ test_that("plot.JointODE all types produce gg", {
     "diagnostic_qq"
   )
   for (type in types) {
-    expect_s3_class(.safe_plot(mock, type = type), "gg", info = type)
+    expect_s3_class(.safe_plot(mock, type = type), "gg")
   }
 })
 
@@ -165,8 +165,7 @@ test_that("plot.JointODE subject_ids produces faceted plots", {
   )
   for (type in types) {
     expect_s3_class(
-      .safe_plot(mock, type = type, subject_ids = ids),
-      "gg", info = type
+      .safe_plot(mock, type = type, subject_ids = ids), "gg"
     )
   }
 })
@@ -189,7 +188,7 @@ test_that("plot.JointODE show_individual=FALSE works", {
   )
   for (type in types) {
     p <- .safe_plot(mock, type = type, show_individual = FALSE)
-    expect_s3_class(p, "gg", info = type)
+    expect_s3_class(p, "gg")
   }
 })
 
@@ -209,7 +208,7 @@ test_that("plot.JointODE by grouping works", {
   )
   for (type in types) {
     p <- .safe_plot(mock, type = type, by = "w1")
-    expect_s3_class(p, "gg", info = type)
+    expect_s3_class(p, "gg")
   }
   expect_error(
     .safe_plot(mock, type = "survival", by = "nonexistent"),

@@ -278,7 +278,7 @@ test_that(".process_joint sorts unordered time data", {
 test_that("JointODE.control returns complete defaults", {
   ctrl <- JointODE.control()
   expect_equal(ctrl$maxit, 200)
-  expect_equal(ctrl$tol, 1e-4)
+  expect_equal(ctrl$tol, 1e-3)
   expect_equal(ctrl$verbose, 0)
   expect_false(ctrl$parallel)
   expect_equal(ctrl$n_cores, 0)
@@ -340,8 +340,8 @@ test_that(".count_params counts correctly", {
 test_that(".coef_table structure and computation", {
   tbl <- .coef_table(c(a = 2.0, b = -1.0), c(a = 0.5, b = 0.25))
   expect_equal(ncol(tbl), 4)
-  expect_equal(tbl[, "z value"], c(4.0, -4.0))
-  expect_equal(tbl[, "Pr(>|z|)"], 2 * pnorm(-abs(c(4.0, -4.0))))
+  expect_equal(unname(tbl[, "z value"]), c(4.0, -4.0))
+  expect_equal(unname(tbl[, "Pr(>|z|)"]), 2 * pnorm(-abs(c(4.0, -4.0))))
 
   tbl2 <- .coef_table(c(1.0), c(0.0))
   expect_true(is.infinite(tbl2[1, "z value"]))

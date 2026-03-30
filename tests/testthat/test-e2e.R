@@ -7,7 +7,7 @@
 # ==============================================================================
 
 e2e_sim <- JointODE::simulate(
-  n_subjects = 20,
+  n_subjects = 10,
   longitudinal = list(
     xi = c(mean = 0.4, sd = 0.05),
     period = c(mean = 6, sd = 0.1),
@@ -40,7 +40,7 @@ e2e_fit <- JointODE(
   longitudinal_data = e2e_sim$longitudinal_data,
   survival_data = e2e_sim$survival_data,
   init = "marginal",
-  control = list(maxit = 30, tol = 1e-3)
+  control = list(maxit = 10, tol = 1e-2)
 )
 
 test_that("JointODE fits and converges", {

@@ -26,3 +26,10 @@
 ^scripts$
 ^src/symbols\.rds$
 ^CLAUDE\.md$
+^\.Rprofile$
+^\.Rhistory$
+^\.covrignore$
+^\.editorconfig$
+^\.pre-commit-config\.yaml$
+\.DS_Store$
+\.Rcheck$

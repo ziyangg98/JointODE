@@ -473,9 +473,9 @@ plot.JointODE <- function(
         linewidth = 0.4
       ) +
       geom_smooth(
+        method = "loess", formula = y ~ x,
         data = data,
         aes(x = .data[[x_var]], y = .data[[y_var]], color = "Mean"),
-        method = "loess",
         span = span,
         se = FALSE,
         linewidth = 1.2
@@ -488,9 +488,9 @@ plot.JointODE <- function(
   } else {
     p <- p +
       geom_smooth(
+        method = "loess", formula = y ~ x,
         data = data,
         aes(x = .data[[x_var]], y = .data[[y_var]]),
-        method = "loess",
         span = span,
         se = FALSE,
         color = "#2E86AB",
@@ -534,9 +534,9 @@ plot.JointODE <- function(
 
   p <- p +
     geom_smooth(
+      method = "loess", formula = y ~ x,
       data = group_means,
       aes(x = .data[[x_var]], y = .data[[y_var]], color = group),
-      method = "loess",
       span = span,
       se = FALSE,
       linewidth = 1.5
@@ -789,9 +789,9 @@ plot.JointODE <- function(
 
   p <- p +
     geom_smooth(
+      method = "loess", formula = y ~ x,
       data = pred_data,
       aes(x = time, y = survival, color = group, group = group),
-      method = "loess",
       span = span,
       se = FALSE,
       linewidth = 1.5
@@ -810,7 +810,7 @@ plot.JointODE <- function(
     geom_point(color = "#2E86AB", alpha = 0.5, size = 2) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
     geom_smooth(
-      method = "loess",
+      method = "loess", formula = y ~ x,
       span = span,
       se = TRUE,
       color = "#A23B72",
@@ -832,17 +832,18 @@ plot.JointODE <- function(
 
   group_var <- vapply(x$data, function(subj) {
     # Check if 'by' is in survival covariates
-    if (by %in% survival_cov_names &&
-          which(survival_cov_names == by) <= length(subj$covariates)) {
-      subj$covariates[which(survival_cov_names == by)]
-    } else if (!is.null(subj$longitudinal$covariates) &&
-                 !is.null(subj$longitudinal$covariates$fixed) &&
-                 by %in% colnames(subj$longitudinal$covariates$fixed)) {
+    surv_idx <- which(survival_cov_names == by)
+    has_fixed <- !is.null(subj$longitudinal$covariates$fixed) &&
+      by %in% colnames(subj$longitudinal$covariates$fixed)
+    has_random <- !is.null(subj$longitudinal$covariates$random) &&
+      by %in% colnames(subj$longitudinal$covariates$random)
+
+    if (length(surv_idx) == 1 && surv_idx <= length(subj$covariates)) {
+      subj$covariates[surv_idx]
+    } else if (has_fixed) {
       using_individual_means <<- TRUE
       mean(subj$longitudinal$covariates$fixed[, by], na.rm = TRUE)
-    } else if (!is.null(subj$longitudinal$covariates) &&
-                 !is.null(subj$longitudinal$covariates$random) &&
-                 by %in% colnames(subj$longitudinal$covariates$random)) {
+    } else if (has_random) {
       using_individual_means <<- TRUE
       mean(subj$longitudinal$covariates$random[, by], na.rm = TRUE)
     } else if (!is.null(subj[[by]])) {
@@ -1482,9 +1483,9 @@ plot.JointODE <- function(
             linewidth = 0.4
           ) +
           geom_smooth(
+            method = "loess", formula = y ~ x,
             data = pred_data,
             aes(x = time, y = survival, color = "Mean"),
-            method = "loess",
             span = span,
             se = FALSE,
             linewidth = 1.2
@@ -1497,9 +1498,9 @@ plot.JointODE <- function(
       } else {
         p <- p +
           geom_smooth(
+            method = "loess", formula = y ~ x,
             data = pred_data,
             aes(x = time, y = survival),
-            method = "loess",
             span = span,
             se = FALSE,
             color = "#2E86AB",

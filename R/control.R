@@ -6,8 +6,8 @@
 #' process a list to fill in missing values with defaults.
 #'
 #' @param maxit Maximum number of EM iterations (default: 200)
-#' @param tol Relative tolerance for convergence. The EM algorithm converges
-#'   when |L_new - L_old| / (|L_old| + 1) < tol (default: 1e-4)
+#' @param tol Convergence tolerance. The EM algorithm converges
+#'   when max|theta_new - theta_old| < tol (default: 1e-3)
 #' @param verbose Logical or numeric; controls verbosity level. FALSE/0 for
 #'   silent, TRUE/1 for basic progress, 2 for detailed output (default: FALSE)
 #' @param parallel Logical; whether to use parallel computation (default: FALSE)
@@ -45,7 +45,7 @@
 # nolint next: object_name_linter
 JointODE.control <- function(
   maxit = 200,
-  tol = 1e-4,
+  tol = 1e-3,
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,
@@ -91,7 +91,8 @@ JointODE.control <- function(
 #'
 #' @param maxit Maximum number of alternating optimization iterations
 #'   (default: 200)
-#' @param tol Relative tolerance for convergence (default: 1e-4)
+#' @param tol Convergence tolerance on max absolute parameter
+#'   change (default: 1e-3)
 #' @param verbose Logical or numeric; FALSE/0 for silent, TRUE/1 for basic
 #'   progress, 2 for detailed output (default: FALSE)
 #' @param parallel Logical; whether to use parallel computation (default: FALSE)
@@ -113,7 +114,7 @@ JointODE.control <- function(
 # nolint next: object_name_linter
 MarginalODE.control <- function(
   maxit = 200,
-  tol = 1e-4,
+  tol = 1e-3,
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,

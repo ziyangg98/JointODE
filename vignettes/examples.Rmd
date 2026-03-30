@@ -102,7 +102,7 @@ fit_ode <- JointODE(
   longitudinal_data = longitudinal_data,
   survival_data = survival_data,
   init = "marginal",
-  control = list(parallel = TRUE)
+  control = list(parallel = !nzchar(Sys.getenv("CI")))
 )
 summary(fit_ode)
 ```

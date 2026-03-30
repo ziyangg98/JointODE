@@ -72,7 +72,8 @@
 #'   \code{\link{JointODE.control}}. Key parameters include:
 #'   \describe{
 #'     \item{\code{maxit}}{Maximum number of EM iterations (default: 200)}
-#'     \item{\code{tol}}{Relative tolerance for convergence (default: 1e-4)}
+#'     \item{\code{tol}}{Convergence tolerance on max absolute
+#'       parameter change (default: 1e-3)}
 #'     \item{\code{verbose}}{Verbosity level: FALSE/0 for silent, TRUE/1 for
 #'       progress messages, 2 for detailed output (default: FALSE)}
 #'     \item{\code{parallel}}{Logical flag enabling parallel computation

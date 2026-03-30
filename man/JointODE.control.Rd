@@ -6,7 +6,7 @@
 \usage{
 JointODE.control(
   maxit = 200,
-  tol = 1e-04,
+  tol = 0.001,
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,
@@ -18,8 +18,8 @@ JointODE.control(
 \arguments{
 \item{maxit}{Maximum number of EM iterations (default: 200)}
 
-\item{tol}{Relative tolerance for convergence. The EM algorithm converges
-when |L_new - L_old| / (|L_old| + 1) < tol (default: 1e-4)}
+\item{tol}{Convergence tolerance. The EM algorithm converges
+when max|theta_new - theta_old| < tol (default: 1e-3)}
 
 \item{verbose}{Logical or numeric; controls verbosity level. FALSE/0 for
 silent, TRUE/1 for basic progress, 2 for detailed output (default: FALSE)}

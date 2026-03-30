@@ -6,7 +6,7 @@
 \usage{
 MarginalODE.control(
   maxit = 200,
-  tol = 1e-04,
+  tol = 0.001,
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,
@@ -18,7 +18,8 @@ MarginalODE.control(
 \item{maxit}{Maximum number of alternating optimization iterations
 (default: 200)}
 
-\item{tol}{Relative tolerance for convergence (default: 1e-4)}
+\item{tol}{Convergence tolerance on max absolute parameter
+change (default: 1e-3)}
 
 \item{verbose}{Logical or numeric; FALSE/0 for silent, TRUE/1 for basic
 progress, 2 for detailed output (default: FALSE)}
