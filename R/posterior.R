@@ -8,7 +8,6 @@ NULL
 .quad_cache <- new.env(parent = emptyenv())
 
 .get_quad_grid <- function(dim, level) {
-  if (dim >= 4 && level > 3) level <- 3
   key <- paste0(dim, "_", level)
   if (!exists(key, envir = .quad_cache)) {
     grid <- mvQuad::createNIGrid(
@@ -99,69 +98,44 @@ NULL
   gradient = TRUE, hessian = FALSE,
   parallel = FALSE, n_cores = 0
 ) {
-  n_subjects <- length(data_list)
-
-  if (parallel && n_subjects > 1) {
-    if (n_cores == 0) {
-      n_cores <- max(1L, parallel::detectCores() - 1L)
-    }
-    n_chunks <- min(n_cores, n_subjects)
-    chunks <- split(seq_len(n_subjects), cut(seq_len(n_subjects),
-      n_chunks,
-      labels = FALSE
-    ))
-
-    compute_chunk <- function(subject_indices) {
-      chunk_data <- data_list[subject_indices]
-      chunk_posteriors <- list(
-        nodes = posteriors$nodes[subject_indices],
-        weights = posteriors$weights[subject_indices]
-      )
-      expanded <- .expand_posteriors(chunk_data, chunk_posteriors)
-      .compute_joint_objective(
-        params = params,
-        data_list = expanded$data,
-        random_effects = expanded$nodes,
-        parameters = parameters,
-        weights = expanded$weights,
-        gradient = gradient,
-        hessian = hessian
-      )
-    }
-
-    results <- .parallel_apply(
-      chunks, compute_chunk,
-      parallel = TRUE, n_cores = n_cores, setup = FALSE
+  eval_chunk <- function(idx) {
+    expanded <- .expand_posteriors(
+      data_list[idx],
+      list(nodes = posteriors$nodes[idx],
+           weights = posteriors$weights[idx])
     )
-
-    total_obj <- sum(vapply(results, as.numeric, numeric(1)))
-    result <- structure(total_obj, names = NULL)
-
-    if (gradient) {
-      total_grad <- Reduce(`+`, lapply(results, function(r) {
-        as.vector(attr(r, "gradient"))
-      }))
-      attr(result, "gradient") <- total_grad
-    }
-    if (hessian) {
-      total_hess <- Reduce(`+`, lapply(results, function(r) {
-        attr(r, "hessian")
-      }))
-      attr(result, "hessian") <- total_hess
-    }
-    result
-  } else {
-    expanded <- .expand_posteriors(data_list, posteriors)
     .compute_joint_objective(
-      params = params,
-      data_list = expanded$data,
-      random_effects = expanded$nodes,
-      parameters = parameters,
-      weights = expanded$weights,
-      gradient = gradient,
-      hessian = hessian
+      params = params, data_list = expanded$data,
+      random_effects = expanded$nodes, parameters = parameters,
+      weights = expanded$weights, gradient = gradient, hessian = hessian
     )
   }
+
+  n <- length(data_list)
+  if (!parallel || n <= 1) return(eval_chunk(seq_len(n)))
+
+  n_cores <- .resolve_cores(n_cores)
+  chunks <- split(seq_len(n), cut(seq_len(n), min(n_cores, n),
+    labels = FALSE
+  ))
+
+  results <- .parallel_apply(chunks, eval_chunk,
+    parallel = TRUE, n_cores = n_cores, setup = FALSE
+  )
+
+  obj <- sum(vapply(results, as.numeric, numeric(1)))
+  result <- structure(obj, names = NULL)
+  if (gradient) {
+    attr(result, "gradient") <- Reduce(`+`, lapply(
+      results, function(r) as.vector(attr(r, "gradient"))
+    ))
+  }
+  if (hessian) {
+    attr(result, "hessian") <- Reduce(`+`, lapply(
+      results, function(r) attr(r, "hessian")
+    ))
+  }
+  result
 }
 
 # Laplace Approximation + AGHQ ================================================
@@ -290,7 +264,6 @@ NULL
   parameters, random_effects, control
 ) {
   theta <- .coef_to_vector(parameters)
-  n_coef <- length(theta)
 
   if (control$verbose > 0) cli::cli_alert_info("Computing SEM vcov...")
 

@@ -80,7 +80,7 @@
 #'     \item{\code{n_cores}}{Number of CPU cores for parallel processing.
 #'       If 0, automatically detects available cores (default: 0)}
 #'     \item{\code{quad_level}}{Quadrature level for numerical integration
-#'       (default: 4)}
+#'       (default: 3)}
 #'   }
 #'   See \code{\link{JointODE.control}} for complete details and examples.
 #' @param ... Additional arguments passed to internal optimization routines.

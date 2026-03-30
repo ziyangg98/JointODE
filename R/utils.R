@@ -82,14 +82,26 @@
 # Parallel Computing ===========================================================
 
 #' @importFrom parallel detectCores
-#' @importFrom future plan multicore multisession sequential
+#' @importFrom future plan multicore multisession sequential supportsMulticore
+#' @noRd
+.resolve_cores <- function(n_cores) {
+  if (n_cores == 0L) {
+    detected <- parallel::detectCores()
+    if (is.na(detected)) 1L else max(1L, detected - 1L)
+  } else {
+    n_cores
+  }
+}
+
 #' @noRd
 .setup_parallel_plan <- function(n_cores = 0) {
-  if (n_cores == 0) {
-    detected <- parallel::detectCores()
-    n_cores <- if (is.na(detected)) 1L else max(1L, detected - 1L)
+  n_cores <- .resolve_cores(n_cores)
+  strategy <- if (future::supportsMulticore()) {
+    future::multicore
+  } else {
+    future::multisession
   }
-  future::plan(future::multisession, workers = n_cores)
+  future::plan(strategy, workers = n_cores)
   function() future::plan(future::sequential)
 }
 
@@ -98,19 +110,18 @@
 .parallel_apply <- function(
   indices, fn, parallel = TRUE, n_cores = 0, setup = TRUE
 ) {
-  if (parallel) {
-    if (setup) {
-      cleanup <- .setup_parallel_plan(n_cores)
-      on.exit(cleanup(), add = TRUE)
-    }
-    future.apply::future_lapply(
-      indices, fn,
-      future.seed = TRUE,
-      future.packages = "JointODE"
-    )
-  } else {
-    lapply(indices, fn)
+  if (!parallel) return(lapply(indices, fn))
+
+  if (setup) {
+    cleanup <- .setup_parallel_plan(n_cores)
+    on.exit(cleanup(), add = TRUE)
   }
+
+  future.apply::future_lapply(
+    indices, fn,
+    future.seed = TRUE,
+    future.packages = "JointODE"
+  )
 }
 
 # Formula Parsing ==============================================================
@@ -374,13 +385,13 @@
       prev$parameters$coefficients$measurement_error_sd,
       as.vector(prev$parameters$coefficients$random_effect_sigma)
     )
-    rel_theta <- max(abs(theta_curr - theta_prev) / (abs(theta_prev) + 1e-8))
+    delta_theta <- max(abs(theta_curr - theta_prev))
   } else {
     delta_l <- curr$loglik
     rel_l <- 1
-    rel_theta <- 1
+    delta_theta <- 1
   }
-  list(delta_l = delta_l, rel_l = rel_l, rel_theta = rel_theta)
+  list(delta_l = delta_l, rel_l = rel_l, delta_theta = delta_theta)
 }
 
 #' @noRd
@@ -390,7 +401,7 @@
   cli::cli_text(sprintf(
     "[%3d/%3d] L=%10.2f | dL=%+.2e  dTheta=%.2e",
     iter, control$maxit, curr$loglik,
-    metrics$delta_l, metrics$rel_theta
+    metrics$delta_l, metrics$delta_theta
   ))
 
   if (control$verbose >= 2) {
@@ -442,7 +453,7 @@
     ))
   }
 
-  converged <- iter > 1 && metrics$rel_theta < control$tol
+  converged <- iter > 1 && metrics$delta_theta < control$tol
   is_final <- iter == control$maxit
 
   if (control$verbose > 0 && !(is_final && !converged)) {
@@ -454,13 +465,13 @@
       cli::cli_text("")
       cli::cli_alert_success(sprintf(
         "Converged in %d iterations (dTheta=%.2e)",
-        iter, metrics$rel_theta
+        iter, metrics$delta_theta
       ))
     } else if (is_final) {
       cli::cli_text("")
       cli::cli_alert_warning(sprintf(
         "Not converged after %d iterations (dTheta=%.2e > %.2e)",
-        control$maxit, metrics$rel_theta, control$tol
+        control$maxit, metrics$delta_theta, control$tol
       ))
       cli::cli_alert_info(
         "Try increasing maxit, relaxing tolerances, or adjusting initial values"

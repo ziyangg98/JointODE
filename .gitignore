@@ -16,3 +16,8 @@ JointODE_*.tar.gz
 *.bak
 testthat-problems.rds
 tests/*.rds
+
+# renv
+renv/library/
+renv/staging/
+renv/sandbox/

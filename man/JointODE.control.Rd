@@ -10,7 +10,7 @@ JointODE.control(
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,
-  quad_level = 4,
+  quad_level = 3,
   .list = NULL,
   ...
 )
@@ -30,7 +30,7 @@ silent, TRUE/1 for basic progress, 2 for detailed output (default: FALSE)}
 If 0, uses all available cores (default: 0)}
 
 \item{quad_level}{Integer; quadrature level for numerical integration
-(default: 4)}
+(default: 3)}
 
 \item{.list}{Optional list of control parameters to process}
 

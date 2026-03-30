@@ -14,7 +14,7 @@
 #' @param n_cores Integer; number of cores to use for parallel computation.
 #'   If 0, uses all available cores (default: 0)
 #' @param quad_level Integer; quadrature level for numerical integration
-#'   (default: 4)
+#'   (default: 3)
 #' @param .list Optional list of control parameters to process
 #' @param ... Additional control parameters
 #'
@@ -49,7 +49,7 @@ JointODE.control <- function(
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,
-  quad_level = 4,
+  quad_level = 3,
   .list = NULL,
   ...
 ) {
