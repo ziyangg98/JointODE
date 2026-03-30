@@ -833,16 +833,16 @@ plot.JointODE <- function(
   group_var <- vapply(x$data, function(subj) {
     # Check if 'by' is in survival covariates
     if (by %in% survival_cov_names &&
-      which(survival_cov_names == by) <= length(subj$covariates)) {
+          which(survival_cov_names == by) <= length(subj$covariates)) {
       subj$covariates[which(survival_cov_names == by)]
     } else if (!is.null(subj$longitudinal$covariates) &&
-      !is.null(subj$longitudinal$covariates$fixed) &&
-      by %in% colnames(subj$longitudinal$covariates$fixed)) {
+                 !is.null(subj$longitudinal$covariates$fixed) &&
+                 by %in% colnames(subj$longitudinal$covariates$fixed)) {
       using_individual_means <<- TRUE
       mean(subj$longitudinal$covariates$fixed[, by], na.rm = TRUE)
     } else if (!is.null(subj$longitudinal$covariates) &&
-      !is.null(subj$longitudinal$covariates$random) &&
-      by %in% colnames(subj$longitudinal$covariates$random)) {
+                 !is.null(subj$longitudinal$covariates$random) &&
+                 by %in% colnames(subj$longitudinal$covariates$random)) {
       using_individual_means <<- TRUE
       mean(subj$longitudinal$covariates$random[, by], na.rm = TRUE)
     } else if (!is.null(subj[[by]])) {
@@ -1307,7 +1307,9 @@ plot.JointODE <- function(
         .theme_faceted()
     } else {
       # If showing all subjects, use overlay with mean trajectory
-      .build_overlay_phase_plot(data = pred_data, show_individual = show_individual)
+      .build_overlay_phase_plot(
+        data = pred_data, show_individual = show_individual
+      )
     }
   }
 }

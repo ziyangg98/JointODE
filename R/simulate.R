@@ -740,9 +740,7 @@ simulate <- function(
     eval(coef_args$survival$covariates)
   )
   # Full RE sigma: [state(2), coef(2)]
-  # State RE variance from simulation parameters:
-  # Var(m(0)) = sum(beta_biomarker^2 * Var(X_j))
-  # Var(v(0)) = sum(beta_velocity^2 * Var(X_j))
+  # State RE variance from simulation parameters
   cov_defs <- eval(coef_args$covariates)
   init_covs <- long_params$initial$covariates
   # Compute Var(X_j) for each covariate

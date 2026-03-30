@@ -23,7 +23,7 @@ test_that(".expand_posteriors expands correctly", {
 
   expanded <- .expand_posteriors(data_list, posteriors)
 
-  expect_equal(nrow(expanded$nodes), 5) # 3 + 2
+  expect_equal(nrow(expanded$nodes), 5)
   expect_equal(length(expanded$weights), 5)
   expect_equal(length(expanded$data), 5)
   expect_equal(expanded$node_to_subject, c(1, 1, 1, 2, 2))

@@ -97,7 +97,7 @@ longitudinal_data |>
 fit_ode <- JointODE(
   longitudinal_formula =
     observed ~ biomarker + velocity + drug +
-      (biomarker + velocity | id),
+    (biomarker + velocity | id),
   survival_formula = Surv(time, status) ~ drug + age + sex,
   longitudinal_data = longitudinal_data,
   survival_data = survival_data,

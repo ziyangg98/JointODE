@@ -333,7 +333,7 @@
 #' @noRd
 .coef_to_vector <- function(parameters) {
   with(parameters$coefficients,
-    c(baseline, hazard, longitudinal, initial_state))
+       c(baseline, hazard, longitudinal, initial_state))
 }
 
 #' @noRd
@@ -400,16 +400,20 @@
       "    longitudinal: %s", .format_vector(cf$longitudinal, 6)
     ))
     if (!is.null(cf$initial_state)) {
-      cli::cli_text(sprintf("    initial_state: %s",
-        paste(sprintf("%.4f", cf$initial_state), collapse = ", ")))
+      cli::cli_text(sprintf(
+        "    initial_state: %s",
+        paste(sprintf("%.4f", cf$initial_state), collapse = ", ")
+      ))
     }
   }
   if (control$verbose >= 3) {
     re <- curr$random_effects
     if (!is.null(re)) {
       for (k in seq_len(ncol(re))) {
-        cli::cli_text(sprintf("    RE[,%d] range: [%.3f, %.3f]",
-          k, min(re[, k]), max(re[, k])))
+        cli::cli_text(sprintf(
+          "    RE[,%d] range: [%.3f, %.3f]",
+          k, min(re[, k]), max(re[, k])
+        ))
       }
     }
   }

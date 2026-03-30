@@ -110,7 +110,7 @@ test_that("predict.MarginalODE returns data.frame", {
   expect_s3_class(pred, "data.frame")
   expect_true(
     all(c("id", "time", "biomarker", "velocity", "acceleration") %in%
-      names(pred))
+          names(pred))
   )
   expect_true(nrow(pred) > 0)
 })

@@ -15,7 +15,6 @@ test_that(".count_params counts correctly", {
       random_effect_sigma = diag(2)
     )
   )
-  # 3 + 2 + 3 + 2 + 1 + 3 = 14
   expect_equal(.count_params(params), 14)
 })
 
@@ -30,7 +29,6 @@ test_that(".count_params handles different dimensions", {
       random_effect_sigma = diag(3)
     )
   )
-  # 5 + 3 + 4 + 2 + 1 + 6 = 21
   expect_equal(.count_params(params), 21)
 })
 
@@ -43,7 +41,10 @@ test_that(".coef_table returns correct structure", {
 
   expect_true(is.matrix(tbl))
   expect_equal(ncol(tbl), 4)
-  expect_equal(colnames(tbl), c("Estimate", "Std. Error", "z value", "Pr(>|z|)"))
+  expect_equal(
+    colnames(tbl),
+    c("Estimate", "Std. Error", "z value", "Pr(>|z|)")
+  )
   expect_equal(nrow(tbl), 3)
 })
 
@@ -151,7 +152,7 @@ test_that(".compute_dimensions counts biomarker/velocity random effects", {
 
   dims <- .compute_dimensions(parsed_long, parsed_surv, spline_config)
   expect_equal(dims$n_random_effects, 4) # 2 state RE + biomarker + velocity
-  expect_equal(dims$n_longitudinal_coef, 3) # intercept + biomarker + velocity
+  expect_equal(dims$n_longitudinal_coef, 3)
 })
 
 # --- .parse_longitudinal_formula ---
@@ -297,7 +298,7 @@ test_that(".update_random_effect_sigma computes mean of second moments", {
     list(mean = c(0, 0), second_moment = diag(2) * 3)
   )
   result <- .update_random_effect_sigma(moments, n_subjects = 2)
-  expect_equal(result, diag(2) * 2) # (1 + 3) / 2
+  expect_equal(result, diag(2) * 2)
 })
 
 # --- .compute_metrics ---

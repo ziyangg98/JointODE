@@ -70,6 +70,17 @@ Uses log-linear interpolation between consecutive ODE time points, with trapezoi
 - `R/validate.R` — Input validation
 - `R/MarginalODE.R` — Longitudinal-only model (no survival)
 - `R/state.R` — Per-subject initial state optimization via `nlm`
+- `R/simulate.R` — `simulate.JointODE()` data generation with physical parameterization (damping ratio, period)
+- `R/plot.R` — `plot.JointODE()` diagnostic plots (trajectories, survival, residuals)
+
+### Test Data: `sim` Dataset
+
+Tests use the bundled `sim` dataset (`data/sim.rda`), structured as:
+- `sim$data$longitudinal_data` — data frame with columns: id, time, biomarker, velocity, observed, x1, x2
+- `sim$data$survival_data` — data frame with columns: id, time, status, w1, w2
+- `sim$data$state` — matrix (n x 2): initial biomarker and velocity per subject
+- `sim$data$random_effects` — matrix (n x 2): dyn_value, dyn_slope random effects
+- `sim$init` — initial parameter list with `$coefficients` and `$configurations`, suitable for direct use in model fitting and test helpers
 
 ## Conventions
 

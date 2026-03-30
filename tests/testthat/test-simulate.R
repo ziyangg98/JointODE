@@ -78,7 +78,10 @@ test_that("simulate generates valid output and respects parameters", {
   ))
   expect_true(is.matrix(sim$state))
   expect_equal(colnames(sim$state), c("biomarker", "velocity"))
-  expect_equal(colnames(sim$random_effects), c("m0", "v0", "dyn_value", "dyn_slope"))
+  expect_equal(
+    colnames(sim$random_effects),
+    c("m0", "v0", "dyn_value", "dyn_slope")
+  )
 
   expect_true(!is.null(attr(sim$random_effects, "mu")))
   expect_true(!is.null(attr(sim$random_effects, "sigma")))
