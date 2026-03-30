@@ -28,7 +28,7 @@
   )
 }
 
-#' @importFrom stats predict reformulate var
+#' @importFrom stats cov predict reformulate var
 #' @noRd
 .initialize_from_marginal <- function(
   longitudinal_data, survival_data, gamma, control,

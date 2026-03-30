@@ -28,10 +28,6 @@
 #'   effect in the hazard function. When \code{gamma = 0}, velocity has no
 #'   effect; \code{gamma = 1} uses linear velocity; \code{gamma = 2} uses
 #'   squared velocity. Default is 1 (default: 1).
-#' @param state A matrix specifying initial conditions for the ODE system with
-#'   two columns: initial biomarker values and their first derivatives. Each row
-#'   corresponds to one subject. If \code{NULL}, defaults to a zero matrix with
-#'   appropriate dimensions (default: \code{NULL}).
 #' @param spline_baseline A list controlling the B-spline representation of the
 #'   baseline hazard function with the following components:
 #'   \describe{

@@ -10,8 +10,7 @@ vignette: >
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   echo = TRUE, message = FALSE, warning = FALSE,
-  fig.width = 8, fig.height = 5,
-  eval = requireNamespace("JMbayes2", quietly = TRUE)
+  fig.width = 8, fig.height = 5
 )
 ```
 
@@ -263,7 +262,9 @@ pred_ode <- predict(fit_ode)
 ode_c <- coef(fit_ode)
 last_ode <- pred_ode |>
   mutate(id = as.integer(id)) |>
-  group_by(id) |> slice_tail(n = 1) |> ungroup() |>
+  group_by(id) |>
+  slice_tail(n = 1) |>
+  ungroup() |>
   left_join(survival_data |> select(id, drug, age, sex), by = "id")
 ode_lp <- ode_c["hazard:alpha_1"] * last_ode$biomarker +
   ode_c["hazard:alpha_2"] * last_ode$velocity +
@@ -273,7 +274,10 @@ ode_lp <- ode_c["hazard:alpha_1"] * last_ode$biomarker +
 c_ode <- cindex(setNames(ode_lp, last_ode$id))
 
 # Extended Cox: lp at last obs
-last <- longitudinal_data |> group_by(id) |> slice_tail(n = 1) |> ungroup()
+last <- longitudinal_data |>
+  group_by(id) |>
+  slice_tail(n = 1) |>
+  ungroup()
 c_cox <- cindex(setNames(predict(cox_td, type = "lp", newdata = last), last$id))
 
 # JMbayes2: lp from lme fitted value/slope + association coefficients

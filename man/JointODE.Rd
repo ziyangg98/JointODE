@@ -102,11 +102,6 @@ If 0, automatically detects available cores (default: 0)}
 See \code{\link{JointODE.control}} for complete details and examples.}
 
 \item{...}{Additional arguments passed to internal optimization routines.}
-
-\item{state}{A matrix specifying initial conditions for the ODE system with
-two columns: initial biomarker values and their first derivatives. Each row
-corresponds to one subject. If \code{NULL}, defaults to a zero matrix with
-appropriate dimensions (default: \code{NULL}).}
 }
 \value{
 An S3 object of class \code{"JointODE"} containing fitted model
