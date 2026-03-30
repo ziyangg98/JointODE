@@ -86,7 +86,8 @@
 #' @noRd
 .setup_parallel_plan <- function(n_cores = 0) {
   if (n_cores == 0) {
-    n_cores <- max(1, parallel::detectCores() - 1)
+    detected <- parallel::detectCores()
+    n_cores <- if (is.na(detected)) 1L else max(1L, detected - 1L)
   }
   future::plan(future::multisession, workers = n_cores)
   function() future::plan(future::sequential)
@@ -102,7 +103,11 @@
       cleanup <- .setup_parallel_plan(n_cores)
       on.exit(cleanup(), add = TRUE)
     }
-    future.apply::future_lapply(indices, fn, future.seed = TRUE)
+    future.apply::future_lapply(
+      indices, fn,
+      future.seed = TRUE,
+      future.packages = "JointODE"
+    )
   } else {
     lapply(indices, fn)
   }
