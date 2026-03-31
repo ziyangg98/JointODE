@@ -10,7 +10,7 @@ JointODE(
   longitudinal_data,
   survival_data,
   gamma = 1,
-  spline_baseline = list(degree = 2, n_knots = 0, knot_placement = "equal",
+  spline_baseline = list(degree = 3, n_knots = 2, knot_placement = "equal",
     boundary_knots = NULL),
   init = "default",
   control = list(),
@@ -47,9 +47,9 @@ squared velocity. Default is 1 (default: 1).}
 baseline hazard function with the following components:
 \describe{
 \item{\code{degree}}{Polynomial degree of the B-spline basis functions
-(default: 2, quadratic splines)}
+(default: 3, cubic splines)}
 \item{\code{n_knots}}{Number of interior knots for flexibility
-(default: 0, providing moderate flexibility)}
+(default: 2)}
 \item{\code{knot_placement}}{Strategy for positioning knots:
 \code{"quantile"} places knots at quantiles of observed event times,
 \code{"equal"} uses equally-spaced knots (default: \code{"equal"})}

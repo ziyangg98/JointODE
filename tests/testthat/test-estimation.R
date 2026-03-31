@@ -8,76 +8,45 @@ td <- .make_test_data(10)
 
 posteriors <- .compute_posteriors(
   td$data_list, td$parameters, td$random_effects,
-  parallel = FALSE, level = 3
+  parallel = FALSE
 )
 
-# --- .expand_posteriors ---
+# --- .compute_posteriors: Laplace structure ---
 
-test_that(".expand_posteriors expands correctly", {
-  post_2 <- list(
-    nodes = list(
-      matrix(rnorm(6), nrow = 3, ncol = 2),
-      matrix(rnorm(4), nrow = 2, ncol = 2)
-    ),
-    weights = list(c(0.3, 0.5, 0.2), c(0.6, 0.4))
-  )
-  data_2 <- list(list(id = 1, v = "a"), list(id = 2, v = "b"))
-  expanded <- .expand_posteriors(data_2, post_2)
-
-  expect_equal(nrow(expanded$nodes), 5)
-  expect_equal(length(expanded$weights), 5)
-  expect_equal(length(expanded$data), 5)
-  expect_equal(expanded$node_to_subject, c(1, 1, 1, 2, 2))
-  expect_equal(expanded$data[[1]]$v, "a")
-  expect_equal(expanded$data[[4]]$v, "b")
-})
-
-test_that(".expand_posteriors preserves weights", {
-  post_2 <- list(
-    nodes = list(matrix(0, 2, 1), matrix(0, 3, 1)),
-    weights = list(c(0.4, 0.6), c(0.2, 0.3, 0.5))
-  )
-  expanded <- .expand_posteriors(
-    list(list(id = 1), list(id = 2)), post_2
-  )
-  expect_equal(expanded$weights, c(0.4, 0.6, 0.2, 0.3, 0.5))
-})
-
-# --- .compute_posteriors: structure + unbiasedness ---
-
-test_that("Posterior AGHQ structure is valid", {
+test_that("Posterior Laplace structure is valid", {
   n <- length(td$data_list)
-  expect_equal(length(posteriors$nodes), n)
-  expect_equal(length(posteriors$weights), n)
+  expect_equal(length(posteriors), n)
 
   for (i in seq_len(n)) {
-    nodes_i <- posteriors$nodes[[i]]
-    weights_i <- posteriors$weights[[i]]
-
-    expect_true(is.matrix(nodes_i))
-    expect_equal(ncol(nodes_i), ncol(td$random_effects))
-    expect_equal(length(weights_i), nrow(nodes_i))
-    expect_true(all(weights_i > 0))
-    expect_equal(sum(weights_i), 1, tolerance = 1e-14)
+    expect_true(is.numeric(posteriors[[i]]$mode))
+    expect_equal(length(posteriors[[i]]$mode), ncol(td$random_effects))
+    expect_true(is.matrix(posteriors[[i]]$cov))
+    expect_equal(nrow(posteriors[[i]]$cov), ncol(td$random_effects))
+    # Covariance must be positive definite
+    eigenvalues <- eigen(posteriors[[i]]$cov, symmetric = TRUE,
+      only.values = TRUE
+    )$values
+    expect_true(all(eigenvalues > 0))
   }
 })
 
-test_that("Posterior means are unbiased (AGHQ)", {
+test_that("Posterior modes are close to true random effects", {
   n <- length(td$data_list)
-  posterior_means <- t(sapply(seq_len(n), function(i) {
-    colSums(sweep(posteriors$nodes[[i]], 1, posteriors$weights[[i]], "*"))
-  }))
+  posterior_modes <- t(vapply(posteriors, `[[`, numeric(ncol(td$random_effects)),
+    "mode"
+  ))
 
-  bias <- colMeans(posterior_means - td$random_effects)
-  ese <- apply(posterior_means, 2, sd)
+  bias <- colMeans(posterior_modes - td$random_effects)
+  ese <- apply(posterior_modes, 2, sd)
   expect_true(all(3 * abs(bias) < ese))
 })
 
 # --- .compute_objective_expected: gradient + hessian ---
 
 test_that("AD gradient and hessian are valid", {
+  re <- t(vapply(posteriors, `[[`, numeric(ncol(td$random_effects)), "mode"))
   result <- .compute_objective_expected(
-    td$params, td$data_list, posteriors, td$parameters,
+    td$params, td$data_list, re, td$parameters,
     gradient = TRUE, hessian = TRUE
   )
 
@@ -122,31 +91,32 @@ test_that(".update_random_effect_sigma computes mean of second moments", {
   expect_equal(.update_random_effect_sigma(moments, 2), diag(2) * 2)
 })
 
-# --- Parallel consistency (reuse td and posteriors) ---
+# --- Parallel consistency ---
 
 test_that(".compute_posteriors parallel matches sequential", {
   result_par <- .compute_posteriors(
     td$data_list, td$parameters, td$random_effects,
-    parallel = TRUE, n_cores = 2, level = 3
+    parallel = TRUE, n_cores = 2
   )
 
   for (i in seq_along(td$data_list)) {
-    expect_equal(result_par$nodes[[i]], posteriors$nodes[[i]],
-      tolerance = 1e-10, info = sprintf("subject %d nodes", i)
+    expect_equal(result_par[[i]]$mode, posteriors[[i]]$mode,
+      tolerance = 1e-10, info = sprintf("subject %d mode", i)
     )
-    expect_equal(result_par$weights[[i]], posteriors$weights[[i]],
-      tolerance = 1e-10, info = sprintf("subject %d weights", i)
+    expect_equal(result_par[[i]]$cov, posteriors[[i]]$cov,
+      tolerance = 1e-10, info = sprintf("subject %d cov", i)
     )
   }
 })
 
 test_that(".compute_objective_expected parallel matches sequential", {
+  re <- t(vapply(posteriors, `[[`, numeric(ncol(td$random_effects)), "mode"))
   result_seq <- .compute_objective_expected(
-    td$params, td$data_list, posteriors, td$parameters,
+    td$params, td$data_list, re, td$parameters,
     gradient = TRUE, hessian = TRUE, parallel = FALSE
   )
   result_par <- .compute_objective_expected(
-    td$params, td$data_list, posteriors, td$parameters,
+    td$params, td$data_list, re, td$parameters,
     gradient = TRUE, hessian = TRUE, parallel = TRUE, n_cores = 2
   )
 

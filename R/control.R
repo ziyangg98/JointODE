@@ -7,7 +7,7 @@
 #'
 #' @param maxit Maximum number of EM iterations (default: 200)
 #' @param tol Convergence tolerance. The EM algorithm converges
-#'   when max|theta_new - theta_old| < tol (default: 1e-4)
+#'   when max|theta_new - theta_old| < tol (default: 1e-3)
 #' @param verbose Logical or numeric; controls verbosity level. FALSE/0 for
 #'   silent, TRUE/1 for basic progress, 2 for detailed output (default: FALSE)
 #' @param parallel Logical; whether to use parallel computation (default: FALSE)
@@ -29,7 +29,7 @@
 #' control <- JointODE.control()
 #'
 #' # Custom settings for faster exploration
-#' control <- JointODE.control(maxit = 30, tol = 1e-4)
+#' control <- JointODE.control(maxit = 30, tol = 1e-3)
 #'
 #' # Verbose output for debugging
 #' control <- JointODE.control(verbose = TRUE)
@@ -45,7 +45,7 @@
 # nolint next: object_name_linter
 JointODE.control <- function(
   maxit = 200,
-  tol = 1e-4,
+  tol = 1e-3,
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,

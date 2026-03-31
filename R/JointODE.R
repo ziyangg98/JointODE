@@ -32,9 +32,9 @@
 #'   baseline hazard function with the following components:
 #'   \describe{
 #'     \item{\code{degree}}{Polynomial degree of the B-spline basis functions
-#'       (default: 2, quadratic splines)}
+#'       (default: 3, cubic splines)}
 #'     \item{\code{n_knots}}{Number of interior knots for flexibility
-#'       (default: 0, providing moderate flexibility)}
+#'       (default: 2)}
 #'     \item{\code{knot_placement}}{Strategy for positioning knots:
 #'       \code{"quantile"} places knots at quantiles of observed event times,
 #'       \code{"equal"} uses equally-spaced knots (default: \code{"equal"})}
@@ -205,8 +205,8 @@ JointODE <- function(
   survival_data,
   gamma = 1,
   spline_baseline = list(
-    degree = 2,
-    n_knots = 0,
+    degree = 3,
+    n_knots = 2,
     knot_placement = "equal",
     boundary_knots = NULL
   ),
@@ -365,8 +365,7 @@ JointODE <- function(
     control = control,
     coef_names = coef_names,
     converged = converged,
-    posteriors = curr$posteriors,
-    posterior_moments = curr$posterior_moments
+    random_effects = curr$random_effects
   )
 
   # Return fitted model

@@ -8,12 +8,9 @@
   control,
   coef_names,
   converged,
-  posteriors,
-  posterior_moments
+  random_effects
 ) {
   n_subjects <- length(data_list)
-  n_re <- length(posterior_moments[[1]]$mean)
-  random_effects <- t(vapply(posterior_moments, `[[`, numeric(n_re), "mean"))
 
   names(parameters$coefficients$baseline) <- coef_names$baseline
   names(parameters$coefficients$hazard) <- coef_names$hazard
@@ -30,8 +27,7 @@
   n_coef <- length(coef_names_expanded)
   vcov_matrix <- if (converged) {
     .compute_vcov_sem(
-      data_list, posteriors, posterior_moments,
-      parameters, random_effects, control
+      data_list, parameters, random_effects, control
     )
   } else {
     matrix(NA, n_coef, n_coef)

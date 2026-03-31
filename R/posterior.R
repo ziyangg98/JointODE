@@ -3,80 +3,33 @@
 #' @importFrom stats nlm
 NULL
 
-# Quadrature Cache =============================================================
-
-.quad_cache <- new.env(parent = emptyenv())
-
-.get_quad_grid <- function(dim, level) {
-  key <- paste0(dim, "_", level)
-  if (!exists(key, envir = .quad_cache)) {
-    grid <- mvQuad::createNIGrid(
-      dim = dim, type = "GHe",
-      level = level, ndConstruction = "product"
-    )
-    assign(key, list(
-      nodes = mvQuad::getNodes(grid),
-      weights = as.numeric(mvQuad::getWeights(grid))
-    ), envir = .quad_cache)
-  }
-  get(key, envir = .quad_cache)
-}
-
-# Posterior Expansion ==========================================================
-
-.expand_posteriors <- function(data_list, posteriors) {
-  n_subjects <- length(data_list)
-  n_nodes_per_subject <- vapply(posteriors$nodes, nrow, integer(1))
-  total_nodes <- sum(n_nodes_per_subject)
-
-  all_nodes <- do.call(rbind, posteriors$nodes)
-  all_weights <- unlist(posteriors$weights, use.names = FALSE)
-  all_data <- vector("list", total_nodes)
-
-  idx <- 1L
-  for (i in seq_len(n_subjects)) {
-    n <- n_nodes_per_subject[i]
-    all_data[idx:(idx + n - 1L)] <- rep(list(data_list[[i]]), n)
-    idx <- idx + n
-  }
-
-  list(
-    nodes = all_nodes, data = all_data, weights = all_weights,
-    node_to_subject = rep(seq_len(n_subjects), n_nodes_per_subject)
-  )
-}
-
 # Variance Updates =============================================================
 
-.update_measurement_error_sd <- function(data_list, parameters, posteriors) {
+.update_measurement_error_sd <- function(data_list, parameters,
+                                         random_effects) {
   n_total_obs <- sum(vapply(data_list, function(d) {
     length(d$longitudinal$measurements)
   }, integer(1)))
 
-  expanded <- .expand_posteriors(data_list, posteriors)
-
   ode_solutions <- .solve_batch_joint(
-    data_list = expanded$data,
-    random_effects = expanded$nodes,
+    data_list = data_list,
+    random_effects = random_effects,
     parameters = parameters
   )
 
-  sigma_e_squared <- sum(vapply(seq_along(ode_solutions), function(k) {
-    i <- expanded$node_to_subject[k]
-    measurements <- data_list[[i]]$longitudinal$measurements
-    if (length(measurements) == 0) {
-      return(0)
-    }
+  rss <- sum(vapply(seq_along(ode_solutions), function(k) {
+    measurements <- data_list[[k]]$longitudinal$measurements
+    if (length(measurements) == 0) return(0)
 
-    obs_times <- data_list[[i]]$longitudinal$times
+    obs_times <- data_list[[k]]$longitudinal$times
     result_times <- ode_solutions[[k]]$times
     match_idx <- match(obs_times, result_times)
     biomarker_pred <- ode_solutions[[k]]$biomarker[match_idx]
 
-    expanded$weights[k] * sum((measurements - biomarker_pred)^2)
+    sum((measurements - biomarker_pred)^2)
   }, numeric(1)))
 
-  sqrt(sigma_e_squared / n_total_obs)
+  sqrt(rss / n_total_obs)
 }
 
 #' @noRd
@@ -92,20 +45,16 @@ NULL
 # Expected Objective ===========================================================
 
 .compute_objective_expected <- function(
-  params, data_list, posteriors, parameters,
+  params, data_list, random_effects, parameters,
   gradient = TRUE, hessian = FALSE,
   parallel = FALSE, n_cores = 0
 ) {
   eval_chunk <- function(idx) {
-    expanded <- .expand_posteriors(
-      data_list[idx],
-      list(nodes = posteriors$nodes[idx],
-           weights = posteriors$weights[idx])
-    )
     .compute_joint_objective(
-      params = params, data_list = expanded$data,
-      random_effects = expanded$nodes, parameters = parameters,
-      weights = expanded$weights, gradient = gradient, hessian = hessian
+      params = params, data_list = data_list[idx],
+      random_effects = random_effects[idx, , drop = FALSE],
+      parameters = parameters,
+      gradient = gradient, hessian = hessian
     )
   }
 
@@ -136,11 +85,9 @@ NULL
   result
 }
 
-# Laplace Approximation + AGHQ ================================================
+# Laplace Approximation ========================================================
 
-.compute_posterior_laplace <- function(
-  data, random_effect, parameters, level = 3
-) {
+.compute_posterior_laplace <- function(data, random_effect, parameters) {
   objective <- function(theta) {
     result <- .compute_joint_logpost(
       random_effect = theta, data = data,
@@ -161,68 +108,25 @@ NULL
     random_effect = fit$estimate, data = data,
     parameters = parameters, gradient = FALSE, hessian = TRUE
   )
-  hessian_neglogpost <- -attr(result_at_mode, "hessian")
+  R <- .safe_chol(-attr(result_at_mode, "hessian"))
 
-  R <- .safe_chol(hessian_neglogpost)
-  chol_factor <- t(backsolve(R, diag(nrow(hessian_neglogpost))))
-
-  quad <- .get_quad_grid(length(fit$estimate), level)
-  n_nodes <- nrow(quad$nodes)
-  n_re <- length(fit$estimate)
-
-  aghq_nodes <- t(vapply(seq_len(n_nodes), function(k) {
-    fit$estimate + tcrossprod(quad$nodes[k, ], chol_factor)
-  }, numeric(n_re)))
-
-  logpost_at_nodes <- vapply(seq_len(n_nodes), function(k) {
-    as.numeric(.compute_joint_logpost(
-      random_effect = aghq_nodes[k, ],
-      data = data, parameters = parameters,
-      gradient = FALSE, hessian = FALSE
-    ))
-  }, numeric(1))
-
-  log_jacobian <- -sum(log(diag(R)))
-
-  log_weights <- log(quad$weights) + log_jacobian + logpost_at_nodes
-  max_log_weight <- max(log_weights)
-  aghq_weights <- exp(log_weights - max_log_weight)
-  aghq_weights <- aghq_weights / sum(aghq_weights)
-
-  list(nodes = aghq_nodes, weights = aghq_weights)
-}
-
-.compute_posterior_moments <- function(posterior_result) {
-  nodes <- posterior_result$nodes
-  weights <- posterior_result$weights
-  mean <- colSums(weights * nodes)
-  second_moment <- crossprod(nodes, weights * nodes)
-  list(mean = mean, second_moment = second_moment)
+  list(mode = fit$estimate, cov = chol2inv(R))
 }
 
 .compute_posteriors <- function(
   data_list, parameters, random_effects,
-  parallel = FALSE, n_cores = 0, level = 3, setup = TRUE
+  parallel = FALSE, n_cores = 0, setup = TRUE
 ) {
-  n_subjects <- length(data_list)
-  .get_quad_grid(ncol(random_effects), level)
-
-  posterior_results <- .parallel_apply(
-    seq_len(n_subjects),
+  .parallel_apply(
+    seq_along(data_list),
     function(i) {
       .compute_posterior_laplace(
         data = data_list[[i]],
         random_effect = random_effects[i, ],
-        parameters = parameters,
-        level = level
+        parameters = parameters
       )
     },
     parallel = parallel, n_cores = n_cores, setup = setup
-  )
-
-  list(
-    nodes = lapply(posterior_results, `[[`, "nodes"),
-    weights = lapply(posterior_results, `[[`, "weights")
   )
 }
 
@@ -230,15 +134,14 @@ NULL
 
 #' @noRd
 .compute_vcov_sem <- function(
-  data_list, posteriors, posterior_moments,
-  parameters, random_effects, control
+  data_list, parameters, random_effects, control
 ) {
   theta <- .coef_to_vector(parameters)
 
   if (control$verbose > 0) cli::cli_alert_info("Computing SEM vcov...")
 
   obj <- .compute_objective_expected(
-    theta, data_list, posteriors, parameters,
+    theta, data_list, random_effects, parameters,
     gradient = FALSE, hessian = TRUE,
     parallel = control$parallel, n_cores = control$n_cores
   )
@@ -252,7 +155,8 @@ NULL
     .coef_to_vector(result$parameters)
   }
 
-  eps_weight <- sqrt(abs(diag(info_complete_inv))) * sqrt(.Machine$double.eps)
+  eps_weight <- sqrt(abs(diag(info_complete_inv)))
+  eps_weight <- eps_weight / min(eps_weight) * sqrt(.Machine$double.eps)
 
   dm_matrix <- numDeriv::jacobian(
     func = em_map, x = theta,
@@ -295,15 +199,12 @@ NULL
   posteriors <- .compute_posteriors(
     data_list, parameters, random_effects,
     control$parallel, control$n_cores,
-    control$quad_level,
     setup = FALSE
   )
 
   n_subjects <- length(data_list)
-  posterior_moments <- lapply(seq_len(n_subjects), function(i) {
-    .compute_posterior_moments(
-      list(nodes = posteriors$nodes[[i]], weights = posteriors$weights[[i]])
-    )
+  posterior_moments <- lapply(posteriors, function(p) {
+    list(mean = p$mode, second_moment = tcrossprod(p$mode) + p$cov)
   })
   n_re <- length(posterior_moments[[1]]$mean)
   random_effects <- t(vapply(posterior_moments, `[[`, numeric(n_re), "mean"))
@@ -312,23 +213,27 @@ NULL
     posterior_moments, n_subjects
   )
   measurement_error_sd <- .update_measurement_error_sd(
-    data_list, parameters, posteriors
+    data_list, parameters, random_effects
   )
   parameters$coefficients$measurement_error_sd <- measurement_error_sd
   parameters$coefficients$random_effect_sigma <- random_effect_sigma
 
-  # M-step: one Newton step for fixed effects
+  # M-step: maximize Q function
   theta <- .coef_to_vector(parameters)
-  obj <- .compute_objective_expected(
-    theta, data_list, posteriors, parameters,
-    gradient = TRUE, hessian = TRUE,
-    parallel = control$parallel, n_cores = control$n_cores
-  )
-  theta_new <- as.vector(theta - .safe_solve(
-    attr(obj, "hessian"), attr(obj, "gradient")
-  ))
-  loglik_value <- -as.numeric(obj)
-  parameters <- .vector_to_coef(parameters, theta_new)
+  q_obj <- function(th) {
+    obj <- .compute_objective_expected(
+      th, data_list, random_effects, .vector_to_coef(parameters, th),
+      gradient = TRUE, hessian = TRUE,
+      parallel = control$parallel, n_cores = control$n_cores
+    )
+    val <- as.numeric(obj)
+    attr(val, "gradient") <- as.vector(attr(obj, "gradient"))
+    attr(val, "hessian") <- as.matrix(attr(obj, "hessian"))
+    val
+  }
+  fit_m <- nlm(q_obj, theta, check.analyticals = FALSE)
+  loglik_value <- -fit_m$minimum
+  parameters <- .vector_to_coef(parameters, fit_m$estimate)
 
   list(
     parameters = parameters,

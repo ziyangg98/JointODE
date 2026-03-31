@@ -42,8 +42,8 @@
 # Constants ====================================================================
 
 .default_spline <- list(
-  degree = 2,
-  n_knots = 0,
+  degree = 3,
+  n_knots = 2,
   knot_placement = "equal",
   boundary_knots = NULL
 )
@@ -327,11 +327,7 @@
   stop("Hessian is not positive definite")
 }
 
-#' @noRd
-.safe_solve <- function(H, g) {
-  R <- .safe_chol(H)
-  backsolve(R, backsolve(R, g, transpose = TRUE))
-}
+
 
 # Parameter Counting & Conversion =============================================
 

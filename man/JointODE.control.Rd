@@ -6,7 +6,7 @@
 \usage{
 JointODE.control(
   maxit = 200,
-  tol = 1e-04,
+  tol = 0.001,
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,
@@ -19,7 +19,7 @@ JointODE.control(
 \item{maxit}{Maximum number of EM iterations (default: 200)}
 
 \item{tol}{Convergence tolerance. The EM algorithm converges
-when max|theta_new - theta_old| < tol (default: 1e-4)}
+when max|theta_new - theta_old| < tol (default: 1e-3)}
 
 \item{verbose}{Logical or numeric; controls verbosity level. FALSE/0 for
 silent, TRUE/1 for basic progress, 2 for detailed output (default: FALSE)}
@@ -49,7 +49,7 @@ process a list to fill in missing values with defaults.
 control <- JointODE.control()
 
 # Custom settings for faster exploration
-control <- JointODE.control(maxit = 30, tol = 1e-4)
+control <- JointODE.control(maxit = 30, tol = 1e-3)
 
 # Verbose output for debugging
 control <- JointODE.control(verbose = TRUE)

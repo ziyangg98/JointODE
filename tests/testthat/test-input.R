@@ -278,7 +278,7 @@ test_that(".process_joint sorts unordered time data", {
 test_that("JointODE.control returns complete defaults", {
   ctrl <- JointODE.control()
   expect_equal(ctrl$maxit, 200)
-  expect_equal(ctrl$tol, 1e-4)
+  expect_equal(ctrl$tol, 1e-3)
   expect_equal(ctrl$verbose, 0)
   expect_false(ctrl$parallel)
   expect_equal(ctrl$n_cores, 0)
