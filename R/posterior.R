@@ -70,9 +70,7 @@ NULL
 
     obs_times <- data_list[[i]]$longitudinal$times
     result_times <- ode_solutions[[k]]$times
-    match_idx <- vapply(obs_times, function(t) {
-      which.min(abs(result_times - t))
-    }, integer(1))
+    match_idx <- match(obs_times, result_times)
     biomarker_pred <- ode_solutions[[k]]$biomarker[match_idx]
 
     expanded$weights[k] * sum((measurements - biomarker_pred)^2)
@@ -250,12 +248,11 @@ NULL
 
   em_map <- function(theta_input) {
     params_input <- .vector_to_coef(parameters, theta_input)
-    result <- .em_step(data_list, params_input, random_effects, control,
-                       regularize = FALSE)
+    result <- .em_step(data_list, params_input, random_effects, control)
     .coef_to_vector(result$parameters)
   }
 
-  eps_weight <- sqrt(abs(diag(info_complete_inv))) * control$tol^(2/3)
+  eps_weight <- sqrt(abs(diag(info_complete_inv))) * sqrt(.Machine$double.eps)
 
   dm_matrix <- numDeriv::jacobian(
     func = em_map, x = theta,
@@ -294,8 +291,7 @@ NULL
 # EM Step ======================================================================
 
 #' @noRd
-.em_step <- function(data_list, parameters, random_effects, control,
-                     regularize = TRUE) {
+.em_step <- function(data_list, parameters, random_effects, control) {
   posteriors <- .compute_posteriors(
     data_list, parameters, random_effects,
     control$parallel, control$n_cores,
@@ -328,9 +324,9 @@ NULL
     gradient = TRUE, hessian = TRUE,
     parallel = control$parallel, n_cores = control$n_cores
   )
-  delta <- .safe_solve(attr(obj, "hessian"), attr(obj, "gradient"))
-  if (regularize) delta <- delta * min(1, 1 / max(abs(delta)))
-  theta_new <- as.vector(theta - delta)
+  theta_new <- as.vector(theta - .safe_solve(
+    attr(obj, "hessian"), attr(obj, "gradient")
+  ))
   loglik_value <- -as.numeric(obj)
   parameters <- .vector_to_coef(parameters, theta_new)
 
