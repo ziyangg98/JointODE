@@ -27,14 +27,15 @@
     paste0("initial state:", coef_names$initial_state)
   )
 
-  vcov_matrix <- .compute_vcov_sem(
-    data_list,
-    posteriors,
-    posterior_moments,
-    parameters,
-    random_effects,
-    control
-  )
+  n_coef <- length(coef_names_expanded)
+  vcov_matrix <- if (converged) {
+    .compute_vcov_sem(
+      data_list, posteriors, posterior_moments,
+      parameters, random_effects, control
+    )
+  } else {
+    matrix(NA, n_coef, n_coef)
+  }
   dimnames(vcov_matrix) <- list(coef_names_expanded, coef_names_expanded)
 
   n_params <- .count_params(parameters)

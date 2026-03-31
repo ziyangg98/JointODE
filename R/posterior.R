@@ -165,7 +165,7 @@ NULL
   )
   hessian_neglogpost <- -attr(result_at_mode, "hessian")
 
-  R <- .regularized_chol(hessian_neglogpost)
+  R <- .safe_chol(hessian_neglogpost)
   chol_factor <- t(backsolve(R, diag(nrow(hessian_neglogpost))))
 
   quad <- .get_quad_grid(length(fit$estimate), level)
@@ -198,8 +198,7 @@ NULL
   nodes <- posterior_result$nodes
   weights <- posterior_result$weights
   mean <- colSums(weights * nodes)
-  weighted_nodes <- sqrt(weights) * nodes
-  second_moment <- crossprod(weighted_nodes)
+  second_moment <- crossprod(nodes, weights * nodes)
   list(mean = mean, second_moment = second_moment)
 }
 
@@ -232,34 +231,6 @@ NULL
 # SEM Variance-Covariance =====================================================
 
 #' @noRd
-.m_step_map <- function(
-  theta_input, data_list, posteriors, posterior_moments, parameters, control,
-  hessian_cache = NULL
-) {
-  params_input <- .vector_to_coef(parameters, theta_input)
-  n_subjects <- length(data_list)
-
-  random_effect_sigma <- .update_random_effect_sigma(
-    posterior_moments, n_subjects
-  )
-  measurement_error_sd <- .update_measurement_error_sd(
-    data_list, params_input, posteriors
-  )
-  params_input$coefficients$measurement_error_sd <- measurement_error_sd
-  params_input$coefficients$random_effect_sigma <- random_effect_sigma
-
-  theta <- .coef_to_vector(params_input)
-  use_cache <- !is.null(hessian_cache)
-  obj <- .compute_objective_expected(
-    theta, data_list, posteriors, params_input,
-    gradient = TRUE, hessian = !use_cache,
-    parallel = control$parallel, n_cores = control$n_cores
-  )
-  hess <- if (use_cache) hessian_cache else attr(obj, "hessian")
-  as.vector(theta - .regularized_solve(hess, attr(obj, "gradient")))
-}
-
-#' @noRd
 .compute_vcov_sem <- function(
   data_list, posteriors, posterior_moments,
   parameters, random_effects, control
@@ -275,30 +246,26 @@ NULL
   )
   hess <- attr(obj, "hessian")
   n_coef <- nrow(hess)
-  r_hess <- try(.regularized_chol(hess), silent = TRUE)
-  if (inherits(r_hess, "try-error")) {
-    if (control$verbose > 0) {
-      cli::cli_alert_warning("Hessian singular, vcov unavailable")
-    }
-    return(matrix(NA, n_coef, n_coef))
-  }
-  info_complete_inv <- chol2inv(r_hess)
+  info_complete_inv <- solve(hess)
 
   em_map <- function(theta_input) {
-    .m_step_map(
-      theta_input, data_list, posteriors, posterior_moments,
-      parameters, control, hessian_cache = hess
-    )
+    params_input <- .vector_to_coef(parameters, theta_input)
+    result <- .em_step(data_list, params_input, random_effects, control,
+                       regularize = FALSE)
+    .coef_to_vector(result$parameters)
   }
 
+  eps_weight <- sqrt(abs(diag(info_complete_inv))) * control$tol^(2/3)
+
   dm_matrix <- numDeriv::jacobian(
-    func = em_map, x = theta, method = "simple"
+    func = em_map, x = theta,
+    method = "simple", method.args = list(eps = eps_weight)
   )
 
   info_observed_inv <- info_complete_inv %*% solve(diag(n_coef) - t(dm_matrix))
 
   asymmetry <- max(abs(info_observed_inv - t(info_observed_inv)))
-  if (control$verbose > 0 && asymmetry > 1e-2) {
+  if (control$verbose > 0 && asymmetry > 1e-4) {
     cli::cli_alert_warning(sprintf(
       "Vcov matrix asymmetry: %.2e", asymmetry
     ))
@@ -317,7 +284,7 @@ NULL
   if (any(diag_ratio < 1 - 0.01) && control$verbose > 0) {
     cli::cli_alert_warning(sprintf(
       "%d parameter(s) violate missing information principle (min ratio: %.3f)",
-      sum(diag_ratio < 1 - 1e-6), min(diag_ratio)
+      sum(diag_ratio < 1 - 0.01), min(diag_ratio)
     ))
   }
 
@@ -327,7 +294,8 @@ NULL
 # EM Step ======================================================================
 
 #' @noRd
-.em_step <- function(data_list, parameters, random_effects, control) {
+.em_step <- function(data_list, parameters, random_effects, control,
+                     regularize = TRUE) {
   posteriors <- .compute_posteriors(
     data_list, parameters, random_effects,
     control$parallel, control$n_cores,
@@ -360,9 +328,9 @@ NULL
     gradient = TRUE, hessian = TRUE,
     parallel = control$parallel, n_cores = control$n_cores
   )
-  theta_new <- as.vector(theta - .regularized_solve(
-    attr(obj, "hessian"), attr(obj, "gradient")
-  ))
+  delta <- .safe_solve(attr(obj, "hessian"), attr(obj, "gradient"))
+  if (regularize) delta <- delta * min(1, 1 / max(abs(delta)))
+  theta_new <- as.vector(theta - delta)
   loglik_value <- -as.numeric(obj)
   parameters <- .vector_to_coef(parameters, theta_new)
 

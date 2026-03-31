@@ -314,25 +314,22 @@
   )
 }
 
-# Gill-Murray Regularized Cholesky ============================================
-
 #' @noRd
-.regularized_chol <- function(H) {
-  n <- nrow(H)
-  tau <- 0
-  ds <- max(abs(diag(H)), 1, na.rm = TRUE)
-  if (!is.finite(ds)) ds <- 1
-  for (k in seq_len(20)) {
-    R <- try(chol(H + diag(tau, n)), silent = TRUE)
+.safe_chol <- function(H) {
+  R <- try(chol(H), silent = TRUE)
+  if (!inherits(R, "try-error")) return(R)
+  tau <- 1e-4 * max(abs(diag(H)), 1)
+  for (k in seq_len(10)) {
+    R <- try(chol(H + diag(tau, nrow(H))), silent = TRUE)
     if (!inherits(R, "try-error")) return(R)
-    tau <- if (tau == 0) 1e-4 * ds else tau * 10
+    tau <- tau * 10
   }
-  stop("Hessian is not positive definite after regularization")
+  stop("Hessian is not positive definite")
 }
 
 #' @noRd
-.regularized_solve <- function(H, g) {
-  R <- .regularized_chol(H)
+.safe_solve <- function(H, g) {
+  R <- .safe_chol(H)
   backsolve(R, backsolve(R, g, transpose = TRUE))
 }
 

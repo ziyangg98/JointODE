@@ -7,7 +7,7 @@
 # ==============================================================================
 
 e2e_sim <- JointODE::simulate(
-  n_subjects = 10,
+  n_subjects = 20,
   longitudinal = list(
     xi = c(mean = 0.4, sd = 0.05),
     period = c(mean = 6, sd = 0.1),
