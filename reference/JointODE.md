@@ -16,10 +16,9 @@ JointODE(
   longitudinal_data,
   survival_data,
   gamma = 1,
-  state = NULL,
-  spline_baseline = list(degree = 2, n_knots = 0, knot_placement = "equal",
+  spline_baseline = list(degree = 3, n_knots = 2, knot_placement = "equal",
     boundary_knots = NULL),
-  init = NULL,
+  init = "default",
   control = list(),
   ...
 )
@@ -59,13 +58,6 @@ JointODE(
   `gamma = 1` uses linear velocity; `gamma = 2` uses squared velocity.
   Default is 1 (default: 1).
 
-- state:
-
-  A matrix specifying initial conditions for the ODE system with two
-  columns: initial biomarker values and their first derivatives. Each
-  row corresponds to one subject. If `NULL`, defaults to a zero matrix
-  with appropriate dimensions (default: `NULL`).
-
 - spline_baseline:
 
   A list controlling the B-spline representation of the baseline hazard
@@ -73,13 +65,12 @@ JointODE(
 
   `degree`
 
-  :   Polynomial degree of the B-spline basis functions (default: 2,
-      quadratic splines)
+  :   Polynomial degree of the B-spline basis functions (default: 3,
+      cubic splines)
 
   `n_knots`
 
-  :   Number of interior knots for flexibility (default: 0, providing
-      moderate flexibility)
+  :   Number of interior knots for flexibility (default: 2)
 
   `knot_placement`
 
@@ -95,15 +86,16 @@ JointODE(
 
 - init:
 
-  Optional initial values for model parameters. Can be either:
+  Initial values for model parameters. Can be:
 
-  - `NULL` (default): Automatically calls
-    [`MarginalODE`](http://gongziyang.com/JointODE/reference/MarginalODE.md)
-    to compute data-driven initial estimates for longitudinal parameters
-    and random effects. Recommended for most applications.
+  - `"default"` (default): Use zero/default initial values.
+
+  - `"marginal"`: Use
+    [`MarginalODE`](https://gongziyang.com/JointODE/reference/MarginalODE.md)
+    to compute data-driven initial estimates.
 
   - A list with the same structure as the fitted model's `parameters`
-    component for full manual control
+    component for full manual control.
 
   When providing a list, it should have elements:
 
@@ -134,20 +126,17 @@ JointODE(
 - control:
 
   A list of control parameters for optimization, or output from
-  [`JointODE.control`](http://gongziyang.com/JointODE/reference/JointODE.control.md).
+  [`JointODE.control`](https://gongziyang.com/JointODE/reference/JointODE.control.md).
   Key parameters include:
 
   `maxit`
 
   :   Maximum number of EM iterations (default: 200)
 
-  `atol`
+  `tol`
 
-  :   Absolute tolerance for parameter convergence (default: 5e-4)
-
-  `rtol`
-
-  :   Relative tolerance for log-likelihood convergence (default: 1e-5)
+  :   Convergence tolerance on max absolute parameter change (default:
+      1e-3)
 
   `verbose`
 
@@ -165,10 +154,10 @@ JointODE(
 
   `quad_level`
 
-  :   Quadrature level for numerical integration (default: 4)
+  :   Quadrature level for numerical integration (default: 3)
 
   See
-  [`JointODE.control`](http://gongziyang.com/JointODE/reference/JointODE.control.md)
+  [`JointODE.control`](https://gongziyang.com/JointODE/reference/JointODE.control.md)
   for complete details and examples.
 
 - ...:
@@ -215,7 +204,7 @@ An S3 object of class `"JointODE"` containing fitted model results:
 
   - `converged`: Logical indicating convergence status
 
-  - `em_iterations`: Number of EM iterations performed
+  - `iterations`: Number of EM iterations performed
 
   - `message`: Descriptive convergence message
 
@@ -269,7 +258,7 @@ with:
 ``` r
 if (FALSE) { # \dontrun{
 # Generate example data
-sim <- simulate(n_subjects = 100, n_times = 10)
+sim <- simulate(n_subjects = 100, n_measurements = 10)
 
 # Fit with default control parameters
 fit1 <- JointODE(
@@ -281,7 +270,7 @@ fit1 <- JointODE(
 
 # Fit with custom control parameters using JointODE.control()
 control <- JointODE.control(
-  maxit = 200, atol = 1e-4, rtol = 1e-6, verbose = TRUE
+  maxit = 200, tol = 1e-4, verbose = TRUE
 )
 fit2 <- JointODE(
   longitudinal_formula = observed ~ x1 + x2,

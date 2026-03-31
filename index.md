@@ -62,7 +62,11 @@ Here’s a basic example using the included simulated dataset:
 
 ``` r
 library(JointODE)
-library(survival)
+#>
+#> Attaching package: 'JointODE'
+#> The following object is masked from 'package:stats':
+#>
+#>     simulate
 
 # Load example dataset (200 subjects with longitudinal and survival data)
 data(sim)
@@ -71,14 +75,21 @@ data(sim)
 longitudinal_data <- sim$data$longitudinal_data[
   , c("id", "time", "observed", "x1", "x2")
 ]
+t0 <- proc.time()
 fit <- JointODE(
   longitudinal_formula = observed ~ biomarker + velocity + x1 + x2 +
     (biomarker + velocity | id),
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = longitudinal_data,
   survival_data = sim$data$survival_data,
-  control = list(atol = 1e-3, verbose = 3)
+  init = "marginal",
+  control = list(parallel = TRUE)
 )
+cat(sprintf("Elapsed: %.1f s\n", (proc.time() - t0)["elapsed"]))
+#> Elapsed: 41.3 s
+```
+
+``` r
 # Model summary
 summary(fit)
 #>
@@ -86,8 +97,8 @@ summary(fit)
 #> JointODE(longitudinal_formula = observed ~ biomarker + velocity +
 #>     x1 + x2 + (biomarker + velocity | id), survival_formula = Surv(time,
 #>     status) ~ w1 + w2, longitudinal_data = longitudinal_data,
-#>     survival_data = sim$data$survival_data, control = list(atol = 0.001,
-#>         verbose = 3))
+#>     survival_data = sim$data$survival_data, init = "marginal",
+#>     control = list(parallel = TRUE))
 #>
 #> Data Descriptives:
 #> Longitudinal Process            Survival Process
@@ -95,54 +106,60 @@ summary(fit)
 #> Number of Subjects: 200
 #>
 #>        AIC        BIC     logLik
-#> -31459.585 -31367.232  15757.792
+#> -32488.560 -32396.207  16272.280
 #>
 #> Coefficients:
 #> Longitudinal Process: Second-Order ODE Model
-#>               Estimate Std. Error  z value Pr(>|z|)
-#> biomarker   -1.091e+00  5.662e-03 -192.618   <2e-16 ***
-#> velocity    -8.568e-01  1.502e-02  -57.054   <2e-16 ***
-#> (Intercept) -2.312e-05  1.390e-03   -0.017    0.987
-#> x1           5.443e-01  2.969e-03  183.302   <2e-16 ***
-#> x2          -4.901e-01  2.795e-03 -175.340   <2e-16 ***
+#>             Estimate Std. Error  z value Pr(>|z|)
+#> biomarker    -1.0844     0.0083 -129.995   <2e-16 ***
+#> velocity     -0.8223     0.0162  -50.876   <2e-16 ***
+#> (Intercept)   0.0003     0.0015    0.217    0.828
+#> x1            0.5427     0.0042  128.237   <2e-16 ***
+#> x2           -0.4885     0.0039 -124.359   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> ODE System Characteristics:
 #>                    Estimate Std. Error z value Pr(>|z|)
-#> T (period)         6.016586   0.015618  385.24   <2e-16 ***
-#> xi (damping ratio) 0.410243   0.006966   58.89   <2e-16 ***
+#> T (period)           6.0336     0.0232  259.99   <2e-16 ***
+#> xi (damping ratio)   0.3948     0.0075   52.64   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Survival Process: Proportional Hazards Model
 #>         Estimate Std. Error z value Pr(>|z|)
-#> alpha_1   0.7241     0.1880   3.852 0.000117 ***
-#> alpha_2   1.8300     0.7721   2.370 0.017785 *
-#> w1        0.6862     0.1245   5.512 3.55e-08 ***
-#> w2       -1.3431     0.2859  -4.697 2.64e-06 ***
+#> alpha_1   0.6774     0.1873   3.617 0.000298 ***
+#> alpha_2   1.9869     1.0253   1.938 0.052646 .
+#> w1        0.6762     0.1240   5.453 4.95e-08 ***
+#> w2       -1.3353     0.2857  -4.673 2.97e-06 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
-#> Baseline Hazard: B-spline with 3 basis functions
-#> (Coefficients range: [-4.816, -2.023] )
+#> Baseline Hazard: B-spline with 6 basis functions
+#> (Coefficients range: [-6.506, -0.518] )
+#>
+#> Initial State: Population Mean
+#>    Estimate Std. Error z value Pr(>|z|)
+#> m0  -0.5061     0.0085  -59.76  < 2e-16 ***
+#> v0  -0.0950     0.0228   -4.16 3.19e-05 ***
+#> ---
+#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Variance Components:
-#> Measurement Error SD: 0.098718
+#> Measurement Error SD: 0.098143
 #> Random Effect Covariance Matrix:
-#>          [,1]     [,2]
-#> [1,] 0.001380 0.001859
-#> [2,] 0.001859 0.034803
+#>            [,1]       [,2]       [,3]      [,4]
+#> [1,]  0.0119511  0.0307804 -0.0004738 -0.001493
+#> [2,]  0.0307804  0.0947550 -0.0001958 -0.003552
+#> [3,] -0.0004738 -0.0001958  0.0017180  0.001939
+#> [4,] -0.0014930 -0.0035520  0.0019394  0.038128
 #>
 #> Model Diagnostics:
-#> C-index (Concordance): 0.667
-#> Convergence: EM algorithm converged after 26 iterations
+#> C-index (Concordance): 0.868
+#> Convergence: Converged after 8 iterations
 
 # Plot results
 plot(fit)
-#> `geom_smooth()` using formula = 'y ~ x'
-#> `geom_smooth()` using formula = 'y ~ x'
-#> `geom_smooth()` using formula = 'y ~ x'
 ```
 
 ![](reference/figures/README-output-1.png)
@@ -150,21 +167,21 @@ plot(fit)
 The formula specifies:
 
 - **ODE terms**: `biomarker` and `velocity` are the state variables
-  (value and slope) in the ODE - **Covariates**: `x1` and `x2` are
-  external variables affecting the dynamics - **Random effects**:
-  `(biomarker + velocity | id)` allows subject-specific coefficients on
-  the ODE value and slope terms
+  (value and slope) in the ODE
+- **Covariates**: `x1` and `x2` are external variables affecting the
+  dynamics
+- **Random effects**: `(biomarker + velocity | id)` allows
+  subject-specific coefficients on the ODE value and slope terms
 
 ## Learn More
 
 - **Getting Started**: See `vignette("JointODE")` for a detailed
   tutorial
 - **Technical Details**: See
-  [`vignette("technical-details")`](http://gongziyang.com/JointODE/articles/technical-details.md)
+  [`vignette("technical-details")`](https://gongziyang.com/JointODE/articles/technical-details.md)
   for mathematical formulations
-- **Model Comparison**: See
-  [`vignette("comparison")`](http://gongziyang.com/JointODE/articles/comparison.md)
-  for comparisons with traditional joint models
+- **Model Comparison**: See `vignette("comparison")` for comparisons
+  with traditional joint models
 
 ## Code of Conduct
 

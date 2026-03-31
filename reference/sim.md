@@ -124,9 +124,9 @@ validation.
 
 ## See also
 
-[`JointODE`](http://gongziyang.com/JointODE/reference/JointODE.md) for
+[`JointODE`](https://gongziyang.com/JointODE/reference/JointODE.md) for
 model fitting,
-[`simulate`](http://gongziyang.com/JointODE/reference/simulate.md) for
+[`simulate`](https://gongziyang.com/JointODE/reference/simulate.md) for
 data generation
 
 ## Examples
@@ -138,18 +138,20 @@ data(sim)
 # Examine structure
 str(sim, max.level = 2)
 #> List of 2
-#>  $ data:List of 4
-#>   ..$ longitudinal_data:'data.frame':    17350 obs. of  8 variables:
-#>   ..$ survival_data    :'data.frame':    200 obs. of  5 variables:
-#>   ..$ state            : num [1:200, 1:2] -0.27 -0.565 -0.541 -0.573 -0.385 ...
+#>  $ data:List of 5
+#>   ..$ longitudinal_data :'data.frame':   17350 obs. of  8 variables:
+#>   ..$ survival_data     :'data.frame':   200 obs. of  5 variables:
+#>   ..$ state             : num [1:200, 1:2] -0.27 -0.565 -0.541 -0.573 -0.385 ...
 #>   .. ..- attr(*, "dimnames")=List of 2
-#>   ..$ random_effects   : num [1:200, 1:2] -0.03361 0.01005 -0.00603 0.01501 -0.08198 ...
+#>   ..$ initial_state_mean: Named num [1:2] -0.503 -0.109
+#>   .. ..- attr(*, "names")= chr [1:2] "m0" "v0"
+#>   ..$ random_effects    : num [1:200, 1:4] 0.2326 -0.0623 -0.0384 -0.0701 0.1178 ...
 #>   .. ..- attr(*, "dimnames")=List of 2
 #>   .. ..- attr(*, "mu")= Named num [1:2] -1.097 -0.838
 #>   .. .. ..- attr(*, "names")= chr [1:2] "dyn_value" "dyn_slope"
 #>   .. ..- attr(*, "sigma")= num [1:2, 1:2] 0.00134 0.00051 0.00051 0.04406
 #>  $ init:List of 2
-#>   ..$ coefficients  :List of 5
+#>   ..$ coefficients  :List of 6
 #>   ..$ configurations:List of 4
 
 # Access longitudinal data
@@ -193,9 +195,11 @@ cat("\nCovariance matrix:\n")
 #> 
 #> Covariance matrix:
 print(sim$init$coefficients$random_effect_sigma)
-#>              [,1]         [,2]
-#> [1,] 0.0013362015 0.0005103914
-#> [2,] 0.0005103914 0.0440598636
+#>       [,1]   [,2]         [,3]         [,4]
+#> [1,] 0.010 0.0320 0.0000000000 0.0000000000
+#> [2,] 0.032 0.1025 0.0000000000 0.0000000000
+#> [3,] 0.000 0.0000 0.0013362015 0.0005103914
+#> [4,] 0.000 0.0000 0.0005103914 0.0440598636
 
 # Compute patient-specific xi and period from random effects
 # Note: A small number of patients may have invalid dynamics due to
@@ -246,7 +250,7 @@ p_physical <- ggplot(patient_params_valid, aes(x = xi, y = period)) +
       nrow(patient_params_valid),
       nrow(patient_params)
     ),
-    x = expression("Damping Ratio ("*xi*")"),
+    x = expression("Damping Ratio (" * xi * ")"),
     y = "Period (T)"
   ) +
   theme_minimal()
@@ -268,8 +272,8 @@ p_ode <- ggplot(beta_df, aes(x = beta1, y = beta2)) +
   labs(
     title = "ODE Parameter Space",
     subtitle = "Green cross: population mean",
-    x = expression(beta[1]~"(value coefficient)"),
-    y = expression(beta[2]~"(slope coefficient)")
+    x = expression(beta[1] ~ "(value coefficient)"),
+    y = expression(beta[2] ~ "(slope coefficient)")
   ) +
   theme_minimal()
 
@@ -279,8 +283,10 @@ grid.arrange(p_physical, p_ode, ncol = 2)
 
 # Select example patients across the distribution (only valid ones)
 set.seed(123)
-example_ids <- sample(patient_params_valid$id,
-  min(6, nrow(patient_params_valid)))
+example_ids <- sample(
+  patient_params_valid$id,
+  min(6, nrow(patient_params_valid))
+)
 plot_data <- sim$data$longitudinal_data %>%
   filter(id %in% example_ids) %>%
   left_join(patient_params_valid, by = "id") %>%
@@ -290,7 +296,7 @@ plot_data <- sim$data$longitudinal_data %>%
 p2 <- ggplot(plot_data, aes(x = time, y = biomarker)) +
   geom_line(linewidth = 1) +
   geom_point(aes(y = observed), alpha = 0.4, size = 0.8) +
-  facet_wrap(~ label, scales = "free_y", ncol = 2) +
+  facet_wrap(~label, scales = "free_y", ncol = 2) +
   labs(
     title = "Example Patient Trajectories",
     subtitle = "Lines: true values, Points: observed with error",

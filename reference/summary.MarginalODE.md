@@ -1,6 +1,6 @@
-# Summary Method for MarginalODE Objects
+# Summary of MarginalODE Model
 
-Summary Method for MarginalODE Objects
+Summary of MarginalODE Model
 
 ## Usage
 
@@ -13,48 +13,12 @@ summary(object, ...)
 
 - object:
 
-  An object of class `MarginalODE`
+  A MarginalODE object
 
 - ...:
 
-  Additional arguments (currently unused)
+  Additional arguments
 
 ## Value
 
-A list of class `summary.MarginalODE` containing:
-
-- call:
-
-  The model call
-
-- coefficients:
-
-  Coefficient table for longitudinal ODE parameters
-
-- sigma:
-
-  Named vector with measurement error SD
-
-- nobs:
-
-  Number of subjects
-
-- n_observations:
-
-  Total number of observations
-
-- AIC:
-
-  Akaike Information Criterion
-
-- BIC:
-
-  Bayesian Information Criterion
-
-- logLik:
-
-  Log-likelihood
-
-- convergence:
-
-  Convergence information
+A summary.MarginalODE object

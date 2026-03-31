@@ -1,6 +1,6 @@
-# Print Summary of MarginalODE Fit
+# Print Summary of MarginalODE Model
 
-Print Summary of MarginalODE Fit
+Print Summary of MarginalODE Model
 
 ## Usage
 
@@ -18,18 +18,20 @@ print(
 
 - x:
 
-  An object of class `summary.MarginalODE`
+  A summary.MarginalODE object
 
 - digits:
 
-  Number of digits to display (default: max(3L, getOption("digits") -
-  3L))
+  Number of digits to display
 
 - signif.stars:
 
-  Logical; show significance stars (default:
-  getOption("show.signif.stars"))
+  Logical; show significance stars
 
 - ...:
 
   Additional arguments passed to `printCoefmat`
+
+## Value
+
+Invisibly returns the object

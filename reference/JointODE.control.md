@@ -9,13 +9,11 @@ process a list to fill in missing values with defaults.
 ``` r
 JointODE.control(
   maxit = 200,
-  atol = 1e-04,
-  rtol = 1e-05,
+  tol = 0.001,
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,
-  quad_level = 4,
-  n_early = 15,
+  quad_level = 3,
   .list = NULL,
   ...
 )
@@ -27,19 +25,10 @@ JointODE.control(
 
   Maximum number of EM iterations (default: 200)
 
-- atol:
+- tol:
 
-  Absolute tolerance for parameter convergence. The EM algorithm
-  converges when the maximum absolute change in any parameter (including
-  variance parameters) is less than this value: max(\|theta_new -
-  theta_old\|) \< atol (default: 1e-4)
-
-- rtol:
-
-  Relative tolerance for log-likelihood convergence. The EM algorithm
-  converges when the relative change in log-likelihood is less than this
-  value: \|L_new - L_old\| / (\|L_new\| + epsilon) \< rtol, where
-  epsilon = 1e-8 prevents division by zero (default: 1e-5)
+  Convergence tolerance. The EM algorithm converges when
+  max\|theta_new - theta_old\| \< tol (default: 1e-3)
 
 - verbose:
 
@@ -57,13 +46,7 @@ JointODE.control(
 
 - quad_level:
 
-  Integer; quadrature level for numerical integration (default: 4)
-
-- n_early:
-
-  Integer; number of early time points to use for quadratic fitting when
-  estimating initial states. Using 15 points balances capturing initial
-  curvature while avoiding overfitting (default: 15)
+  Integer; quadrature level for numerical integration (default: 3)
 
 - .list:
 
@@ -79,7 +62,7 @@ A list of control parameters with all defaults filled in
 
 ## See also
 
-[`JointODE`](http://gongziyang.com/JointODE/reference/JointODE.md)
+[`JointODE`](https://gongziyang.com/JointODE/reference/JointODE.md)
 
 ## Examples
 
@@ -88,7 +71,7 @@ A list of control parameters with all defaults filled in
 control <- JointODE.control()
 
 # Custom settings for faster exploration
-control <- JointODE.control(maxit = 30, atol = 1e-4, rtol = 1e-4)
+control <- JointODE.control(maxit = 30, tol = 1e-3)
 
 # Verbose output for debugging
 control <- JointODE.control(verbose = TRUE)

@@ -6,7 +6,7 @@
 
 - **Comprehensive Visualization System**: Implemented complete plotting
   framework with
-  [`plot.JointODE()`](http://gongziyang.com/JointODE/reference/plot.JointODE.md)
+  [`plot.JointODE()`](https://gongziyang.com/JointODE/reference/plot.JointODE.md)
   method
   - Model diagnostics: overview panels, biomarker/velocity trajectories,
     phase space diagrams
@@ -19,9 +19,9 @@
     computation
   - Improves model convergence and parameter estimation accuracy
   - Available in both
-    [`JointODE()`](http://gongziyang.com/JointODE/reference/JointODE.md)
+    [`JointODE()`](https://gongziyang.com/JointODE/reference/JointODE.md)
     and
-    [`MarginalODE()`](http://gongziyang.com/JointODE/reference/MarginalODE.md)
+    [`MarginalODE()`](https://gongziyang.com/JointODE/reference/MarginalODE.md)
     functions
 - **Enhanced Prediction**: Extended
   [`predict()`](https://rdrr.io/r/stats/predict.html) method with

@@ -342,8 +342,8 @@ sim_basic <- simulate(n_subjects = 20, seed = 123)
 
 # Explore the output structure
 names(sim_basic)
-#> [1] "longitudinal_data" "survival_data"     "state"            
-#> [4] "random_effects"   
+#> [1] "longitudinal_data"  "survival_data"      "state"             
+#> [4] "initial_state_mean" "random_effects"    
 head(sim_basic$longitudinal_data)
 #>   id time  biomarker    velocity acceleration   observed         x1        x2
 #> 1  1  0.0 -0.4807686 -0.02655417    0.7898386 -0.4237065 -0.5604756 -1.067824
@@ -364,16 +364,16 @@ head(sim_basic$survival_data)
 # Check patient-specific dynamics
 # Each patient has unique dynamics drawn from population distribution
 head(sim_basic$random_effects)
-#>         dyn_value  dyn_slope
-#> [1,] -0.037462229 -0.1026366
-#> [2,] -0.025788552 -0.4844648
-#> [3,] -0.006184456  0.2112125
-#> [4,]  0.021120355 -0.1491376
-#> [5,] -0.051345273 -0.1438230
-#> [6,]  0.024461609  0.2150100
+#>                m0          v0    dyn_value  dyn_slope
+#> [1,]  0.004826037  0.02778845 -0.037462229 -0.1026366
+#> [2,] -0.019741038 -0.05960677 -0.025788552 -0.4844648
+#> [3,]  0.171851598  0.54922059 -0.006184456  0.2112125
+#> [4,]  0.034968811  0.11774796  0.021120355 -0.1491376
+#> [5,]  0.033440041  0.11167240 -0.051345273 -0.1438230
+#> [6,]  0.224001464  0.72044753  0.024461609  0.2150100
 
 # Population parameters (mean and covariance)
-attr(sim_basic$random_effects, "mu")    # Mean of dynamics distribution
+attr(sim_basic$random_effects, "mu") # Mean of dynamics distribution
 #> dyn_value dyn_slope 
 #> -1.096623 -0.837758 
 attr(sim_basic$random_effects, "sigma") # Covariance matrix
@@ -386,11 +386,11 @@ attr(sim_basic$random_effects, "sigma") # Covariance matrix
 sim_hetero <- simulate(
   n_subjects = 20,
   longitudinal = list(
-    xi = c(mean = 0.5, sd = 0.2),      # Mean damping ratio with variation
-    period = c(mean = 8, sd = 2),      # Mean period with variation
+    xi = c(mean = 0.5, sd = 0.2), # Mean damping ratio with variation
+    period = c(mean = 8, sd = 2), # Mean period with variation
     excitation = list(
-      offset = 4.0,                    # Constant external force
-      covariates = c(x1 = 0.8, x2 = -0.5)  # Covariate effects
+      offset = 4.0, # Constant external force
+      covariates = c(x1 = 0.8, x2 = -0.5) # Covariate effects
     ),
     initial = list(
       offset = c(biomarker = 3.8, velocity = -0.1),
@@ -416,8 +416,8 @@ sim_hetero <- simulate(
 sim_uniform <- simulate(
   n_subjects = 20,
   longitudinal = list(
-    xi = c(mean = 0.707, sd = 0.01),    # Very small variation
-    period = c(mean = 5, sd = 0.1),     # Very small variation
+    xi = c(mean = 0.707, sd = 0.01), # Very small variation
+    period = c(mean = 5, sd = 0.1), # Very small variation
     excitation = list(offset = 0, covariates = numeric(0)),
     initial = list(
       offset = c(biomarker = -2, velocity = 0),
@@ -431,8 +431,8 @@ sim_uniform <- simulate(
 
 # Verify low variability - all patients should have similar dynamics
 apply(sim_uniform$random_effects, 2, sd)
-#>  dyn_value  dyn_slope 
-#> 0.06639935 0.04269099 
+#>         m0         v0  dyn_value  dyn_slope 
+#> 0.00000000 0.00000000 0.06639935 0.04269099 
 
 # \donttest{
 # Example 4: Comprehensive simulation with survival outcomes
@@ -457,9 +457,9 @@ sim_full <- simulate(
   ),
   survival = list(
     baseline = list(type = "weibull", shape = 3.0, scale = 23),
-    value = 0.4,      # Effect of biomarker value on hazard
-    slope = 1.5,      # Effect of biomarker velocity on hazard
-    gamma = 1,        # Linear velocity effect
+    value = 0.4, # Effect of biomarker value on hazard
+    slope = 1.5, # Effect of biomarker velocity on hazard
+    gamma = 1, # Linear velocity effect
     covariates = c(w1 = 0.4, w2 = -0.6)
   ),
   covariates = list(
@@ -487,8 +487,10 @@ dynamics_df$period_implied <- 2 * pi / dynamics_df$omega
 ggplot(dynamics_df, aes(x = xi_implied)) +
   geom_histogram(bins = 30, fill = "steelblue", alpha = 0.7) +
   geom_vline(xintercept = 0.4, color = "red", linetype = "dashed") +
-  labs(title = "Distribution of Patient Damping Ratios",
-       x = "Damping Ratio (xi)", y = "Count") +
+  labs(
+    title = "Distribution of Patient Damping Ratios",
+    x = "Damping Ratio (xi)", y = "Count"
+  ) +
   theme_minimal()
 
 
@@ -496,8 +498,10 @@ ggplot(dynamics_df, aes(x = xi_implied)) +
 ggplot(dynamics_df, aes(x = period_implied, y = xi_implied)) +
   geom_point(alpha = 0.5) +
   geom_density_2d(color = "steelblue") +
-  labs(title = "Patient-Specific Dynamics",
-       x = "Period", y = "Damping Ratio (xi)") +
+  labs(
+    title = "Patient-Specific Dynamics",
+    x = "Period", y = "Damping Ratio (xi)"
+  ) +
   theme_minimal()
 
 
@@ -519,17 +523,21 @@ plot_data$xi_group <- factor(
 
 ggplot(plot_data, aes(x = time, y = biomarker, color = xi_group)) +
   geom_line(linewidth = 1) +
-  labs(title = "Biomarker Trajectories by Damping Ratio",
-       x = "Time", y = "Biomarker Value",
-       color = "Patient Group") +
+  labs(
+    title = "Biomarker Trajectories by Damping Ratio",
+    x = "Time", y = "Biomarker Value",
+    color = "Patient Group"
+  ) +
   theme_minimal()
 
 
 # Kaplan-Meier survival curve
 library(survival)
 km_fit <- survfit(Surv(time, status) ~ 1, data = sim_full$survival_data)
-plot(km_fit, xlab = "Time", ylab = "Survival Probability",
-     main = "Kaplan-Meier Survival Curve")
+plot(km_fit,
+  xlab = "Time", ylab = "Survival Probability",
+  main = "Kaplan-Meier Survival Curve"
+)
 
 # }
 ```

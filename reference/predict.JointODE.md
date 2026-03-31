@@ -73,6 +73,10 @@ A data.frame with columns:
   Predicted survival probability, computed as \\S(t) =
   \exp(-\text{cumhaz})\\
 
+- `log_hazard`:
+
+  Log instantaneous hazard at each time point
+
 - `biomarker`:
 
   Predicted biomarker values
