@@ -5,33 +5,6 @@ NULL
 
 # Variance Updates =============================================================
 
-.update_measurement_error_sd <- function(data_list, parameters,
-                                         random_effects) {
-  n_total_obs <- sum(vapply(data_list, function(d) {
-    length(d$longitudinal$measurements)
-  }, integer(1)))
-
-  ode_solutions <- .solve_batch_joint(
-    data_list = data_list,
-    random_effects = random_effects,
-    parameters = parameters
-  )
-
-  rss <- sum(vapply(seq_along(ode_solutions), function(k) {
-    measurements <- data_list[[k]]$longitudinal$measurements
-    if (length(measurements) == 0) return(0)
-
-    obs_times <- data_list[[k]]$longitudinal$times
-    result_times <- ode_solutions[[k]]$times
-    match_idx <- match(obs_times, result_times)
-    biomarker_pred <- ode_solutions[[k]]$biomarker[match_idx]
-
-    sum((measurements - biomarker_pred)^2)
-  }, numeric(1)))
-
-  sqrt(rss / n_total_obs)
-}
-
 #' @noRd
 .update_random_effect_sigma <- function(posterior_moments, n_subjects) {
   n_re <- length(posterior_moments[[1]]$mean)
@@ -196,50 +169,51 @@ NULL
 
 #' @noRd
 .em_step <- function(data_list, parameters, random_effects, control) {
-  posteriors <- .compute_posteriors(
-    data_list, parameters, random_effects,
-    control$parallel, control$n_cores,
-    setup = FALSE
-  )
-
   n_subjects <- length(data_list)
-  posterior_moments <- lapply(posteriors, function(p) {
-    list(mean = p$mode, second_moment = tcrossprod(p$mode) + p$cov)
-  })
-  n_re <- length(posterior_moments[[1]]$mean)
-  random_effects <- t(vapply(posterior_moments, `[[`, numeric(n_re), "mean"))
+  n_re <- ncol(random_effects)
 
-  random_effect_sigma <- .update_random_effect_sigma(
-    posterior_moments, n_subjects
-  )
-  measurement_error_sd <- .update_measurement_error_sd(
-    data_list, parameters, random_effects
-  )
-  parameters$coefficients$measurement_error_sd <- measurement_error_sd
-  parameters$coefficients$random_effect_sigma <- random_effect_sigma
+  # Cache last accepted E-step results to avoid redundant recomputation
+  last <- list(posteriors = NULL, moments = NULL, re = random_effects)
 
-  # M-step: maximize Q function
+  # Profile Laplace: re-solve b̂(θ) at each evaluation
   theta <- .coef_to_vector(parameters)
-  q_obj <- function(th) {
-    obj <- .compute_objective_expected(
-      th, data_list, random_effects, .vector_to_coef(parameters, th),
-      gradient = TRUE, hessian = TRUE,
-      parallel = control$parallel, n_cores = control$n_cores
-    )
-    val <- as.numeric(obj)
-    attr(val, "gradient") <- as.vector(attr(obj, "gradient"))
-    attr(val, "hessian") <- as.matrix(attr(obj, "hessian"))
-    val
-  }
-  fit_m <- nlm(q_obj, theta, check.analyticals = FALSE, iterlim = 5)
-  loglik_value <- -fit_m$minimum
-  parameters <- .vector_to_coef(parameters, fit_m$estimate)
+  fit_m <- trust::trust(
+    objfun = function(th) {
+      params_th <- .vector_to_coef(parameters, th)
+      posts <- .compute_posteriors(
+        data_list, params_th, last$re,
+        control$parallel, control$n_cores, setup = FALSE
+      )
+      re_new <- t(vapply(posts, function(p) p$mode, numeric(n_re)))
+      moments <- lapply(posts, function(p) {
+        list(mean = p$mode, second_moment = tcrossprod(p$mode) + p$cov)
+      })
+      params_th$coefficients$random_effect_sigma <-
+        .update_random_effect_sigma(moments, n_subjects)
+      last <<- list(posteriors = posts, moments = moments, re = re_new)
+
+      obj <- .compute_objective_expected(
+        th, data_list, re_new, params_th,
+        gradient = TRUE, hessian = TRUE,
+        parallel = control$parallel, n_cores = control$n_cores
+      )
+      list(value = as.numeric(obj),
+           gradient = as.vector(attr(obj, "gradient")),
+           hessian = as.matrix(attr(obj, "hessian")))
+    },
+    parinit = theta, rinit = 1, rmax = 10, iterlim = 1
+  )
+
+  parameters <- .vector_to_coef(parameters, fit_m$argument)
+  random_effects <- last$re
+  parameters$coefficients$random_effect_sigma <-
+    .update_random_effect_sigma(last$moments, n_subjects)
 
   list(
     parameters = parameters,
     random_effects = random_effects,
-    loglik = loglik_value,
-    posteriors = posteriors,
-    posterior_moments = posterior_moments
+    loglik = -fit_m$value,
+    posteriors = last$posteriors,
+    posterior_moments = last$moments
   )
 }

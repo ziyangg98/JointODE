@@ -97,8 +97,6 @@ progress messages, 2 for detailed output (default: FALSE)}
 (default: FALSE)}
 \item{\code{n_cores}}{Number of CPU cores for parallel processing.
 If 0, automatically detects available cores (default: 0)}
-\item{\code{quad_level}}{Quadrature level for numerical integration
-(default: 3)}
 }
 See \code{\link{JointODE.control}} for complete details and examples.}
 
@@ -168,13 +166,12 @@ Two association structures are supported:
 slope
 }
 
-Parameter estimation employs an Expectation-Maximization (EM) algorithm
-with:
+Parameter estimation employs a Laplace EM algorithm with:
 \itemize{
-\item E-step: Multivariate Gauss-Hermite quadrature (mvQuad) for
-posterior computation of random effects
-\item M-step: Optimization for fixed effects and mvQuad-based
-closed-form updates for variance parameters
+\item E-step: Laplace approximation for posterior computation of
+random effects
+\item M-step: Newton step on the Laplace-approximated marginal
+log-likelihood with nested AD for the Hessian correction term
 }
 }
 \examples{

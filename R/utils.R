@@ -342,7 +342,8 @@
 #' @noRd
 .coef_to_vector <- function(parameters) {
   with(parameters$coefficients,
-       c(baseline, hazard, longitudinal, initial_state))
+       c(baseline, hazard, longitudinal, initial_state,
+         log(measurement_error_sd)))
 }
 
 #' @noRd
@@ -356,6 +357,7 @@
   parameters$coefficients$hazard <- theta[(idx[1] + 1):idx[2]]
   parameters$coefficients$longitudinal <- theta[(idx[2] + 1):idx[3]]
   parameters$coefficients$initial_state <- theta[(idx[3] + 1):idx[4]]
+  parameters$coefficients$measurement_error_sd <- exp(theta[idx[4] + 1])
   parameters
 }
 
@@ -370,12 +372,10 @@
     # Parameter change: max relative change across fixed effects + variance
     theta_curr <- c(
       .coef_to_vector(curr$parameters),
-      curr$parameters$coefficients$measurement_error_sd,
       as.vector(curr$parameters$coefficients$random_effect_sigma)
     )
     theta_prev <- c(
       .coef_to_vector(prev$parameters),
-      prev$parameters$coefficients$measurement_error_sd,
       as.vector(prev$parameters$coefficients$random_effect_sigma)
     )
     delta_theta <- max(abs(theta_curr - theta_prev))
@@ -436,7 +436,7 @@
     if (control$verbose > 0) {
       cli::cli_alert_warning("Log-likelihood is NA at iteration {iter}")
     }
-    return(list(converged = FALSE))
+    return(list(converged = FALSE, metrics = metrics))
   }
 
   if (iter > 1 && metrics$delta_l < -1e-6 && control$verbose > 0) {
@@ -472,5 +472,5 @@
     }
   }
 
-  list(converged = converged)
+  list(converged = converged, metrics = metrics)
 }

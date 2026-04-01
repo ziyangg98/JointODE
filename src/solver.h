@@ -13,6 +13,7 @@ using namespace arma;
 using CppAD::AD;
 
 typedef AD<double> ADdouble;
+typedef AD<ADdouble> AD2double;
 typedef CppAD::vector<ADdouble> ADvector;
 
 // ============================================================================
@@ -51,16 +52,10 @@ inline MatExpBranch classify_disc(double b1, double b2) {
 // Basic utility functions
 // ============================================================================
 
-// Extract scalar value from AD or regular type
-template <typename Scalar>
-inline double get_value(const Scalar& x) {
-  return CppAD::Value(x);
-}
-
-template <>
-inline double get_value<double>(const double& x) {
-  return x;
-}
+// Extract scalar value from AD or regular type (recursive unwrap)
+inline double get_value(double x) { return x; }
+template <typename T>
+inline double get_value(const CppAD::AD<T>& x) { return get_value(CppAD::Value(x)); }
 
 // Clamp value using CppAD conditional expressions
 template <typename Scalar>
@@ -113,7 +108,8 @@ struct ODEParams {
   std::vector<Scalar> baseline_coefs;
   std::vector<Scalar> hazard_coefs;
   std::vector<Scalar> initial_state_coefs;  // population mean [m(0), v(0)]
-  double measurement_error_sd;
+  Scalar log_sigma_e;                       // log measurement error SD
+  double measurement_error_sd;              // double copy for non-AD paths
   arma::mat random_effect_sigma;
 
   // Configurations
@@ -281,6 +277,7 @@ inline void load_params(ODEParams<Scalar>& params,
 
   params.measurement_error_sd =
       as<double>(coefficients["measurement_error_sd"]);
+  params.log_sigma_e = Scalar(std::log(params.measurement_error_sd));
   params.random_effect_sigma =
       as<arma::mat>(coefficients["random_effect_sigma"]);
 
@@ -734,11 +731,11 @@ inline Scalar joint_loglik(
     const std::vector<std::vector<Scalar>>& sol,
     const std::vector<double>& times,
     const ODEParams<Scalar>& params,
-    BSplineWorkspace& ws,
-    double inv_sigma_e2, double log_2pi_sigma_e2) {
+    BSplineWorkspace& ws) {
   Scalar ll(0);
   const int n_obs = params.subject.longitudinal_times.size();
-  const Scalar half_inv(0.5 * inv_sigma_e2);
+  const Scalar inv_sigma_e2 = CppAD::exp(Scalar(-2) * params.log_sigma_e);
+  const Scalar half_inv = Scalar(0.5) * inv_sigma_e2;
 
   // Longitudinal: -0.5 * sum((y - m)^2 / sigma_e^2)
   for (int i = 0; i < n_obs; i++) {
@@ -748,7 +745,9 @@ inline Scalar joint_loglik(
       ll -= half_inv * r * r;
     }
   }
-  if (n_obs > 0) ll -= Scalar(0.5 * n_obs * log_2pi_sigma_e2);
+  if (n_obs > 0)
+    ll -= Scalar(0.5) * Scalar(n_obs) *
+          (Scalar(std::log(2.0 * M_PI)) + Scalar(2) * params.log_sigma_e);
 
   // Survival: -H(T) + delta * log h(T)
   const int ei = time_index(times, params.subject.event_time);
@@ -798,8 +797,7 @@ template <typename Scalar>
 inline Scalar eval_logpost(
     const std::vector<Scalar>& re,
     ODEParams<Scalar>& ode,
-    const arma::mat& inv_sigma_b, double re_const,
-    double inv_sigma_e2, double log_2pi_sigma_e2) {
+    const arma::mat& inv_sigma_b, double re_const) {
   const auto times = time_grid(ode.subject.longitudinal_times,
                                   ode.subject.event_time);
   const std::vector<Scalar> y0 = {Scalar(0.0),
@@ -810,8 +808,7 @@ inline Scalar eval_logpost(
   BSplineWorkspace ws;
   bspline_basis(0.0, ode.spline_degree, ode.spline_knots,
       ode.spline_boundary, ws.basis, ws.knots, ws.work1, ws.work2, false);
-  Scalar lp = joint_loglik(sol, times, ode, ws,
-                                    inv_sigma_e2, log_2pi_sigma_e2);
+  Scalar lp = joint_loglik(sol, times, ode, ws);
 
   const int n_re = re.size();
   Scalar qf(0.0);

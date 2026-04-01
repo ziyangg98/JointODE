@@ -80,8 +80,6 @@
 #'       (default: FALSE)}
 #'     \item{\code{n_cores}}{Number of CPU cores for parallel processing.
 #'       If 0, automatically detects available cores (default: 0)}
-#'     \item{\code{quad_level}}{Quadrature level for numerical integration
-#'       (default: 3)}
 #'   }
 #'   See \code{\link{JointODE.control}} for complete details and examples.
 #' @param ... Additional arguments passed to internal optimization routines.
@@ -141,13 +139,12 @@
 #'     slope
 #' }
 #'
-#' Parameter estimation employs an Expectation-Maximization (EM) algorithm
-#' with:
+#' Parameter estimation employs a Laplace EM algorithm with:
 #' \itemize{
-#'   \item E-step: Multivariate Gauss-Hermite quadrature (mvQuad) for
-#'     posterior computation of random effects
-#'   \item M-step: Optimization for fixed effects and mvQuad-based
-#'     closed-form updates for variance parameters
+#'   \item E-step: Laplace approximation for posterior computation of
+#'     random effects
+#'   \item M-step: Newton step on the Laplace-approximated marginal
+#'     log-likelihood with nested AD for the Hessian correction term
 #' }
 #'
 #' @importFrom utils modifyList
@@ -337,26 +334,28 @@ JointODE <- function(
   )
   prev <- curr
   converged <- FALSE
+  loglik_history <- rep(NA_real_, control$maxit)
+  delta_theta_history <- rep(NA_real_, control$maxit)
+  delta_loglik_history <- rep(NA_real_, control$maxit)
 
   for (em_iter in seq_len(control$maxit)) {
-    # EM step (initial states integrated as random effects)
     curr <- .em_step(
-      data_list,
-      curr$parameters,
-      curr$random_effects,
-      control
+      data_list, curr$parameters, curr$random_effects, control
     )
 
-    # Track progress and check convergence
     status <- .track(em_iter, curr, prev, control)
+    loglik_history[em_iter] <- curr$loglik
+    delta_theta_history[em_iter] <- status$metrics$delta_theta
+    delta_loglik_history[em_iter] <- status$metrics$delta_l
 
     if (status$converged) {
       converged <- TRUE
       break
     }
-
     prev <- curr
   }
+
+  n_iter <- if (converged) em_iter else control$maxit
 
   # Finalize model
   final_results <- .finalize_joint(
@@ -379,12 +378,15 @@ JointODE <- function(
       cindex = final_results$cindex,
       convergence = list(
         converged = converged,
-        iterations = if (converged) em_iter else control$maxit,
+        iterations = n_iter,
         message = sprintf(
           "%s after %d iterations",
           if (converged) "Converged" else "Did not converge",
-          if (converged) em_iter else control$maxit
-        )
+          n_iter
+        ),
+        loglik_history = loglik_history[seq_len(n_iter)],
+        delta_theta_history = delta_theta_history[seq_len(n_iter)],
+        delta_loglik_history = delta_loglik_history[seq_len(n_iter)]
       ),
       random_effects = final_results$random_effects,
       vcov = final_results$vcov,

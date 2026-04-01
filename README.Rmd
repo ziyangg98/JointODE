@@ -105,6 +105,23 @@ The formula specifies:
 - **Technical Details**: See `vignette("technical-details")` for mathematical formulations
 - **Model Comparison**: See `vignette("comparison")` for comparisons with traditional joint models
 
+## Performance Baseline
+
+Use the helper scripts in `scripts/` to generate reproducible runtime baselines and compare two runs:
+
+```bash
+# Generate baseline CSV (sequential + optional parallel case)
+Rscript scripts/perf-baseline.R --n=20 --reps=3 --maxit=10 --tol=1e-2 --out=perf-base.csv
+
+# Generate candidate CSV after code changes
+Rscript scripts/perf-baseline.R --n=20 --reps=3 --maxit=10 --tol=1e-2 --out=perf-new.csv
+
+# Compare elapsed_mean and fail if slowdown > 10%
+Rscript scripts/perf-compare.R --base=perf-base.csv --new=perf-new.csv --metric=elapsed_mean --fail_pct=10
+```
+
+These scripts are intended for quick engineering checks, not publication-grade benchmarking.
+
 
 ## Code of Conduct
 

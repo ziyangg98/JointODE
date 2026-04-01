@@ -10,7 +10,6 @@ JointODE.control(
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,
-  quad_level = 3,
   hazard_quadrature = 1,
   .list = NULL,
   ...
@@ -29,9 +28,6 @@ silent, TRUE/1 for basic progress, 2 for detailed output (default: FALSE)}
 
 \item{n_cores}{Integer; number of cores to use for parallel computation.
 If 0, uses all available cores (default: 0)}
-
-\item{quad_level}{Integer; quadrature level for numerical integration
-(default: 3)}
 
 \item{hazard_quadrature}{Integer; number of Simpson sub-intervals per
 observation interval for hazard integration (default: 1)}
