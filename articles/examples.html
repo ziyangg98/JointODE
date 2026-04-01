@@ -101,7 +101,7 @@
 <span><span class="va">longitudinal_data</span> <span class="op">&lt;-</span> <span class="va">pbc2</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/transmute.html" class="external-link">transmute</a></span><span class="op">(</span></span>
 <span>    id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/integer.html" class="external-link">as.integer</a></span><span class="op">(</span><span class="va">id</span><span class="op">)</span>, time <span class="op">=</span> <span class="va">year</span>,</span>
-<span>    observed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="va">serBilir</span><span class="op">)</span></span>
+<span>    observed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="va">albumin</span><span class="op">)</span></span>
 <span>  <span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">left_join</a></span><span class="op">(</span></span>
 <span>    <span class="va">survival_data</span> <span class="op">|&gt;</span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">id</span>, <span class="va">drug</span>, <span class="va">age</span>, <span class="va">sex</span><span class="op">)</span>,</span>

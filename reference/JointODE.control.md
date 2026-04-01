@@ -14,6 +14,7 @@ JointODE.control(
   parallel = FALSE,
   n_cores = 0,
   quad_level = 3,
+  hazard_quadrature = 1,
   .list = NULL,
   ...
 )
@@ -47,6 +48,11 @@ JointODE.control(
 - quad_level:
 
   Integer; quadrature level for numerical integration (default: 3)
+
+- hazard_quadrature:
+
+  Integer; number of Simpson sub-intervals per observation interval for
+  hazard integration (default: 1)
 
 - .list:
 

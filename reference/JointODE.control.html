@@ -64,6 +64,7 @@ process a list to fill in missing values with defaults.</p>
 <span>  parallel <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  n_cores <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  quad_level <span class="op">=</span> <span class="fl">3</span>,</span>
+<span>  hazard_quadrature <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  .list <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -99,6 +100,11 @@ If 0, uses all available cores (default: 0)</p></dd>
 <dt id="arg-quad-level">quad_level<a class="anchor" aria-label="anchor" href="#arg-quad-level"></a></dt>
 <dd><p>Integer; quadrature level for numerical integration
 (default: 3)</p></dd>
+
+
+<dt id="arg-hazard-quadrature">hazard_quadrature<a class="anchor" aria-label="anchor" href="#arg-hazard-quadrature"></a></dt>
+<dd><p>Integer; number of Simpson sub-intervals per
+observation interval for hazard integration (default: 1)</p></dd>
 
 
 <dt id="arg--list">.list<a class="anchor" aria-label="anchor" href="#arg--list"></a></dt>

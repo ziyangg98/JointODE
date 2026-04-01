@@ -27,7 +27,7 @@ survival_data <- pbc2.id |>
 longitudinal_data <- pbc2 |>
   transmute(
     id = as.integer(id), time = year,
-    observed = log(serBilir)
+    observed = log(albumin)
   ) |>
   left_join(
     survival_data |> select(id, drug, age, sex),
