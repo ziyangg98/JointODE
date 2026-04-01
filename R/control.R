@@ -15,6 +15,8 @@
 #'   If 0, uses all available cores (default: 0)
 #' @param quad_level Integer; quadrature level for numerical integration
 #'   (default: 3)
+#' @param hazard_quadrature Integer; number of Simpson sub-intervals per
+#'   observation interval for hazard integration (default: 1)
 #' @param .list Optional list of control parameters to process
 #' @param ... Additional control parameters
 #'
@@ -50,12 +52,14 @@ JointODE.control <- function(
   parallel = FALSE,
   n_cores = 0,
   quad_level = 3,
+  hazard_quadrature = 1,
   .list = NULL,
   ...
 ) {
   defaults <- list(
     maxit = maxit, tol = tol, verbose = verbose,
-    parallel = parallel, n_cores = n_cores, quad_level = quad_level
+    parallel = parallel, n_cores = n_cores, quad_level = quad_level,
+    hazard_quadrature = hazard_quadrature
   )
 
   if (!is.null(.list)) {
@@ -79,6 +83,10 @@ JointODE.control <- function(
   }
   if (!is.numeric(control$quad_level) || control$quad_level < 1) {
     stop("quad_level must be a positive integer")
+  }
+  if (!is.numeric(control$hazard_quadrature) || control$hazard_quadrature < 1 ||
+      control$hazard_quadrature != as.integer(control$hazard_quadrature)) {
+    stop("hazard_quadrature must be a positive integer")
   }
 
   control

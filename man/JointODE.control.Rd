@@ -11,6 +11,7 @@ JointODE.control(
   parallel = FALSE,
   n_cores = 0,
   quad_level = 3,
+  hazard_quadrature = 1,
   .list = NULL,
   ...
 )
@@ -31,6 +32,9 @@ If 0, uses all available cores (default: 0)}
 
 \item{quad_level}{Integer; quadrature level for numerical integration
 (default: 3)}
+
+\item{hazard_quadrature}{Integer; number of Simpson sub-intervals per
+observation interval for hazard integration (default: 1)}
 
 \item{.list}{Optional list of control parameters to process}
 

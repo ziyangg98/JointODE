@@ -54,3 +54,31 @@ test_that(".solve_batch_joint structure and accuracy", {
     )
   }
 })
+
+test_that("hazard_quadrature Simpson quadrature convergence", {
+  params_k1 <- td$parameters
+  params_k1$configurations$hazard_quadrature <- 1L
+  params_k5 <- td$parameters
+  params_k5$configurations$hazard_quadrature <- 5L
+  params_k50 <- td$parameters
+  params_k50$configurations$hazard_quadrature <- 50L
+
+  sol_k1 <- .solve_batch_joint(td$data_list, td$random_effects, params_k1)
+  sol_k5 <- .solve_batch_joint(td$data_list, td$random_effects, params_k5)
+  sol_k50 <- .solve_batch_joint(td$data_list, td$random_effects, params_k50)
+
+  for (i in seq_along(td$data_list)) {
+    # Same time grid
+    expect_equal(sol_k5[[i]]$times, sol_k1[[i]]$times)
+
+    # Biomarker/velocity identical (both use exact matexp)
+    expect_equal(sol_k5[[i]]$biomarker, sol_k1[[i]]$biomarker, tolerance = 1e-10)
+    expect_equal(sol_k5[[i]]$velocity, sol_k1[[i]]$velocity, tolerance = 1e-10)
+
+    # Cumulative hazard converges: k=5 closer to k=50 than k=1
+    H1 <- tail(sol_k1[[i]]$cum_hazard, 1)
+    H5 <- tail(sol_k5[[i]]$cum_hazard, 1)
+    H50 <- tail(sol_k50[[i]]$cum_hazard, 1)
+    expect_lt(abs(H5 - H50), abs(H1 - H50) + 1e-15)
+  }
+})

@@ -127,6 +127,7 @@ struct ODEParams {
   bool velocity_random;
   MatExpBranch branch;
   double biomarker_clamp;
+  int hazard_quadrature;  // Simpson sub-intervals for hazard integration
 };
 
 // Marginal ODE parameters (longitudinal only, no survival)
@@ -248,6 +249,9 @@ inline void load_config(ODEParams<Scalar>& params, const List& parameters) {
   params.biomarker_clamp = configurations.containsElementNamed("biomarker_clamp")
     ? as<double>(configurations["biomarker_clamp"])
     : BIOMARKER_CLAMP_DEFAULT;
+  params.hazard_quadrature = configurations.containsElementNamed("hazard_quadrature")
+    ? as<int>(configurations["hazard_quadrature"])
+    : 1;
 }
 
 // Fill all ODE parameters from R List
@@ -596,12 +600,13 @@ inline Scalar eval_hazard(Scalar biomarker, Scalar velocity,
   return clamp(lh, Scalar(HAZARD_CLAMP_MIN), Scalar(HAZARD_CLAMP_MAX));
 }
 
-// Solve joint ODE: matexp for biomarker, log-linear for cumulative hazard
+// Solve joint ODE: matexp for biomarker, composite Simpson's rule for hazard
 template <typename Scalar>
 inline std::vector<std::vector<Scalar>> ode_solve_joint(
     const std::vector<Scalar>& y0, const std::vector<double>& times,
     const ODEParams<Scalar>& params) {
   const int nt = times.size();
+  const int N = std::max(1, params.hazard_quadrature);
   BSplineWorkspace ws;
   bspline_basis(0.0, params.spline_degree, params.spline_knots,
                 params.spline_boundary, ws.basis, ws.knots,
@@ -609,15 +614,13 @@ inline std::vector<std::vector<Scalar>> ode_solve_joint(
 
   std::vector<std::vector<Scalar>> sol(nt, std::vector<Scalar>(3));
   Scalar H = y0[0], m = y0[1], v = y0[2];
+  const Scalar bc(params.biomarker_clamp);
   sol[0] = {H, m, v};
-
-  // Cache log-hazard at interval start
-  Scalar lh_prev = eval_hazard(m, v, params, ws, times[0]);
 
   for (int i = 1; i < nt; i++) {
     const double t0 = times[i - 1], t1 = times[i], dt = t1 - t0;
 
-    // Extract beta1, beta2, forcing
+    // Extract beta1, beta2, forcing (piecewise constant at t0)
     Scalar b1(0), b2(0), f(0);
     std::vector<double> cf, cr;
     covariates_at(t0, params.subject.longitudinal_times,
@@ -634,25 +637,36 @@ inline std::vector<std::vector<Scalar>> ode_solve_joint(
     for (size_t j = 0; j < cr.size(); j++)
       f += params.subject.random_effect[ri++] * Scalar(cr[j]);
 
-    // Advance biomarker via matexp, clamp to prevent overflow
-    ode_step(m, v, b1, b2, f, Scalar(dt), params.branch);
-    m = clamp(m, Scalar(-params.biomarker_clamp), Scalar(params.biomarker_clamp));
-    v = clamp(v, Scalar(-params.biomarker_clamp), Scalar(params.biomarker_clamp));
+    // Composite Simpson's rule for cumulative hazard over N sub-intervals
+    const double sub_dt = dt / N;
+    Scalar h_left = safe_exp(eval_hazard(m, v, params, ws, t0));
 
-    // Cumulative hazard: log-linear integration
-    // Assumes log h(t) linear in [t0, t1], giving exact integral:
-    //   int h(t)dt = dt * h0 * (exp(d) - 1) / d,  d = lh1 - lh0
-    // When d ~ 0, falls back to trapezoidal (same result to first order)
-    Scalar lh_curr = eval_hazard(m, v, params, ws, t1);
-    Scalar h0 = safe_exp(lh_prev);
-    Scalar d = lh_curr - lh_prev;
-    Scalar ed = safe_exp(d);
-    Scalar abs_d = CppAD::CondExpGe(d, Scalar(0), d, -d);
-    Scalar loglin = Scalar(dt) * h0 * (ed - Scalar(1)) / d;
-    Scalar trap = Scalar(dt * 0.5) * (h0 + h0 * ed);
-    H += CppAD::CondExpGt(abs_d, Scalar(1e-8), loglin, trap);
+    for (int k = 0; k < N; k++) {
+      const double ta = t0 + k * sub_dt;
 
-    lh_prev = lh_curr;
+      // Advance to midpoint, evaluate hazard
+      Scalar m_sub = m, v_sub = v;
+      ode_step(m_sub, v_sub, b1, b2, f, Scalar(sub_dt * 0.5), params.branch);
+      m_sub = clamp(m_sub, -bc, bc);
+      v_sub = clamp(v_sub, -bc, bc);
+      Scalar h_mid = safe_exp(
+          eval_hazard(m_sub, v_sub, params, ws, ta + sub_dt * 0.5));
+
+      // Advance midpoint to right boundary, evaluate hazard
+      ode_step(m_sub, v_sub, b1, b2, f, Scalar(sub_dt * 0.5), params.branch);
+      m_sub = clamp(m_sub, -bc, bc);
+      v_sub = clamp(v_sub, -bc, bc);
+      Scalar h_right = safe_exp(
+          eval_hazard(m_sub, v_sub, params, ws, ta + sub_dt));
+
+      H += Scalar(sub_dt / 6.0) *
+           (h_left + Scalar(4.0) * h_mid + h_right);
+
+      m = m_sub;
+      v = v_sub;
+      h_left = h_right;
+    }
+
     sol[i] = {H, m, v};
   }
   return sol;

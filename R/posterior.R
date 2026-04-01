@@ -231,7 +231,7 @@ NULL
     attr(val, "hessian") <- as.matrix(attr(obj, "hessian"))
     val
   }
-  fit_m <- nlm(q_obj, theta, check.analyticals = FALSE)
+  fit_m <- nlm(q_obj, theta, check.analyticals = FALSE, iterlim = 5)
   loglik_value <- -fit_m$minimum
   parameters <- .vector_to_coef(parameters, fit_m$estimate)
 

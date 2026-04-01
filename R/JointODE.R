@@ -284,6 +284,7 @@ JointODE <- function(
     longitudinal_data
   ))
   parameters$configurations$biomarker_clamp <- max(abs(response)) * 5
+  parameters$configurations$hazard_quadrature <- control$hazard_quadrature
 
   names(parameters$coefficients$baseline) <- model_config$coef_names$baseline
   names(parameters$coefficients$hazard) <- model_config$coef_names$hazard

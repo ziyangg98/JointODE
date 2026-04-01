@@ -97,7 +97,7 @@ fit <- JointODE(
   control = list(parallel = TRUE)
 )
 cat(sprintf("Elapsed: %.1f s\n", (proc.time() - t0)["elapsed"]))
-#> Elapsed: 41.3 s
+#> Elapsed: 175.1 s
 ```
 
 ``` r

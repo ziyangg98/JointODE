@@ -11,7 +11,7 @@ survival_data <- pbc2.id |>
   )
 
 longitudinal_data <- pbc2 |>
-  transmute(id = as.integer(id), time = year, observed = log(serBilir)) |>
+  transmute(id = as.integer(id), time = year, observed = log(albumin)) |>
   left_join(survival_data |> select(id, drug, age, sex), by = "id")
 
 m <- mean(longitudinal_data$observed)
@@ -24,6 +24,7 @@ fit <- JointODE(
   Surv(time, status) ~ drug + age + sex,
   longitudinal_data, survival_data,
   init = "marginal",
+  spline_baseline = list(degree = 1, n_knots = 1),
   control = list(parallel = TRUE, verbose = 3)
 )
 cat(sprintf("\nElapsed: %.1f s\n", (proc.time() - t0)["elapsed"]))

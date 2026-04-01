@@ -283,6 +283,7 @@ test_that("JointODE.control returns complete defaults", {
   expect_false(ctrl$parallel)
   expect_equal(ctrl$n_cores, 0)
   expect_equal(ctrl$quad_level, 3)
+  expect_equal(ctrl$hazard_quadrature, 1)
 })
 
 test_that("JointODE.control overrides and merges", {
@@ -299,6 +300,8 @@ test_that("JointODE.control validates inputs", {
   expect_error(JointODE.control(parallel = "yes"), "TRUE or FALSE")
   expect_error(JointODE.control(n_cores = -1), "non-negative")
   expect_error(JointODE.control(quad_level = 0), "positive")
+  expect_error(JointODE.control(hazard_quadrature = 0), "positive integer")
+  expect_error(JointODE.control(hazard_quadrature = 2.5), "positive integer")
   expect_error(JointODE.control(.list = "bad"), "\\.list must be a list")
 })
 
