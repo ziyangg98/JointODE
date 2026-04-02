@@ -278,7 +278,7 @@ test_that(".process_joint sorts unordered time data", {
 test_that("JointODE.control returns complete defaults", {
   ctrl <- JointODE.control()
   expect_equal(ctrl$maxit, 200)
-  expect_equal(ctrl$tol, 1e-3)
+  expect_equal(ctrl$tol, 1e-4)
   expect_equal(ctrl$verbose, 0)
   expect_false(ctrl$parallel)
   expect_equal(ctrl$n_cores, 0)
@@ -417,10 +417,12 @@ test_that(".get_spline_config variants", {
 
 # --- .update_random_effect_sigma ---
 
-test_that(".update_random_effect_sigma computes mean of second moments", {
-  moments <- list(
-    list(mean = c(0, 0), second_moment = diag(2)),
-    list(mean = c(0, 0), second_moment = diag(2) * 3)
+test_that(".update_random_effect_sigma computes Laplace-corrected estimate", {
+  re <- matrix(c(1, 0, 0, 2), nrow = 2, byrow = TRUE)
+  posteriors <- list(
+    list(cov = diag(2) * 0.1),
+    list(cov = diag(2) * 0.3)
   )
-  expect_equal(.update_random_effect_sigma(moments, 2), diag(2) * 2)
+  expected <- (crossprod(re) + diag(2) * 0.1 + diag(2) * 0.3) / 2
+  expect_equal(.update_random_effect_sigma(re, posteriors), expected)
 })

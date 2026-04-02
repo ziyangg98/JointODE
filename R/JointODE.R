@@ -111,12 +111,8 @@
 #'         \item \code{iterations}: Number of EM iterations performed
 #'         \item \code{message}: Descriptive convergence message
 #'       }}
-#'     \item{\code{random_effects}}{List containing random effects estimates:
-#'       \itemize{
-#'         \item \code{estimates}: Posterior means of subject-specific random
-#'           effects
-#'         \item \code{variances}: Posterior variances of random effects
-#'       }}
+#'     \item{\code{random_effects}}{Matrix of posterior mode random effects
+#'       (n_subjects x n_re)}
 #'     \item{\code{data}}{Processed data used for model fitting in internal
 #'       format}
 #'     \item{\code{control}}{List of control parameters used in optimization}
@@ -139,12 +135,12 @@
 #'     slope
 #' }
 #'
-#' Parameter estimation employs a Laplace EM algorithm with:
+#' Parameter estimation employs a Monte Carlo EM (MCEM) algorithm with:
 #' \itemize{
-#'   \item E-step: Laplace approximation for posterior computation of
-#'     random effects
-#'   \item M-step: Newton step on the Laplace-approximated marginal
-#'     log-likelihood with nested AD for the Hessian correction term
+#'   \item E-step: Laplace proposal plus importance sampling for posterior
+#'     moments of random effects
+#'   \item M-step: damped Newton step on the self-normalized
+#'     importance-weighted objective
 #' }
 #'
 #' @importFrom utils modifyList
@@ -309,7 +305,7 @@ JointODE <- function(
     }
   }
 
-  # EM Algorithm
+  # MCEM Algorithm
   if (control$verbose > 0) {
     cli::cli_h2("Joint ODE Model Estimation")
     cli::cli_text(sprintf(
@@ -326,7 +322,7 @@ JointODE <- function(
     on.exit(parallel_cleanup(), add = TRUE)
   }
 
-  # EM loop
+  # MCEM loop
   curr <- list(
     parameters = parameters,
     random_effects = random_effects,
@@ -776,15 +772,7 @@ predict.JointODE <- function(
   parameters <- object$parameters
   data_list <- object$data
 
-  # Handle both old (matrix) and new (list) random effects format
-  random_effects <- if (
-    is.list(object$random_effects) &&
-      !is.null(object$random_effects$estimates)
-  ) {
-    object$random_effects$estimates
-  } else {
-    object$random_effects
-  }
+  random_effects <- object$random_effects
 
   # Prepare prediction data for all subjects
   pred_data_list <- lapply(seq_along(data_list), function(i) {

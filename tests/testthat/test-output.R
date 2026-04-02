@@ -142,11 +142,9 @@ test_that("plot.JointODE all types produce gg", {
   }
 })
 
-test_that("plot.JointODE random_effects needs matrix conversion", {
-  mock_re <- mock
-  mock_re$random_effects <- mock$random_effects$estimates
+test_that("plot.JointODE random_effects as matrix", {
   expect_s3_class(
-    .safe_plot(mock_re, type = "diagnostic_random_effects"), "gg"
+    .safe_plot(mock, type = "diagnostic_random_effects"), "gg"
   )
 })
 
@@ -207,7 +205,7 @@ test_that("plot.JointODE by grouping works", {
     "phase_biomarker_velocity", "phase_velocity_acceleration", "survival"
   )
   for (type in types) {
-    p <- .safe_plot(mock, type = type, by = "w1")
+    p <- suppressMessages(.safe_plot(mock, type = type, by = "w1"))
     expect_s3_class(p, "gg")
   }
   expect_error(
@@ -234,7 +232,7 @@ test_that("plot.JointODE random_effects edge cases", {
 
   mock_df <- mock
   mock_df$random_effects <- as.data.frame(
-    mock$random_effects$estimates
+    mock$random_effects
   )
   expect_s3_class(
     .safe_plot(mock_df, type = "diagnostic_random_effects"), "gg"

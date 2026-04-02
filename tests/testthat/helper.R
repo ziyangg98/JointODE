@@ -4,10 +4,16 @@
 
 # nolint start: object_usage_linter
 
+# Load required packages
+library(survival)
+
+# Load bundled test data
+data("sim", package = "JointODE", envir = environment())
+
 #' Subset sim data into processed test data
 .make_test_data <- function(n = 10) {
   test_ids <- unique(sim$data$longitudinal_data$id)[seq_len(n)]
-  data_list <- .process_joint(
+  data_list <- JointODE:::.process_joint(
     longitudinal_data = sim$data$longitudinal_data[
       sim$data$longitudinal_data$id %in% test_ids,
       c("id", "time", "observed", "x1", "x2")
@@ -21,8 +27,8 @@
   )
   list(
     data_list = data_list,
-    random_effects = sim$data$random_effects[seq_len(n), ],
-    params = .coef_to_vector(sim$init),
+    random_effects = sim$data$random_effects[seq_len(n), , drop = FALSE],
+    params = JointODE:::.coef_to_vector(sim$init),
     parameters = sim$init
   )
 }
@@ -63,10 +69,7 @@
         converged = TRUE, iterations = 10,
         message = "Converged after 10 iterations"
       ),
-      random_effects = list(
-        estimates = td$random_effects,
-        variances = lapply(seq_len(n_subjects), function(i) diag(0.01, n_re))
-      ),
+      random_effects = td$random_effects,
       vcov = vcov_matrix,
       data = td$data_list,
       control = JointODE.control(),
@@ -78,6 +81,29 @@
     ),
     class = "JointODE"
   )
+}
+
+#' Central finite difference gradient helper
+.finite_diff_gradient <- function(func, x, eps = 1e-5) {
+  grad <- numeric(length(x))
+  for (i in seq_along(x)) {
+    x_plus <- x
+    x_minus <- x
+    x_plus[i] <- x_plus[i] + eps
+    x_minus[i] <- x_minus[i] - eps
+    grad[i] <- (func(x_plus) - func(x_minus)) / (2 * eps)
+  }
+  grad
+}
+
+#' Zero random effects matrix with same shape as td$random_effects
+.zero_random_effects <- function(td) {
+  matrix(0, nrow = nrow(td$random_effects), ncol = ncol(td$random_effects))
+}
+
+#' Expect all values finite
+.expect_all_finite <- function(x) {
+  expect_true(all(is.finite(x)))
 }
 
 # nolint end

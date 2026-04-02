@@ -35,11 +35,12 @@ R CMD INSTALL --no-docs --no-multiarch .
 
 ### EM Algorithm Flow (R side)
 
-`JointODE()` in `R/JointODE.R` is the main entry point. It runs an EM loop:
+`JointODE()` in `R/JointODE.R` is the main entry point. It runs a PQL-ECM loop:
 
-1. **E-step** (`R/posterior.R`): For each subject, find posterior mode of random effects via Laplace approximation + AGHQ. Calls `.compute_joint_logpost()` (C++). Uses `.regularized_chol()` (Gill-Murray) when the posterior Hessian is not positive definite.
-2. **M-step** (`R/posterior.R`): One Newton step for fixed effects via `.compute_objective_expected()` → `.compute_joint_objective()` (C++). Variance components (sigma_e, Sigma_b) updated in closed form. Newton step uses `.regularized_solve()` for Hessian inversion.
-3. **SEM vcov** (`R/posterior.R`): Post-convergence variance-covariance via supplemented EM (Louis formula). Numerical Jacobian of EM map with Richardson extrapolation (r=2).
+1. **E-step** (`R/posterior.R`): For each subject, find posterior mode of random effects via Laplace approximation (`nlm`). Calls `.compute_joint_logpost()` (C++). Uses `.safe_chol()` (Gill-Murray) when the posterior Hessian is not positive definite.
+2. **M-step** (`R/posterior.R`): Trust region optimization (`trust::trust`) of Laplace marginal likelihood. The C++ objective (`compute_joint_objective`) includes `-0.5·log|H_z(θ)|` via nested AD (`AD<AD<double>>`). Fixed effects θ = [baseline, hazard, longitudinal, initial_state]; σ_e and Σ_b are fixed during M-step.
+3. **Variance updates** (`R/posterior.R`): Laplace-corrected closed form — Σ_b = (1/n)Σ(b̂b̂ᵀ + H_z⁻¹), σ_e = sqrt(RSS/N).
+4. **SEM vcov** (`R/posterior.R`): Post-convergence variance-covariance via supplemented EM (Louis formula). Numerical Jacobian of EM map.
 
 ### C++ Layer (`src/`)
 
@@ -49,7 +50,7 @@ R CMD INSTALL --no-docs --no-multiarch .
 
 CppAD headers are vendored in `inst/include/cppad/` and included via `PKG_CPPFLAGS = -I../inst/include` in `src/Makevars`.
 
-Three AD tapes share the same ODE solver and likelihood code; they differ only in **which variable is the AD independent variable**.
+Three AD tapes share the same ODE solver and likelihood code; they differ only in **which variable is the AD independent variable**. A fourth nested AD tape (`AD<AD<double>>`) computes the Laplace correction: inner tape over b yields H_z as `AD<double>` values tracked by the outer theta tape, enabling exact gradient propagation of -0.5·log|H_z(θ)| through `CppAD::LuSolve`.
 
 ### ODE Solver: Matrix Exponential
 
@@ -57,12 +58,12 @@ The ODE is solved analytically via Cayley-Hamilton decomposition of exp(A*dt), w
 
 ### Hazard Integration
 
-Uses log-linear interpolation between consecutive ODE time points, with trapezoidal fallback (via `CppAD::CondExpGt`) when the log-hazard difference is near zero.
+Composite Simpson's rule over configurable sub-intervals (`hazard_quadrature` control parameter) for cumulative hazard integration within each ODE time step.
 
 ### Key R Modules
 
-- `R/posterior.R` — E-step (Laplace + AGHQ), M-step (Newton), SEM vcov
-- `R/utils.R` — Formula parsing, `.regularized_chol`/`.regularized_solve` (Gill-Murray), parameter conversion, convergence tracking
+- `R/posterior.R` — E-step (Laplace), M-step (trust region + nested AD Laplace correction), SEM vcov
+- `R/utils.R` — Formula parsing, `.safe_chol` (Gill-Murray), parameter conversion, convergence tracking
 - `R/process.R` — Data preprocessing: parses formulas, builds per-subject data lists for C++
 - `R/initial.R` — Default parameter construction and `MarginalODE`-based initial value computation
 - `R/finalize.R` — Post-convergence: C-index, AIC/BIC, SEM vcov call

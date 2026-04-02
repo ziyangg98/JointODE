@@ -3,6 +3,12 @@
 # Shared Helpers ===============================================================
 
 #' @noRd
+.logsumexp <- function(x) {
+  m <- max(x)
+  m + log(sum(exp(x - m)))
+}
+
+#' @noRd
 .n_obs <- function(data_list) {
   sum(vapply(
     data_list,
@@ -342,8 +348,7 @@
 #' @noRd
 .coef_to_vector <- function(parameters) {
   with(parameters$coefficients,
-       c(baseline, hazard, longitudinal, initial_state,
-         log(measurement_error_sd)))
+       c(baseline, hazard, longitudinal, initial_state))
 }
 
 #' @noRd
@@ -357,7 +362,6 @@
   parameters$coefficients$hazard <- theta[(idx[1] + 1):idx[2]]
   parameters$coefficients$longitudinal <- theta[(idx[2] + 1):idx[3]]
   parameters$coefficients$initial_state <- theta[(idx[3] + 1):idx[4]]
-  parameters$coefficients$measurement_error_sd <- exp(theta[idx[4] + 1])
   parameters
 }
 
@@ -372,10 +376,12 @@
     # Parameter change: max relative change across fixed effects + variance
     theta_curr <- c(
       .coef_to_vector(curr$parameters),
+      curr$parameters$coefficients$measurement_error_sd,
       as.vector(curr$parameters$coefficients$random_effect_sigma)
     )
     theta_prev <- c(
       .coef_to_vector(prev$parameters),
+      prev$parameters$coefficients$measurement_error_sd,
       as.vector(prev$parameters$coefficients$random_effect_sigma)
     )
     delta_theta <- max(abs(theta_curr - theta_prev))

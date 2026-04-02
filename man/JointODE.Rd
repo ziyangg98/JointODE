@@ -130,12 +130,8 @@ discrimination ability for survival prediction}
 \item \code{iterations}: Number of EM iterations performed
 \item \code{message}: Descriptive convergence message
 }}
-\item{\code{random_effects}}{List containing random effects estimates:
-\itemize{
-\item \code{estimates}: Posterior means of subject-specific random
-effects
-\item \code{variances}: Posterior variances of random effects
-}}
+\item{\code{random_effects}}{Matrix of posterior mode random effects
+(n_subjects x n_re)}
 \item{\code{data}}{Processed data used for model fitting in internal
 format}
 \item{\code{control}}{List of control parameters used in optimization}
@@ -166,12 +162,12 @@ Two association structures are supported:
 slope
 }
 
-Parameter estimation employs a Laplace EM algorithm with:
+Parameter estimation employs a Monte Carlo EM (MCEM) algorithm with:
 \itemize{
-\item E-step: Laplace approximation for posterior computation of
-random effects
-\item M-step: Newton step on the Laplace-approximated marginal
-log-likelihood with nested AD for the Hessian correction term
+\item E-step: Laplace proposal plus importance sampling for posterior
+moments of random effects
+\item M-step: damped Newton step on the self-normalized
+importance-weighted objective
 }
 }
 \examples{

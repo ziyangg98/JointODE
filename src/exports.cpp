@@ -26,6 +26,14 @@ static void fill_coefs(ODEParams<DstScalar>& p, const SrcVec& theta,
   for (int j = 0; j < n_in; j++) p.initial_state_coefs[j] = DstScalar(theta[off++]);
 }
 
+static const char* SPD_ERR_SIGMA =
+    "random_effect_sigma must be positive definite";
+
+static void assert_spd(const mat& M, const char* msg) {
+  mat R;
+  if (!chol(R, M)) stop(msg);
+}
+
 static void eval_subject_nll(
     const std::vector<double>& theta_vec,
     const List& subject_data,
@@ -43,9 +51,8 @@ static void eval_subject_nll(
   const int n_baseline = params_template.baseline_coefs.size();
   const int n_hazard = params_template.hazard_coefs.size();
   const int n_long = params_template.longitudinal_coefs.size();
-  const int n_init = 2;
-  const int n_coef = n_baseline + n_hazard + n_long + n_init;
-  const int n_params = n_coef + 1;  // +1 for log_sigma_e
+  const int n_init = params_template.initial_state_coefs.size();
+  const int n_params = n_baseline + n_hazard + n_long + n_init;
   const int n_re = inv_sigma_b.n_rows;
 
   NumericVector coef_re(random_effect.begin() + 2, random_effect.end());
@@ -57,7 +64,7 @@ static void eval_subject_nll(
                 params_template.biomarker_random,
                 params_template.velocity_random);
 
-  // Outer tape: AD over theta = [baseline, hazard, longitudinal, initial_state, log_sigma_e]
+  // Outer tape: AD over theta = [baseline, hazard, longitudinal, initial_state]
   ADvector ad_theta(n_params);
   std::copy(theta_vec.begin(), theta_vec.end(), ad_theta.begin());
   CppAD::Independent(ad_theta);
@@ -69,7 +76,7 @@ static void eval_subject_nll(
   load_subject(ode.subject, subject_data,
       std::vector<ADdouble>(random_effect.begin() + 2, random_effect.end()));
 
-  ode.log_sigma_e = ad_theta[n_coef];
+  ode.log_sigma_e = ADdouble(params_template.log_sigma_e);
 
   const auto times = time_grid(ode.subject.longitudinal_times,
                                   ode.subject.event_time);
@@ -91,43 +98,7 @@ static void eval_subject_nll(
   }
   ll -= ADdouble(0.5 * qf + re_const);
 
-  // Laplace correction: -0.5 * log|H_z(theta)| via nested AD
-  {
-    std::vector<AD2double> ad2_re(n_re);
-    for (int j = 0; j < n_re; j++)
-      ad2_re[j] = AD2double(random_effect[j]);
-    CppAD::Independent(ad2_re);
-
-    ODEParams<AD2double> ode2;
-    fill_coefs<AD2double>(ode2, ad_theta, n_baseline, n_hazard, n_long, n_init);
-    load_config(ode2, parameters);
-    ode2.log_sigma_e = AD2double(ode.log_sigma_e);
-    ode2.branch = branch;
-    load_subject(ode2.subject, subject_data,
-        std::vector<AD2double>(ad2_re.begin() + 2, ad2_re.end()));
-
-    AD2double lp = eval_logpost(ad2_re, ode2, inv_sigma_b, re_const);
-
-    CppAD::ADFun<ADdouble> inner_tape;
-    inner_tape.Dependent(ad2_re, std::vector<AD2double>{lp});
-    inner_tape.optimize();
-
-    std::vector<ADdouble> re_ad(n_re);
-    for (int j = 0; j < n_re; j++)
-      re_ad[j] = ADdouble(random_effect[j]);
-    auto hess_ad = inner_tape.Hessian(re_ad, 0);
-    inner_tape.capacity_order(0);
-
-    CppAD::vector<ADdouble> H_z(n_re * n_re);
-    for (int j = 0; j < n_re * n_re; j++)
-      H_z[j] = -hess_ad[j];
-    CppAD::vector<ADdouble> B_dummy, X_dummy;
-    ADdouble logdet;
-    CppAD::LuSolve(n_re, 0, H_z, B_dummy, X_dummy, logdet);
-    ll -= ADdouble(0.5) * logdet;
-  }
-
-  // Finish outer tape: NLL = -ll_laplace
+  // Finish outer tape: NLL = -ll
   CppAD::ADFun<double> tape;
   tape.Dependent(ad_theta, ADvector{-ll});
   tape.optimize();
@@ -166,11 +137,12 @@ NumericVector compute_joint_objective(
   const int n_hazard = params_template.hazard_coefs.size();
   const int n_long = params_template.longitudinal_coefs.size();
   const int n_init = params_template.initial_state_coefs.size();
-  const int n_params = n_baseline + n_hazard + n_long + n_init + 1;  // +1: log_sigma_e
+  const int n_params = n_baseline + n_hazard + n_long + n_init;
 
   mat inv_sigma_b;
   if (!inv(inv_sigma_b, params_template.random_effect_sigma))
     stop("Failed to invert random effect covariance matrix");
+  assert_spd(params_template.random_effect_sigma, SPD_ERR_SIGMA);
   double log_det_val, sign;
   log_det(log_det_val, sign, params_template.random_effect_sigma);
   const double re_const =
@@ -184,10 +156,8 @@ NumericVector compute_joint_objective(
   // Value-only fast path: pure double, no AD tape
   if (!gradient && !hessian) {
     const int n_re = random_effects.ncol();
-    const double log_se = theta_vec[n_params - 1];
     ODEParams<double> ode_val;
     load_params(ode_val, parameters);
-    ode_val.log_sigma_e = log_se;
 
     for (int i = 0; i < n_subjects; i++) {
       NumericVector re = random_effects(i, _);
@@ -200,31 +170,6 @@ NumericVector compute_joint_objective(
 
       std::vector<double> re_vec(re.begin(), re.end());
       double nll_i = -eval_logpost(re_vec, ode_val, inv_sigma_b, re_const);
-
-      // Laplace correction: +0.5 * log|H_z| (pure double Hessian)
-      ADvector ad_re(n_re);
-      std::copy(re_vec.begin(), re_vec.end(), ad_re.begin());
-      CppAD::Independent(ad_re);
-      ODEParams<ADdouble> ode_lp;
-      load_params(ode_lp, parameters);
-      ode_lp.log_sigma_e = ADdouble(log_se);
-      load_subject(ode_lp.subject, data_list[i],
-          std::vector<ADdouble>(ad_re.begin() + 2, ad_re.end()));
-      ode_lp.branch = ode_val.branch;
-      std::vector<ADdouble> ad_re_vec(ad_re.begin(), ad_re.end());
-      ADdouble lp = eval_logpost(ad_re_vec, ode_lp, inv_sigma_b, re_const);
-      CppAD::ADFun<double> tape;
-      tape.Dependent(ad_re, ADvector{lp});
-      auto h = tape.Hessian(re_vec, 0);
-      tape.capacity_order(0);
-
-      mat H_z(n_re, n_re);
-      for (int r = 0; r < n_re; r++)
-        for (int c = 0; c < n_re; c++)
-          H_z(r, c) = -h[r * n_re + c];
-      double ld, s;
-      log_det(ld, s, H_z);
-      nll_i += 0.5 * ld;
 
       total_obj += subject_weights[i] * nll_i;
     }
@@ -268,6 +213,7 @@ static ODEParams<double> setup_logpost(
   load_params(params, parameters);
   if (!inv(inv_sigma_b, params.random_effect_sigma))
     stop("Failed to invert random effect covariance matrix");
+  assert_spd(params.random_effect_sigma, SPD_ERR_SIGMA);
   double ld, s;
   log_det(ld, s, params.random_effect_sigma);
   re_const = 0.5 * (random_effect.size() * std::log(2.0 * M_PI) + ld);
@@ -316,6 +262,42 @@ NumericVector compute_joint_logpost(
   CppAD::ADFun<double> tape;
   tape.Dependent(ad_re, ADvector{lp});
   return eval_tape(tape, re_vec, n_re, gradient, hessian);
+}
+
+// ============================================================================
+// Joint: batch log-posterior for M samples (value-only, no AD)
+// ============================================================================
+
+// [[Rcpp::export(.compute_joint_logpost_batch)]]
+NumericVector compute_joint_logpost_batch(
+    const NumericMatrix& samples,
+    const List& data, const List& parameters) {
+  const int M = samples.nrow();
+  const int n_re = samples.ncol();
+
+  // Setup once: params, inverse sigma, constant
+  NumericVector re0 = samples(0, _);
+  mat inv_sigma_b;
+  double re_const;
+  ODEParams<double> base_params = setup_logpost(parameters, re0,
+      inv_sigma_b, re_const);
+
+  NumericVector result(M);
+  for (int m = 0; m < M; m++) {
+    NumericVector re = samples(m, _);
+    std::vector<double> re_vec(re.begin(), re.end());
+
+    // Update branch for this sample's RE coefficients
+    NumericVector coef_re(re.begin() + 2, re.end());
+    NumericVector lc = as<List>(parameters["coefficients"])["longitudinal"];
+    update_branch(base_params.branch, lc, coef_re,
+                  base_params.biomarker_random, base_params.velocity_random);
+
+    load_subject(base_params.subject, data,
+        std::vector<double>(coef_re.begin(), coef_re.end()));
+    result[m] = eval_logpost(re_vec, base_params, inv_sigma_b, re_const);
+  }
+  return result;
 }
 
 // ============================================================================

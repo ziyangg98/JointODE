@@ -13,7 +13,6 @@ using namespace arma;
 using CppAD::AD;
 
 typedef AD<double> ADdouble;
-typedef AD<ADdouble> AD2double;
 typedef CppAD::vector<ADdouble> ADvector;
 
 // ============================================================================

@@ -5,14 +5,31 @@ NULL
 
 # Variance Updates =============================================================
 
+.update_measurement_error_sd <- function(data_list, parameters,
+                                         random_effects) {
+  n_total_obs <- sum(vapply(data_list, function(d) {
+    length(d$longitudinal$measurements)
+  }, integer(1)))
+  ode_solutions <- .solve_batch_joint(
+    data_list = data_list, random_effects = random_effects,
+    parameters = parameters
+  )
+  rss <- sum(vapply(seq_along(ode_solutions), function(k) {
+    measurements <- data_list[[k]]$longitudinal$measurements
+    if (length(measurements) == 0) return(0)
+    obs_times <- data_list[[k]]$longitudinal$times
+    match_idx <- match(obs_times, ode_solutions[[k]]$times)
+    sum((measurements - ode_solutions[[k]]$biomarker[match_idx])^2)
+  }, numeric(1)))
+  sqrt(rss / n_total_obs)
+}
+
 #' @noRd
-.update_random_effect_sigma <- function(posterior_moments, n_subjects) {
-  n_re <- length(posterior_moments[[1]]$mean)
-  sigma_sum <- matrix(0, n_re, n_re)
-  for (i in seq_len(n_subjects)) {
-    sigma_sum <- sigma_sum + posterior_moments[[i]]$second_moment
-  }
-  sigma_sum / n_subjects
+.update_random_effect_sigma <- function(random_effects, posteriors) {
+  n <- nrow(random_effects)
+  sigma <- crossprod(random_effects)
+  for (i in seq_len(n)) sigma <- sigma + posteriors[[i]]$cov
+  sigma / n
 }
 
 # Expected Objective ===========================================================
@@ -20,13 +37,16 @@ NULL
 .compute_objective_expected <- function(
   params, data_list, random_effects, parameters,
   gradient = TRUE, hessian = FALSE,
+  weights = NULL,
   parallel = FALSE, n_cores = 0
 ) {
   eval_chunk <- function(idx) {
+    w <- if (!is.null(weights)) weights[idx] else NULL
     .compute_joint_objective(
       params = params, data_list = data_list[idx],
       random_effects = random_effects[idx, , drop = FALSE],
       parameters = parameters,
+      weights = w,
       gradient = gradient, hessian = hessian
     )
   }
@@ -109,6 +129,9 @@ NULL
 .compute_vcov_sem <- function(
   data_list, parameters, random_effects, control
 ) {
+  sem_control <- control
+  sem_control$mc_samples <- max(1L, as.integer(sem_control$mc_samples))
+
   theta <- .coef_to_vector(parameters)
 
   if (control$verbose > 0) cli::cli_alert_info("Computing SEM vcov...")
@@ -116,25 +139,22 @@ NULL
   obj <- .compute_objective_expected(
     theta, data_list, random_effects, parameters,
     gradient = FALSE, hessian = TRUE,
-    parallel = control$parallel, n_cores = control$n_cores
+    parallel = sem_control$parallel, n_cores = sem_control$n_cores
   )
   hess <- attr(obj, "hessian")
   n_coef <- nrow(hess)
   info_complete_inv <- solve(hess)
 
   em_map <- function(theta_input) {
+    # Fixed seed makes the MCEM mapping deterministic for numerical Jacobian.
+    set.seed(20260402)
     params_input <- .vector_to_coef(parameters, theta_input)
-    result <- .em_step(data_list, params_input, random_effects, control)
+    result <- .em_step(data_list, params_input, random_effects, sem_control)
     .coef_to_vector(result$parameters)
   }
 
-  eps_weight <- sqrt(abs(diag(info_complete_inv)))
-  eps_weight <- eps_weight / min(eps_weight) * sqrt(.Machine$double.eps)
-
-  dm_matrix <- numDeriv::jacobian(
-    func = em_map, x = theta,
-    method = "simple", method.args = list(eps = eps_weight)
-  )
+  dm_matrix <- numDeriv::jacobian(func = em_map, x = theta,
+    method.args = list(r = 2))
 
   info_observed_inv <- info_complete_inv %*% solve(diag(n_coef) - t(dm_matrix))
 
@@ -165,55 +185,120 @@ NULL
   vcov_sym
 }
 
-# EM Step ======================================================================
+# MCEM Step ====================================================================
 
 #' @noRd
 .em_step <- function(data_list, parameters, random_effects, control) {
-  n_subjects <- length(data_list)
+  .em_step_mcem(data_list, parameters, random_effects, control)
+}
+
+# Monte Carlo EM ==============================================================
+
+#' MCEM E-step: Laplace proposal + importance sampling
+#' @references Booth & Hobert (1999), Wei & Tanner (1990)
+#' @noRd
+.compute_posteriors_mcem <- function(data_list, parameters, random_effects,
+                                     M, parallel, n_cores) {
+  .parallel_apply(seq_along(data_list), function(i) {
+    # Laplace proposal: mode + covariance
+    post <- .compute_posterior_laplace(
+      data_list[[i]], random_effects[i, ], parameters
+    )
+    n_re <- length(post$mode)
+    R <- .safe_chol(post$cov)
+
+    # Draw M samples from N(mode, cov)
+    z <- matrix(rnorm(M * n_re), M, n_re)
+    samples <- sweep(z %*% R, 2, post$mode, `+`)
+
+    # Log-importance weights: log p(b|Y,T,theta) - log q(b)
+    # Normalizing constants cancel in self-normalization
+    log_post <- as.numeric(.compute_joint_logpost_batch(
+      samples = samples, data = data_list[[i]], parameters = parameters
+    ))
+    centered <- sweep(samples, 2, post$mode, `-`)
+    V <- forwardsolve(t(R), t(centered))
+    log_w <- log_post + 0.5 * colSums(V^2)
+
+    # Self-normalize
+    log_w <- log_w - .logsumexp(log_w)
+
+    list(samples = samples, weights = exp(log_w),
+         mode = post$mode, cov = post$cov)
+  }, parallel = parallel, n_cores = n_cores, setup = FALSE)
+}
+
+#' @noRd
+.em_step_mcem <- function(data_list, parameters, random_effects, control) {
+  M <- control$mc_samples
+  if (M < 1) {
+    stop("mc_samples must be a positive integer for MCEM optimization")
+  }
+  n <- length(data_list)
   n_re <- ncol(random_effects)
 
-  # Cache last accepted E-step results to avoid redundant recomputation
-  last <- list(posteriors = NULL, moments = NULL, re = random_effects)
-
-  # Profile Laplace: re-solve b̂(θ) at each evaluation
-  theta <- .coef_to_vector(parameters)
-  fit_m <- trust::trust(
-    objfun = function(th) {
-      params_th <- .vector_to_coef(parameters, th)
-      posts <- .compute_posteriors(
-        data_list, params_th, last$re,
-        control$parallel, control$n_cores, setup = FALSE
-      )
-      re_new <- t(vapply(posts, function(p) p$mode, numeric(n_re)))
-      moments <- lapply(posts, function(p) {
-        list(mean = p$mode, second_moment = tcrossprod(p$mode) + p$cov)
-      })
-      params_th$coefficients$random_effect_sigma <-
-        .update_random_effect_sigma(moments, n_subjects)
-      last <<- list(posteriors = posts, moments = moments, re = re_new)
-
-      obj <- .compute_objective_expected(
-        th, data_list, re_new, params_th,
-        gradient = TRUE, hessian = TRUE,
-        parallel = control$parallel, n_cores = control$n_cores
-      )
-      list(value = as.numeric(obj),
-           gradient = as.vector(attr(obj, "gradient")),
-           hessian = as.matrix(attr(obj, "hessian")))
-    },
-    parinit = theta, rinit = 1, rmax = 10, iterlim = 1
+  # E-step: Laplace + importance sampling
+  mc_post <- .compute_posteriors_mcem(
+    data_list, parameters, random_effects, M,
+    control$parallel, control$n_cores
   )
 
-  parameters <- .vector_to_coef(parameters, fit_m$argument)
-  random_effects <- last$re
-  parameters$coefficients$random_effect_sigma <-
-    .update_random_effect_sigma(last$moments, n_subjects)
+  # IS-weighted random effects (posterior mean)
+  random_effects <- t(vapply(mc_post, function(p) {
+    as.vector(crossprod(p$weights, p$samples))
+  }, numeric(n_re)))
+
+  # M-step: one-step Newton on IS-weighted complete-data log-likelihood
+  idx_map <- rep(seq_len(n), each = M)
+  data_list_rep <- data_list[idx_map]
+  re_matrix <- do.call(rbind, lapply(mc_post, `[[`, "samples"))
+  weights_vec <- unlist(lapply(mc_post, `[[`, "weights"))
+
+  eval_objective <- function(theta_val, gradient = FALSE, hessian = FALSE) {
+    .compute_objective_expected(
+      theta_val, data_list_rep, re_matrix,
+      .vector_to_coef(parameters, theta_val),
+      gradient = gradient, hessian = hessian,
+      weights = weights_vec,
+      parallel = control$parallel, n_cores = control$n_cores
+    )
+  }
+
+  theta <- .coef_to_vector(parameters)
+  obj <- eval_objective(theta, gradient = TRUE, hessian = TRUE)
+  g <- as.vector(attr(obj, "gradient"))
+  H <- as.matrix(attr(obj, "hessian"))
+  R_h <- .safe_chol(H)
+  direction <- -backsolve(R_h, forwardsolve(t(R_h), g))
+
+  # One-step Newton update
+  theta_new <- theta + direction
+  if (any(!is.finite(theta_new))) {
+    stop("One-step Newton update produced non-finite parameters")
+  }
+  f_new <- as.numeric(eval_objective(theta_new, gradient = FALSE, hessian = FALSE))
+  if (!is.finite(f_new)) {
+    stop("One-step Newton update produced non-finite objective")
+  }
+  parameters <- .vector_to_coef(parameters, theta_new)
+  loglik <- -f_new
+
+  # IS-weighted Sigma_b = (1/n) sum_i E[bb^T | Y_i]
+  sigma_b <- Reduce(`+`, lapply(seq_len(n), function(i) {
+    crossprod(
+      mc_post[[i]]$samples,
+      sweep(mc_post[[i]]$samples, 1, mc_post[[i]]$weights, `*`)
+    )
+  })) / n
+  parameters$coefficients$random_effect_sigma <- sigma_b
+
+  # sigma_e at IS-weighted posterior mean
+  parameters$coefficients$measurement_error_sd <-
+    .update_measurement_error_sd(data_list, parameters, random_effects)
 
   list(
     parameters = parameters,
     random_effects = random_effects,
-    loglik = -fit_m$value,
-    posteriors = last$posteriors,
-    posterior_moments = last$moments
+    loglik = loglik
   )
 }

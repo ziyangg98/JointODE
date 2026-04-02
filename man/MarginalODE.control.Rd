@@ -6,7 +6,7 @@
 \usage{
 MarginalODE.control(
   maxit = 200,
-  tol = 0.001,
+  tol = 1e-04,
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,
@@ -19,7 +19,7 @@ MarginalODE.control(
 (default: 200)}
 
 \item{tol}{Convergence tolerance on max absolute parameter
-change (default: 1e-3)}
+change (default: 1e-4)}
 
 \item{verbose}{Logical or numeric; FALSE/0 for silent, TRUE/1 for basic
 progress, 2 for detailed output (default: FALSE)}
@@ -40,7 +40,7 @@ Construct control parameters for the MarginalODE optimization.
 }
 \examples{
 control <- MarginalODE.control()
-control <- MarginalODE.control(maxit = 50, tol = 1e-3)
+control <- MarginalODE.control(maxit = 50, tol = 1e-4)
 
 }
 \seealso{

@@ -49,6 +49,21 @@ test_that("JointODE fits and converges", {
   expect_true(is.matrix(e2e_fit$vcov))
 })
 
+test_that("JointODE exposes EM history in convergence info", {
+  conv <- e2e_fit$convergence
+
+  expect_true(is.numeric(conv$loglik_history))
+  expect_true(is.numeric(conv$delta_theta_history))
+  expect_true(is.numeric(conv$delta_loglik_history))
+
+  expect_equal(length(conv$loglik_history), conv$iterations)
+  expect_equal(length(conv$delta_theta_history), conv$iterations)
+  expect_equal(length(conv$delta_loglik_history), conv$iterations)
+
+  expect_true(all(is.finite(conv$loglik_history)))
+  expect_true(all(is.finite(conv$delta_theta_history)))
+})
+
 test_that("JointODE S3 methods work on fitted object", {
   expect_true(is.numeric(coef(e2e_fit)))
   expect_s3_class(logLik(e2e_fit), "logLik")
