@@ -1,4 +1,4 @@
-library(JointODE)
+devtools::load_all()
 data("sim", package = "JointODE")
 
 fit <- JointODE(
@@ -10,5 +10,5 @@ fit <- JointODE(
   ],
   survival_data = sim$data$survival_data,
   init = sim$init,
-  control = list(maxit = 20, verbose = 2)
+  control = list(maxit = 20, parallel = TRUE, verbose = 2)
 )

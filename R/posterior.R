@@ -194,37 +194,67 @@ NULL
 
 # Monte Carlo EM ==============================================================
 
-#' MCEM E-step: Laplace proposal + importance sampling
+#' MCEM E-step: Independent Metropolis-Hastings sampling from posterior
 #' @references Booth & Hobert (1999), Wei & Tanner (1990)
 #' @noRd
 .compute_posteriors_mcem <- function(data_list, parameters, random_effects,
-                                     M, parallel, n_cores) {
+                                     M, mc_burnin, parallel, n_cores) {
   .parallel_apply(seq_along(data_list), function(i) {
-    # Laplace proposal: mode + covariance
+    # Laplace proposal distribution: N(mode, cov)
     post <- .compute_posterior_laplace(
       data_list[[i]], random_effects[i, ], parameters
     )
     n_re <- length(post$mode)
     R <- .safe_chol(post$cov)
+    n_total <- mc_burnin + M
 
-    # Draw M samples from N(mode, cov)
-    z <- matrix(rnorm(M * n_re), M, n_re)
-    samples <- sweep(z %*% R, 2, post$mode, `+`)
+    # Pre-generate all proposals from N(mode, cov)
+    z <- matrix(rnorm(n_total * n_re), n_total, n_re)
+    proposals <- sweep(z %*% R, 2, post$mode, `+`)
 
-    # Log-importance weights: log p(b|Y,T,theta) - log q(b)
-    # Normalizing constants cancel in self-normalization
-    log_post <- as.numeric(.compute_joint_logpost_batch(
-      samples = samples, data = data_list[[i]], parameters = parameters
+    # Batch-evaluate log-posteriors for all proposals
+    all_logp <- as.numeric(.compute_joint_logpost_batch(
+      samples = proposals, data = data_list[[i]], parameters = parameters
     ))
-    centered <- sweep(samples, 2, post$mode, `-`)
+
+    # Log-proposal densities: -0.5 * (b - mode)' Sigma^{-1} (b - mode)
+    centered <- sweep(proposals, 2, post$mode, `-`)
     V <- forwardsolve(t(R), t(centered))
-    log_w <- log_post + 0.5 * colSums(V^2)
+    all_logq <- -0.5 * colSums(V^2)
 
-    # Self-normalize
-    log_w <- log_w - .logsumexp(log_w)
+    # Initialize chain at posterior mode
+    mode_logp <- as.numeric(.compute_joint_logpost_batch(
+      samples = matrix(post$mode, nrow = 1),
+      data = data_list[[i]], parameters = parameters
+    ))
+    current <- post$mode
+    current_logp <- mode_logp
+    current_logq <- 0.0  # (mode - mode)' Sigma^{-1} (mode - mode) = 0
 
-    list(samples = samples, weights = exp(log_w),
-         mode = post$mode, cov = post$cov)
+    # MH accept/reject loop
+    samples <- matrix(NA_real_, M, n_re)
+    u <- log(runif(n_total))
+    n_accept <- 0L
+
+    for (t in seq_len(n_total)) {
+      log_alpha <- all_logp[t] - current_logp + current_logq - all_logq[t]
+      if (u[t] < log_alpha) {
+        current <- proposals[t, ]
+        current_logp <- all_logp[t]
+        current_logq <- all_logq[t]
+        if (t > mc_burnin) n_accept <- n_accept + 1L
+      }
+      if (t > mc_burnin) {
+        samples[t - mc_burnin, ] <- current
+      }
+    }
+
+    # Equal weights for MCMC samples
+    weights <- rep(1.0 / M, M)
+
+    list(samples = samples, weights = weights,
+         mode = post$mode, cov = post$cov,
+         accept_rate = n_accept / M)
   }, parallel = parallel, n_cores = n_cores, setup = FALSE)
 }
 
@@ -237,18 +267,26 @@ NULL
   n <- length(data_list)
   n_re <- ncol(random_effects)
 
-  # E-step: Laplace + importance sampling
+  # E-step: Independent Metropolis-Hastings from posterior
   mc_post <- .compute_posteriors_mcem(
     data_list, parameters, random_effects, M,
-    control$parallel, control$n_cores
+    control$mc_burnin, control$parallel, control$n_cores
   )
 
-  # IS-weighted random effects (posterior mean)
+  if (control$verbose >= 2) {
+    rates <- vapply(mc_post, `[[`, numeric(1), "accept_rate")
+    cli::cli_text(sprintf(
+      "    MH accept rate: mean=%.1f%%, min=%.1f%%, max=%.1f%%",
+      mean(rates) * 100, min(rates) * 100, max(rates) * 100
+    ))
+  }
+
+  # MCMC posterior mean (equal weights)
   random_effects <- t(vapply(mc_post, function(p) {
-    as.vector(crossprod(p$weights, p$samples))
+    colMeans(p$samples)
   }, numeric(n_re)))
 
-  # M-step: one-step Newton on IS-weighted complete-data log-likelihood
+  # M-step: one-step Newton on MC-averaged complete-data log-likelihood
   idx_map <- rep(seq_len(n), each = M)
   data_list_rep <- data_list[idx_map]
   re_matrix <- do.call(rbind, lapply(mc_post, `[[`, "samples"))
@@ -283,16 +321,13 @@ NULL
   parameters <- .vector_to_coef(parameters, theta_new)
   loglik <- -f_new
 
-  # IS-weighted Sigma_b = (1/n) sum_i E[bb^T | Y_i]
+  # MCMC Sigma_b = (1/n) sum_i (1/M) sum_m b_{im} b_{im}'
   sigma_b <- Reduce(`+`, lapply(seq_len(n), function(i) {
-    crossprod(
-      mc_post[[i]]$samples,
-      sweep(mc_post[[i]]$samples, 1, mc_post[[i]]$weights, `*`)
-    )
+    crossprod(mc_post[[i]]$samples) / M
   })) / n
   parameters$coefficients$random_effect_sigma <- sigma_b
 
-  # sigma_e at IS-weighted posterior mean
+  # sigma_e at MCMC posterior mean
   parameters$coefficients$measurement_error_sd <-
     .update_measurement_error_sd(data_list, parameters, random_effects)
 

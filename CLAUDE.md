@@ -91,3 +91,25 @@ Tests use the bundled `sim` dataset (`data/sim.rda`), structured as:
 - testthat edition 3; test helpers in `tests/testthat/helper-*.R`
 - Tests rely on the bundled `sim` dataset (`data/sim.rda`) for processed data, initial parameters, and random effects
 - Ad-hoc test scripts (PBC, sim benchmarks) go in `scripts/`, not `tests/`
+
+## Performance Baseline
+
+```bash
+# Generate baseline CSV (sequential + optional parallel)
+Rscript scripts/perf-baseline.R --n=20 --reps=3 --maxit=10 --tol=1e-2 --out=perf-base.csv
+
+# Generate candidate CSV after code changes
+Rscript scripts/perf-baseline.R --n=20 --reps=3 --maxit=10 --tol=1e-2 --out=perf-new.csv
+
+# Compare elapsed_mean; fail if slowdown > 10%
+Rscript scripts/perf-compare.R --base=perf-base.csv --new=perf-new.csv --metric=elapsed_mean --fail_pct=10
+```
+
+## Formula Syntax
+
+`longitudinal_formula`: `observed ~ biomarker + velocity + x1 + x2 + (biomarker + velocity | id)`
+- `biomarker` and `velocity` are reserved names for ODE state variables (value and slope)
+- Other terms (`x1`, `x2`) are external covariates affecting the forcing function
+- `(biomarker + velocity | id)` specifies subject-specific random effects on ODE coefficients
+
+`survival_formula`: `Surv(time, status) ~ w1 + w2` — standard Cox-style formula
