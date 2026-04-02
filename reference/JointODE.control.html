@@ -59,12 +59,13 @@ process a list to fill in missing values with defaults.</p>
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">JointODE.control</span><span class="op">(</span></span>
 <span>  maxit <span class="op">=</span> <span class="fl">200</span>,</span>
-<span>  tol <span class="op">=</span> <span class="fl">0.001</span>,</span>
+<span>  tol <span class="op">=</span> <span class="fl">1e-04</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  parallel <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  n_cores <span class="op">=</span> <span class="fl">0</span>,</span>
-<span>  quad_level <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>  hazard_quadrature <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  mc_samples <span class="op">=</span> <span class="fl">100</span>,</span>
+<span>  mc_burnin <span class="op">=</span> <span class="fl">50</span>,</span>
 <span>  .list <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -75,12 +76,12 @@ process a list to fill in missing values with defaults.</p>
 
 
 <dl><dt id="arg-maxit">maxit<a class="anchor" aria-label="anchor" href="#arg-maxit"></a></dt>
-<dd><p>Maximum number of EM iterations (default: 200)</p></dd>
+<dd><p>Maximum number of MCEM iterations (default: 200)</p></dd>
 
 
 <dt id="arg-tol">tol<a class="anchor" aria-label="anchor" href="#arg-tol"></a></dt>
-<dd><p>Convergence tolerance. The EM algorithm converges
-when max|theta_new - theta_old| &lt; tol (default: 1e-3)</p></dd>
+<dd><p>Convergence tolerance. The MCEM algorithm converges
+when max|theta_new - theta_old| &lt; tol (default: 1e-4)</p></dd>
 
 
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
@@ -97,14 +98,21 @@ silent, TRUE/1 for basic progress, 2 for detailed output (default: FALSE)</p></d
 If 0, uses all available cores (default: 0)</p></dd>
 
 
-<dt id="arg-quad-level">quad_level<a class="anchor" aria-label="anchor" href="#arg-quad-level"></a></dt>
-<dd><p>Integer; quadrature level for numerical integration
-(default: 3)</p></dd>
-
-
 <dt id="arg-hazard-quadrature">hazard_quadrature<a class="anchor" aria-label="anchor" href="#arg-hazard-quadrature"></a></dt>
 <dd><p>Integer; number of Simpson sub-intervals per
 observation interval for hazard integration (default: 1)</p></dd>
+
+
+<dt id="arg-mc-samples">mc_samples<a class="anchor" aria-label="anchor" href="#arg-mc-samples"></a></dt>
+<dd><p>Integer; number of MCMC samples per subject for
+Monte Carlo EM (MCEM). Must be a positive integer.
+Recommended range: 50-200 for MCEM (default: 100).</p></dd>
+
+
+<dt id="arg-mc-burnin">mc_burnin<a class="anchor" aria-label="anchor" href="#arg-mc-burnin"></a></dt>
+<dd><p>Integer; number of burn-in iterations for the
+Metropolis-Hastings sampler in the E-step. Discarded before
+collecting <code>mc_samples</code> draws (default: 50).</p></dd>
 
 
 <dt id="arg--list">.list<a class="anchor" aria-label="anchor" href="#arg--list"></a></dt>
@@ -130,7 +138,7 @@ observation interval for hazard integration (default: 1)</p></dd>
 <span class="r-in"><span><span class="va">control</span> <span class="op">&lt;-</span> <span class="fu">JointODE.control</span><span class="op">(</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Custom settings for faster exploration</span></span></span>
-<span class="r-in"><span><span class="va">control</span> <span class="op">&lt;-</span> <span class="fu">JointODE.control</span><span class="op">(</span>maxit <span class="op">=</span> <span class="fl">30</span>, tol <span class="op">=</span> <span class="fl">1e-3</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">control</span> <span class="op">&lt;-</span> <span class="fu">JointODE.control</span><span class="op">(</span>maxit <span class="op">=</span> <span class="fl">30</span>, tol <span class="op">=</span> <span class="fl">1e-4</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Verbose output for debugging</span></span></span>
 <span class="r-in"><span><span class="va">control</span> <span class="op">&lt;-</span> <span class="fu">JointODE.control</span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>

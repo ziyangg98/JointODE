@@ -42,19 +42,21 @@ R CMD INSTALL --no-docs --no-multiarch .
 ### EM Algorithm Flow (R side)
 
 [`JointODE()`](https://gongziyang.com/JointODE/reference/JointODE.md) in
-`R/JointODE.R` is the main entry point. It runs an EM loop:
+`R/JointODE.R` is the main entry point. It runs a PQL-ECM loop:
 
 1.  **E-step** (`R/posterior.R`): For each subject, find posterior mode
-    of random effects via Laplace approximation + AGHQ. Calls
-    `.compute_joint_logpost()` (C++). Uses `.regularized_chol()`
-    (Gill-Murray) when the posterior Hessian is not positive definite.
-2.  **M-step** (`R/posterior.R`): One Newton step for fixed effects via
-    `.compute_objective_expected()` → `.compute_joint_objective()`
-    (C++). Variance components (sigma_e, Sigma_b) updated in closed
-    form. Newton step uses `.regularized_solve()` for Hessian inversion.
-3.  **SEM vcov** (`R/posterior.R`): Post-convergence variance-covariance
-    via supplemented EM (Louis formula). Numerical Jacobian of EM map
-    with Richardson extrapolation (r=2).
+    of random effects via Laplace approximation (`nlm`). Calls
+    `.compute_joint_logpost()` (C++). Uses `.safe_chol()` (Gill-Murray)
+    when the posterior Hessian is not positive definite.
+2.  **M-step** (`R/posterior.R`): Trust region optimization
+    (`trust::trust`) of Laplace marginal likelihood. The C++ objective
+    (`compute_joint_objective`) includes `-0.5·log|H_z(θ)|` via nested
+    AD (`AD<AD<double>>`). Fixed effects θ = \[baseline, hazard,
+    longitudinal, initial_state\]; σ_e and Σ_b are fixed during M-step.
+3.  **Variance updates** (`R/posterior.R`): Laplace-corrected closed
+    form — Σ_b = (1/n)Σ(b̂b̂ᵀ + H_z⁻¹), σ_e = sqrt(RSS/N).
+4.  **SEM vcov** (`R/posterior.R`): Post-convergence variance-covariance
+    via supplemented EM (Louis formula). Numerical Jacobian of EM map.
 
 ### C++ Layer (`src/`)
 
@@ -76,7 +78,11 @@ CppAD headers are vendored in `inst/include/cppad/` and included via
 `PKG_CPPFLAGS = -I../inst/include` in `src/Makevars`.
 
 Three AD tapes share the same ODE solver and likelihood code; they
-differ only in **which variable is the AD independent variable**.
+differ only in **which variable is the AD independent variable**. A
+fourth nested AD tape (`AD<AD<double>>`) computes the Laplace
+correction: inner tape over b yields H_z as `AD<double>` values tracked
+by the outer theta tape, enabling exact gradient propagation of
+-0.5·log\|H_z(θ)\| through `CppAD::LuSolve`.
 
 ### ODE Solver: Matrix Exponential
 
@@ -90,15 +96,15 @@ clamp = 5x max observed value).
 
 ### Hazard Integration
 
-Uses log-linear interpolation between consecutive ODE time points, with
-trapezoidal fallback (via `CppAD::CondExpGt`) when the log-hazard
-difference is near zero.
+Composite Simpson’s rule over configurable sub-intervals
+(`hazard_quadrature` control parameter) for cumulative hazard
+integration within each ODE time step.
 
 ### Key R Modules
 
-- `R/posterior.R` — E-step (Laplace + AGHQ), M-step (Newton), SEM vcov
-- `R/utils.R` — Formula parsing,
-  `.regularized_chol`/`.regularized_solve` (Gill-Murray), parameter
+- `R/posterior.R` — E-step (Laplace), M-step (trust region + nested AD
+  Laplace correction), SEM vcov
+- `R/utils.R` — Formula parsing, `.safe_chol` (Gill-Murray), parameter
   conversion, convergence tracking
 - `R/process.R` — Data preprocessing: parses formulas, builds
   per-subject data lists for C++
@@ -145,3 +151,28 @@ helpers
   data, initial parameters, and random effects
 - Ad-hoc test scripts (PBC, sim benchmarks) go in `scripts/`, not
   `tests/`
+
+## Performance Baseline
+
+``` bash
+# Generate baseline CSV (sequential + optional parallel)
+Rscript scripts/perf-baseline.R --n=20 --reps=3 --maxit=10 --tol=1e-2 --out=perf-base.csv
+
+# Generate candidate CSV after code changes
+Rscript scripts/perf-baseline.R --n=20 --reps=3 --maxit=10 --tol=1e-2 --out=perf-new.csv
+
+# Compare elapsed_mean; fail if slowdown > 10%
+Rscript scripts/perf-compare.R --base=perf-base.csv --new=perf-new.csv --metric=elapsed_mean --fail_pct=10
+```
+
+## Formula Syntax
+
+`longitudinal_formula`:
+`observed ~ biomarker + velocity + x1 + x2 + (biomarker + velocity | id)` -
+`biomarker` and `velocity` are reserved names for ODE state variables
+(value and slope) - Other terms (`x1`, `x2`) are external covariates
+affecting the forcing function - `(biomarker + velocity | id)` specifies
+subject-specific random effects on ODE coefficients
+
+`survival_formula`: `Surv(time, status) ~ w1 + w2` — standard Cox-style
+formula

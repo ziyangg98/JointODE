@@ -78,13 +78,15 @@
 <h2 id="architecture">Architecture<a class="anchor" aria-label="anchor" href="#architecture"></a></h2>
 <div class="section level3">
 <h3 id="em-algorithm-flow-r-side">EM Algorithm Flow (R side)<a class="anchor" aria-label="anchor" href="#em-algorithm-flow-r-side"></a></h3>
-<p><code><a href="reference/JointODE.html">JointODE()</a></code> in <code>R/JointODE.R</code> is the main entry point. It runs an EM loop:</p>
+<p><code><a href="reference/JointODE.html">JointODE()</a></code> in <code>R/JointODE.R</code> is the main entry point. It runs a PQL-ECM loop:</p>
 <ol style="list-style-type: decimal"><li>
-<strong>E-step</strong> (<code>R/posterior.R</code>): For each subject, find posterior mode of random effects via Laplace approximation + AGHQ. Calls <code>.compute_joint_logpost()</code> (C++). Uses <code>.regularized_chol()</code> (Gill-Murray) when the posterior Hessian is not positive definite.</li>
+<strong>E-step</strong> (<code>R/posterior.R</code>): For each subject, find posterior mode of random effects via Laplace approximation (<code>nlm</code>). Calls <code>.compute_joint_logpost()</code> (C++). Uses <code>.safe_chol()</code> (Gill-Murray) when the posterior Hessian is not positive definite.</li>
 <li>
-<strong>M-step</strong> (<code>R/posterior.R</code>): One Newton step for fixed effects via <code>.compute_objective_expected()</code> → <code>.compute_joint_objective()</code> (C++). Variance components (sigma_e, Sigma_b) updated in closed form. Newton step uses <code>.regularized_solve()</code> for Hessian inversion.</li>
+<strong>M-step</strong> (<code>R/posterior.R</code>): Trust region optimization (<code>trust::trust</code>) of Laplace marginal likelihood. The C++ objective (<code>compute_joint_objective</code>) includes <code>-0.5·log|H_z(θ)|</code> via nested AD (<code>AD&lt;AD&lt;double&gt;&gt;</code>). Fixed effects θ = [baseline, hazard, longitudinal, initial_state]; σ_e and Σ_b are fixed during M-step.</li>
 <li>
-<strong>SEM vcov</strong> (<code>R/posterior.R</code>): Post-convergence variance-covariance via supplemented EM (Louis formula). Numerical Jacobian of EM map with Richardson extrapolation (r=2).</li>
+<strong>Variance updates</strong> (<code>R/posterior.R</code>): Laplace-corrected closed form — Σ_b = (1/n)Σ(b̂b̂ᵀ + H_z⁻¹), σ_e = sqrt(RSS/N).</li>
+<li>
+<strong>SEM vcov</strong> (<code>R/posterior.R</code>): Post-convergence variance-covariance via supplemented EM (Louis formula). Numerical Jacobian of EM map.</li>
 </ol></div>
 <div class="section level3">
 <h3 id="c-layer-src">C++ Layer (<code>src/</code>)<a class="anchor" aria-label="anchor" href="#c-layer-src"></a></h3>
@@ -95,7 +97,7 @@
 <li>
 <strong><code>cppad_stub.cpp</code></strong> — Minimal CppAD compilation unit required for linking.</li>
 </ul><p>CppAD headers are vendored in <code>inst/include/cppad/</code> and included via <code>PKG_CPPFLAGS = -I../inst/include</code> in <code>src/Makevars</code>.</p>
-<p>Three AD tapes share the same ODE solver and likelihood code; they differ only in <strong>which variable is the AD independent variable</strong>.</p>
+<p>Three AD tapes share the same ODE solver and likelihood code; they differ only in <strong>which variable is the AD independent variable</strong>. A fourth nested AD tape (<code>AD&lt;AD&lt;double&gt;&gt;</code>) computes the Laplace correction: inner tape over b yields H_z as <code>AD&lt;double&gt;</code> values tracked by the outer theta tape, enabling exact gradient propagation of -0.5·log|H_z(θ)| through <code>CppAD::LuSolve</code>.</p>
 </div>
 <div class="section level3">
 <h3 id="ode-solver-matrix-exponential">ODE Solver: Matrix Exponential<a class="anchor" aria-label="anchor" href="#ode-solver-matrix-exponential"></a></h3>
@@ -103,14 +105,14 @@
 </div>
 <div class="section level3">
 <h3 id="hazard-integration">Hazard Integration<a class="anchor" aria-label="anchor" href="#hazard-integration"></a></h3>
-<p>Uses log-linear interpolation between consecutive ODE time points, with trapezoidal fallback (via <code>CppAD::CondExpGt</code>) when the log-hazard difference is near zero.</p>
+<p>Composite Simpson’s rule over configurable sub-intervals (<code>hazard_quadrature</code> control parameter) for cumulative hazard integration within each ODE time step.</p>
 </div>
 <div class="section level3">
 <h3 id="key-r-modules">Key R Modules<a class="anchor" aria-label="anchor" href="#key-r-modules"></a></h3>
 <ul><li>
-<code>R/posterior.R</code> — E-step (Laplace + AGHQ), M-step (Newton), SEM vcov</li>
+<code>R/posterior.R</code> — E-step (Laplace), M-step (trust region + nested AD Laplace correction), SEM vcov</li>
 <li>
-<code>R/utils.R</code> — Formula parsing, <code>.regularized_chol</code>/<code>.regularized_solve</code> (Gill-Murray), parameter conversion, convergence tracking</li>
+<code>R/utils.R</code> — Formula parsing, <code>.safe_chol</code> (Gill-Murray), parameter conversion, convergence tracking</li>
 <li>
 <code>R/process.R</code> — Data preprocessing: parses formulas, builds per-subject data lists for C++</li>
 <li>
@@ -148,6 +150,22 @@
 <li>Ad-hoc test scripts (PBC, sim benchmarks) go in <code>scripts/</code>, not <code>tests/</code>
 </li>
 </ul></div>
+<div class="section level2">
+<h2 id="performance-baseline">Performance Baseline<a class="anchor" aria-label="anchor" href="#performance-baseline"></a></h2>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Generate baseline CSV (sequential + optional parallel)</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="ex">Rscript</span> scripts/perf-baseline.R <span class="at">--n</span><span class="op">=</span>20 <span class="at">--reps</span><span class="op">=</span>3 <span class="at">--maxit</span><span class="op">=</span>10 <span class="at">--tol</span><span class="op">=</span>1e-2 <span class="at">--out</span><span class="op">=</span>perf-base.csv</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co"># Generate candidate CSV after code changes</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="ex">Rscript</span> scripts/perf-baseline.R <span class="at">--n</span><span class="op">=</span>20 <span class="at">--reps</span><span class="op">=</span>3 <span class="at">--maxit</span><span class="op">=</span>10 <span class="at">--tol</span><span class="op">=</span>1e-2 <span class="at">--out</span><span class="op">=</span>perf-new.csv</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co"># Compare elapsed_mean; fail if slowdown &gt; 10%</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="ex">Rscript</span> scripts/perf-compare.R <span class="at">--base</span><span class="op">=</span>perf-base.csv <span class="at">--new</span><span class="op">=</span>perf-new.csv <span class="at">--metric</span><span class="op">=</span>elapsed_mean <span class="at">--fail_pct</span><span class="op">=</span>10</span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="formula-syntax">Formula Syntax<a class="anchor" aria-label="anchor" href="#formula-syntax"></a></h2>
+<p><code>longitudinal_formula</code>: <code>observed ~ biomarker + velocity + x1 + x2 + (biomarker + velocity | id)</code> - <code>biomarker</code> and <code>velocity</code> are reserved names for ODE state variables (value and slope) - Other terms (<code>x1</code>, <code>x2</code>) are external covariates affecting the forcing function - <code>(biomarker + velocity | id)</code> specifies subject-specific random effects on ODE coefficients</p>
+<p><code>survival_formula</code>: <code>Surv(time, status) ~ w1 + w2</code> — standard Cox-style formula</p>
+</div>
 </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

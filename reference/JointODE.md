@@ -152,10 +152,6 @@ JointODE(
   :   Number of CPU cores for parallel processing. If 0, automatically
       detects available cores (default: 0)
 
-  `quad_level`
-
-  :   Quadrature level for numerical integration (default: 3)
-
   See
   [`JointODE.control`](https://gongziyang.com/JointODE/reference/JointODE.control.md)
   for complete details and examples.
@@ -210,11 +206,7 @@ An S3 object of class `"JointODE"` containing fitted model results:
 
 - `random_effects`:
 
-  List containing random effects estimates:
-
-  - `estimates`: Posterior means of subject-specific random effects
-
-  - `variances`: Posterior variances of random effects
+  Matrix of posterior mode random effects (n_subjects x n_re)
 
 - `data`:
 
@@ -244,14 +236,13 @@ Two association structures are supported:
 
 - Rate of change: hazard depends on the biomarker's instantaneous slope
 
-Parameter estimation employs an Expectation-Maximization (EM) algorithm
-with:
+Parameter estimation employs a Monte Carlo EM (MCEM) algorithm with:
 
-- E-step: Multivariate Gauss-Hermite quadrature (mvQuad) for posterior
-  computation of random effects
+- E-step: Laplace proposal plus importance sampling for posterior
+  moments of random effects
 
-- M-step: Optimization for fixed effects and mvQuad-based closed-form
-  updates for variance parameters
+- M-step: damped Newton step on the self-normalized importance-weighted
+  objective
 
 ## Examples
 

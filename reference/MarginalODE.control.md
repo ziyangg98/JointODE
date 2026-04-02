@@ -7,7 +7,7 @@ Construct control parameters for the MarginalODE optimization.
 ``` r
 MarginalODE.control(
   maxit = 200,
-  tol = 0.001,
+  tol = 1e-04,
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,
@@ -24,7 +24,7 @@ MarginalODE.control(
 
 - tol:
 
-  Convergence tolerance on max absolute parameter change (default: 1e-3)
+  Convergence tolerance on max absolute parameter change (default: 1e-4)
 
 - verbose:
 
@@ -59,5 +59,5 @@ A list of control parameters with all defaults filled in
 
 ``` r
 control <- MarginalODE.control()
-control <- MarginalODE.control(maxit = 50, tol = 1e-3)
+control <- MarginalODE.control(maxit = 50, tol = 1e-4)
 ```

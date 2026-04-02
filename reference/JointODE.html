@@ -191,10 +191,6 @@ progress messages, 2 for detailed output (default: FALSE)</p></dd>
 <dd><p>Number of CPU cores for parallel processing.
 If 0, automatically detects available cores (default: 0)</p></dd>
 
-<dt><code>quad_level</code></dt>
-<dd><p>Quadrature level for numerical integration
-(default: 3)</p></dd>
-
 
 </dl><p>See <code><a href="JointODE.control.html">JointODE.control</a></code> for complete details and examples.</p></dd>
 
@@ -239,10 +235,8 @@ discrimination ability for survival prediction</p></dd>
 </ul></dd>
 
 <dt><code>random_effects</code></dt>
-<dd><p>List containing random effects estimates:</p><ul><li><p><code>estimates</code>: Posterior means of subject-specific random
-effects</p></li>
-<li><p><code>variances</code>: Posterior variances of random effects</p></li>
-</ul></dd>
+<dd><p>Matrix of posterior mode random effects
+(n_subjects x n_re)</p></dd>
 
 <dt><code>data</code></dt>
 <dd><p>Processed data used for model fitting in internal
@@ -268,11 +262,10 @@ features derived from the longitudinal trajectory.</p>
 <p>Two association structures are supported:</p><ul><li><p>Current value: hazard depends on the biomarker level at time t</p></li>
 <li><p>Rate of change: hazard depends on the biomarker's instantaneous
 slope</p></li>
-</ul><p>Parameter estimation employs an Expectation-Maximization (EM) algorithm
-with:</p><ul><li><p>E-step: Multivariate Gauss-Hermite quadrature (mvQuad) for
-posterior computation of random effects</p></li>
-<li><p>M-step: Optimization for fixed effects and mvQuad-based
-closed-form updates for variance parameters</p></li>
+</ul><p>Parameter estimation employs a Monte Carlo EM (MCEM) algorithm with:</p><ul><li><p>E-step: Laplace proposal plus importance sampling for posterior
+moments of random effects</p></li>
+<li><p>M-step: damped Newton step on the self-normalized
+importance-weighted objective</p></li>
 </ul></div>
 
     <div class="section level2">

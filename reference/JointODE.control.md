@@ -9,12 +9,13 @@ process a list to fill in missing values with defaults.
 ``` r
 JointODE.control(
   maxit = 200,
-  tol = 0.001,
+  tol = 1e-04,
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,
-  quad_level = 3,
   hazard_quadrature = 1,
+  mc_samples = 100,
+  mc_burnin = 50,
   .list = NULL,
   ...
 )
@@ -24,12 +25,12 @@ JointODE.control(
 
 - maxit:
 
-  Maximum number of EM iterations (default: 200)
+  Maximum number of MCEM iterations (default: 200)
 
 - tol:
 
-  Convergence tolerance. The EM algorithm converges when
-  max\|theta_new - theta_old\| \< tol (default: 1e-3)
+  Convergence tolerance. The MCEM algorithm converges when
+  max\|theta_new - theta_old\| \< tol (default: 1e-4)
 
 - verbose:
 
@@ -45,14 +46,22 @@ JointODE.control(
   Integer; number of cores to use for parallel computation. If 0, uses
   all available cores (default: 0)
 
-- quad_level:
-
-  Integer; quadrature level for numerical integration (default: 3)
-
 - hazard_quadrature:
 
   Integer; number of Simpson sub-intervals per observation interval for
   hazard integration (default: 1)
+
+- mc_samples:
+
+  Integer; number of MCMC samples per subject for Monte Carlo EM (MCEM).
+  Must be a positive integer. Recommended range: 50-200 for MCEM
+  (default: 100).
+
+- mc_burnin:
+
+  Integer; number of burn-in iterations for the Metropolis-Hastings
+  sampler in the E-step. Discarded before collecting `mc_samples` draws
+  (default: 50).
 
 - .list:
 
@@ -77,7 +86,7 @@ A list of control parameters with all defaults filled in
 control <- JointODE.control()
 
 # Custom settings for faster exploration
-control <- JointODE.control(maxit = 30, tol = 1e-3)
+control <- JointODE.control(maxit = 30, tol = 1e-4)
 
 # Verbose output for debugging
 control <- JointODE.control(verbose = TRUE)
