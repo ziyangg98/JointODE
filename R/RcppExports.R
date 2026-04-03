@@ -9,10 +9,6 @@
     .Call(`_JointODE_compute_joint_logpost`, random_effect, data, parameters, gradient, hessian)
 }
 
-.compute_joint_logpost_batch <- function(samples, data, parameters) {
-    .Call(`_JointODE_compute_joint_logpost_batch`, samples, data, parameters)
-}
-
 .compute_joint_state <- function(initial_state, data, random_effect, parameters, gradient = TRUE, hessian = FALSE) {
     .Call(`_JointODE_compute_joint_state`, initial_state, data, random_effect, parameters, gradient, hessian)
 }

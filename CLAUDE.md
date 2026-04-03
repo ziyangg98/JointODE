@@ -37,7 +37,7 @@ R CMD INSTALL --no-docs --no-multiarch .
 
 `JointODE()` in `R/JointODE.R` is the main entry point. It runs a PQL-ECM loop:
 
-1. **E-step** (`R/posterior.R`): For each subject, find posterior mode of random effects via Laplace approximation (`nlm`). Calls `.compute_joint_logpost()` (C++). Uses `.safe_chol()` (Gill-Murray) when the posterior Hessian is not positive definite.
+1. **E-step** (`R/posterior.R`): MCMC sampling of random effects via `MCMCpack::MCMCmetrop1R` (random-walk Metropolis). Laplace approximation provides starting values and proposal covariance. Uses `.safe_chol()` (Gill-Murray) when the posterior Hessian is not positive definite.
 2. **M-step** (`R/posterior.R`): Trust region optimization (`trust::trust`) of Laplace marginal likelihood. The C++ objective (`compute_joint_objective`) includes `-0.5·log|H_z(θ)|` via nested AD (`AD<AD<double>>`). Fixed effects θ = [baseline, hazard, longitudinal, initial_state]; σ_e and Σ_b are fixed during M-step.
 3. **Variance updates** (`R/posterior.R`): Laplace-corrected closed form — Σ_b = (1/n)Σ(b̂b̂ᵀ + H_z⁻¹), σ_e = sqrt(RSS/N).
 4. **SEM vcov** (`R/posterior.R`): Post-convergence variance-covariance via supplemented EM (Louis formula). Numerical Jacobian of EM map.
@@ -62,7 +62,7 @@ Composite Simpson's rule over configurable sub-intervals (`hazard_quadrature` co
 
 ### Key R Modules
 
-- `R/posterior.R` — E-step (Laplace), M-step (trust region + nested AD Laplace correction), SEM vcov
+- `R/posterior.R` — E-step (MCMC via MCMCpack), M-step (one-step Newton), SEM vcov
 - `R/utils.R` — Formula parsing, `.safe_chol` (Gill-Murray), parameter conversion, convergence tracking
 - `R/process.R` — Data preprocessing: parses formulas, builds per-subject data lists for C++
 - `R/initial.R` — Default parameter construction and `MarginalODE`-based initial value computation

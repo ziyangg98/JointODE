@@ -17,10 +17,9 @@
 #'   observation interval for hazard integration (default: 1)
 #' @param mc_samples Integer; number of MCMC samples per subject for
 #'   Monte Carlo EM (MCEM). Must be a positive integer.
-#'   Recommended range: 50-200 for MCEM (default: 100).
+#'   Recommended range: 50-500 for MCEM (default: 200).
 #' @param mc_burnin Integer; number of burn-in iterations for the
-#'   Metropolis-Hastings sampler in the E-step. Discarded before
-#'   collecting \code{mc_samples} draws (default: 50).
+#'   random-walk Metropolis sampler in the MCEM E-step (default: 200).
 #' @param .list Optional list of control parameters to process
 #' @param ... Additional control parameters
 #'
@@ -56,8 +55,8 @@ JointODE.control <- function(
   parallel = FALSE,
   n_cores = 0,
   hazard_quadrature = 1,
-  mc_samples = 100,
-  mc_burnin = 50,
+  mc_samples = 200,
+  mc_burnin = 200,
   .list = NULL,
   ...
 ) {

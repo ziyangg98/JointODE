@@ -30,6 +30,7 @@ Imports:
     cli,
     numDeriv,
     MASS,
+    MCMCpack,
     splines2,
     mvQuad,
     Rcpp,

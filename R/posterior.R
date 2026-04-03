@@ -194,67 +194,37 @@ NULL
 
 # Monte Carlo EM ==============================================================
 
-#' MCEM E-step: Independent Metropolis-Hastings sampling from posterior
+#' MCEM E-step: MCMC sampling via random-walk Metropolis
 #' @references Booth & Hobert (1999), Wei & Tanner (1990)
 #' @noRd
 .compute_posteriors_mcem <- function(data_list, parameters, random_effects,
                                      M, mc_burnin, parallel, n_cores) {
   .parallel_apply(seq_along(data_list), function(i) {
-    # Laplace proposal distribution: N(mode, cov)
+    # Laplace approximation for MCMC starting point & proposal scale
     post <- .compute_posterior_laplace(
       data_list[[i]], random_effects[i, ], parameters
     )
-    n_re <- length(post$mode)
-    R <- .safe_chol(post$cov)
-    n_total <- mc_burnin + M
 
-    # Pre-generate all proposals from N(mode, cov)
-    z <- matrix(rnorm(n_total * n_re), n_total, n_re)
-    proposals <- sweep(z %*% R, 2, post$mode, `+`)
-
-    # Batch-evaluate log-posteriors for all proposals
-    all_logp <- as.numeric(.compute_joint_logpost_batch(
-      samples = proposals, data = data_list[[i]], parameters = parameters
-    ))
-
-    # Log-proposal densities: -0.5 * (b - mode)' Sigma^{-1} (b - mode)
-    centered <- sweep(proposals, 2, post$mode, `-`)
-    V <- forwardsolve(t(R), t(centered))
-    all_logq <- -0.5 * colSums(V^2)
-
-    # Initialize chain at posterior mode
-    mode_logp <- as.numeric(.compute_joint_logpost_batch(
-      samples = matrix(post$mode, nrow = 1),
-      data = data_list[[i]], parameters = parameters
-    ))
-    current <- post$mode
-    current_logp <- mode_logp
-    current_logq <- 0.0  # (mode - mode)' Sigma^{-1} (mode - mode) = 0
-
-    # MH accept/reject loop
-    samples <- matrix(NA_real_, M, n_re)
-    u <- log(runif(n_total))
-    n_accept <- 0L
-
-    for (t in seq_len(n_total)) {
-      log_alpha <- all_logp[t] - current_logp + current_logq - all_logq[t]
-      if (u[t] < log_alpha) {
-        current <- proposals[t, ]
-        current_logp <- all_logp[t]
-        current_logq <- all_logq[t]
-        if (t > mc_burnin) n_accept <- n_accept + 1L
-      }
-      if (t > mc_burnin) {
-        samples[t - mc_burnin, ] <- current
-      }
+    logpost_fn <- function(b) {
+      as.numeric(.compute_joint_logpost(
+        random_effect = b, data = data_list[[i]],
+        parameters = parameters, gradient = FALSE, hessian = FALSE
+      ))
     }
 
-    # Equal weights for MCMC samples
-    weights <- rep(1.0 / M, M)
+    invisible(capture.output(
+      raw <- MCMCpack::MCMCmetrop1R(
+        logpost_fn, theta.init = post$mode,
+        burnin = mc_burnin, mcmc = M, thin = 1,
+        V = post$cov, tune = 1, verbose = 0, logfun = TRUE
+      )
+    ))
+    accept_rate <- 1 - coda::rejectionRate(raw)[[1]]
+    samples <- unclass(raw)
+    attr(samples, "mcpar") <- NULL
 
-    list(samples = samples, weights = weights,
-         mode = post$mode, cov = post$cov,
-         accept_rate = n_accept / M)
+    list(samples = samples, mode = post$mode, cov = post$cov,
+         accept_rate = accept_rate)
   }, parallel = parallel, n_cores = n_cores, setup = FALSE)
 }
 
@@ -267,30 +237,30 @@ NULL
   n <- length(data_list)
   n_re <- ncol(random_effects)
 
-  # E-step: Independent Metropolis-Hastings from posterior
+  # E-step: MCMC sampling from per-subject posterior
   mc_post <- .compute_posteriors_mcem(
     data_list, parameters, random_effects, M,
     control$mc_burnin, control$parallel, control$n_cores
   )
 
   if (control$verbose >= 2) {
-    rates <- vapply(mc_post, `[[`, numeric(1), "accept_rate")
+    ar <- vapply(mc_post, `[[`, numeric(1), "accept_rate")
     cli::cli_text(sprintf(
-      "    MH accept rate: mean=%.1f%%, min=%.1f%%, max=%.1f%%",
-      mean(rates) * 100, min(rates) * 100, max(rates) * 100
+      "    MCMC accept rate: mean=%.1f%%, min=%.1f%%, max=%.1f%%",
+      mean(ar) * 100, min(ar) * 100, max(ar) * 100
     ))
   }
 
-  # MCMC posterior mean (equal weights)
+  # Posterior mean for random effects
   random_effects <- t(vapply(mc_post, function(p) {
     colMeans(p$samples)
   }, numeric(n_re)))
 
-  # M-step: one-step Newton on MC-averaged complete-data log-likelihood
+  # M-step: one-step Newton on IS-weighted complete-data log-likelihood
   idx_map <- rep(seq_len(n), each = M)
   data_list_rep <- data_list[idx_map]
   re_matrix <- do.call(rbind, lapply(mc_post, `[[`, "samples"))
-  weights_vec <- unlist(lapply(mc_post, `[[`, "weights"))
+  weights_vec <- rep(1 / M, n * M)
 
   eval_objective <- function(theta_val, gradient = FALSE, hessian = FALSE) {
     .compute_objective_expected(
@@ -321,15 +291,37 @@ NULL
   parameters <- .vector_to_coef(parameters, theta_new)
   loglik <- -f_new
 
-  # MCMC Sigma_b = (1/n) sum_i (1/M) sum_m b_{im} b_{im}'
+  # MC-averaged Sigma_b = (1/n) sum_i [ mu_i mu_i' + Cov_i ]
   sigma_b <- Reduce(`+`, lapply(seq_len(n), function(i) {
-    crossprod(mc_post[[i]]$samples) / M
+    s <- mc_post[[i]]$samples
+    mu <- colMeans(s)
+    centered <- sweep(s, 2, mu, `-`)
+    cov_i <- crossprod(centered) / M
+    mu %*% t(mu) + cov_i
   })) / n
   parameters$coefficients$random_effect_sigma <- sigma_b
 
-  # sigma_e at MCMC posterior mean
-  parameters$coefficients$measurement_error_sd <-
-    .update_measurement_error_sd(data_list, parameters, random_effects)
+  # MC-averaged sigma_e
+  n_total_obs <- sum(vapply(data_list, function(d) {
+    length(d$longitudinal$measurements)
+  }, integer(1)))
+
+  rss <- sum(vapply(seq_len(n), function(i) {
+    s <- mc_post[[i]]$samples
+    mean(vapply(seq_len(M), function(m) {
+      re_mat <- matrix(s[m, ], nrow = 1)
+      sol <- .solve_batch_joint(
+        data_list = data_list[i], random_effects = re_mat,
+        parameters = parameters
+      )[[1]]
+      measurements <- data_list[[i]]$longitudinal$measurements
+      if (length(measurements) == 0) return(0)
+      obs_times <- data_list[[i]]$longitudinal$times
+      match_idx <- match(obs_times, sol$times)
+      sum((measurements - sol$biomarker[match_idx])^2)
+    }, numeric(1)))
+  }, numeric(1)))
+  parameters$coefficients$measurement_error_sd <- sqrt(rss / n_total_obs)
 
   list(
     parameters = parameters,

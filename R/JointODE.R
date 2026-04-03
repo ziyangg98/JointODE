@@ -335,6 +335,12 @@ JointODE <- function(
   delta_loglik_history <- rep(NA_real_, control$maxit)
 
   for (em_iter in seq_len(control$maxit)) {
+    # Double mc_samples when near convergence to reduce MC error
+    if (em_iter > 1 && delta_theta_history[em_iter - 1] < control$tol * 10) {
+      control$mc_samples <- min(control$mc_samples * 2L,
+                                control$mc_samples_max)
+    }
+
     curr <- .em_step(
       data_list, curr$parameters, curr$random_effects, control
     )
