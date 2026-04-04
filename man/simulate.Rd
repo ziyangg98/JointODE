@@ -67,7 +67,7 @@ measurement error process (default: 0.1)}
 \item{shape}{Weibull shape parameter \eqn{\kappa > 0}
 (default: 2.0)}
 \item{scale}{Weibull scale parameter \eqn{\lambda > 0}
-(default: 100.0)}
+(default: 15.0)}
 }
 }
 \item{value}{Association parameter \eqn{\alpha_1} linking current
@@ -102,7 +102,9 @@ study (default: 10 time units)}
 reproducibility (default: 42)}
 }
 \value{
-A list containing three components:
+A list with two elements:
+\describe{
+\item{\code{data}}{A list containing three data components:
 \describe{
 \item{\code{longitudinal_data}}{Data frame comprising longitudinal
 observations with columns:
@@ -138,6 +140,10 @@ subject-specific random effects (centered at zero). Columns
 state variability; \code{dyn_biomarker} and \code{dyn_velocity}
 capture ODE coefficient variability corresponding to the formula
 term \code{(biomarker + velocity | id)}.}
+}}
+\item{\code{init}}{A list of initial parameter values suitable for
+passing to \code{JointODE()}, containing \code{$coefficients} and
+\code{$configurations}.}
 }
 }
 \description{

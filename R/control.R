@@ -78,8 +78,9 @@ JointODE.control <- function(
   if (!is.numeric(control$n_cores) || control$n_cores < 0) {
     stop("n_cores must be a non-negative integer")
   }
-  if (!is.numeric(control$hazard_quadrature) || control$hazard_quadrature < 1 ||
-      control$hazard_quadrature != as.integer(control$hazard_quadrature)) {
+  if (!is.numeric(control$hazard_quadrature) ||
+        control$hazard_quadrature < 1 ||
+        control$hazard_quadrature != as.integer(control$hazard_quadrature)) {
     stop("hazard_quadrature must be a positive integer")
   }
 

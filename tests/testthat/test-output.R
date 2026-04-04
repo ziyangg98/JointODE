@@ -173,7 +173,8 @@ test_that("plot.JointODE subject_ids produces faceted plots", {
 test_that("plot.JointODE show_observed=FALSE works", {
   ids <- names(mock$data)[1:2]
   p <- .safe_plot(
-    mock, type = "trajectory_biomarker",
+    mock,
+    type = "trajectory_biomarker",
     subject_ids = ids, show_observed = FALSE
   )
   expect_s3_class(p, "gg")

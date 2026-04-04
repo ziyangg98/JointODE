@@ -395,7 +395,8 @@ test_that(".compute_dimensions returns correct values", {
 test_that(".get_spline_config variants", {
   x <- seq(0, 10, length.out = 100)
   c1 <- .get_spline_config(
-    x, degree = 2, n_knots = 1, knot_placement = "quantile"
+    x,
+    degree = 2, n_knots = 1, knot_placement = "quantile"
   )
   expect_equal(length(c1$knots), 1)
   expect_equal(c1$df, 4)

@@ -9,6 +9,10 @@
     .Call(`_JointODE_compute_joint_logpost`, random_effect, data, parameters, gradient, hessian)
 }
 
+.compute_rss_hessian <- function(random_effect, data, parameters) {
+    .Call(`_JointODE_compute_rss_hessian`, random_effect, data, parameters)
+}
+
 .compute_joint_logpost_batch <- function(samples, data, parameters) {
     .Call(`_JointODE_compute_joint_logpost_batch`, samples, data, parameters)
 }

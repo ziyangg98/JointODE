@@ -173,14 +173,14 @@ evaluated at posterior modes
 \examples{
 \dontrun{
 # Generate example data
-sim <- simulate(n_subjects = 100, n_measurements = 10)
+sim <- simulate(JointODE, n_subjects = 100)
 
 # Fit with default control parameters
 fit1 <- JointODE(
   longitudinal_formula = observed ~ x1 + x2,
-  survival_formula = Surv(event_time, event) ~ x1 + x2,
-  longitudinal_data = sim$longitudinal_data,
-  survival_data = sim$survival_data
+  survival_formula = Surv(time, status) ~ w1 + w2,
+  longitudinal_data = sim$data$longitudinal_data,
+  survival_data = sim$data$survival_data
 )
 
 # Fit with custom control parameters using JointODE.control()

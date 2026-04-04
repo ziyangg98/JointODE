@@ -6,11 +6,11 @@ test_that(".safe_chol regularizes indefinite matrices", {
   H <- matrix(c(1, 2, 2, 1), 2, 2)
 
   R <- JointODE:::.safe_chol(H)
-  H_reg <- t(R) %*% R
+  h_reg <- t(R) %*% R
 
-  ev <- eigen(H_reg, symmetric = TRUE, only.values = TRUE)$values
+  ev <- eigen(h_reg, symmetric = TRUE, only.values = TRUE)$values
   expect_true(all(ev > 0))
-  expect_true(all(is.finite(H_reg)))
+  expect_true(all(is.finite(h_reg)))
 })
 
 test_that(".safe_chol returns standard chol for SPD matrices", {

@@ -123,17 +123,12 @@ library(JointODE)
 # Load example dataset
 data(sim)
 
-# Prepare data
-longitudinal_data <- sim$data$longitudinal_data[
-  , c("id", "time", "observed", "x1", "x2")
-]
-
 # Fit joint ODE model
 fit <- JointODE(
-  longitudinal_formula = observed ~ biomarker + velocity + x1 + x2 +
+  longitudinal_formula = observed ~ x1 + x2 +
     (biomarker + velocity | id),
   survival_formula = Surv(time, status) ~ w1 + w2,
-  longitudinal_data = longitudinal_data,
+  longitudinal_data = sim$data$longitudinal_data,
   survival_data = sim$data$survival_data,
   control = list(maxit = 5)
 )

@@ -22,7 +22,8 @@ test_that(".solve_batch_joint is stable across ODE branch regimes", {
     params$coefficients$longitudinal[2] <- unname(case["b2"])
 
     # Keep branch classification determined by fixed effects only.
-    re_zero <- matrix(0, nrow = nrow(td_branch$random_effects),
+    re_zero <- matrix(0,
+      nrow = nrow(td_branch$random_effects),
       ncol = ncol(td_branch$random_effects)
     )
 
@@ -41,7 +42,9 @@ test_that(".solve_batch_joint is stable across ODE branch regimes", {
         info = sprintf("%s: subject %d time monotonic", case_name, i)
       )
       expect_true(min(diff(sol[[i]]$cum_hazard)) >= -1e-10,
-        info = sprintf("%s: subject %d cumulative hazard monotone", case_name, i)
+        info = sprintf(
+          "%s: subject %d cumulative hazard monotone", case_name, i
+        )
       )
     }
   }

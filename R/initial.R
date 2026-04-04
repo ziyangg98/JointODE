@@ -75,8 +75,10 @@
   sigma <- diag(1e-2, n_re)
 
   # State block (2×2) from empirical variance of initial conditions
-  state_mat <- cbind(subj_m0 - mean(subj_m0, na.rm = TRUE),
-                     subj_v0 - mean(subj_v0, na.rm = TRUE))
+  state_mat <- cbind(
+    subj_m0 - mean(subj_m0, na.rm = TRUE),
+    subj_v0 - mean(subj_v0, na.rm = TRUE)
+  )
   state_cov <- cov(state_mat, use = "complete.obs")
   state_cov[is.na(state_cov)] <- 1e-2
   diag(state_cov) <- pmax(diag(state_cov), 1e-4)
@@ -244,7 +246,7 @@
   long_names <- c(long_names, long_fixed_names)
 
   # Random effects layout: [init_biomarker, init_velocity, dyn_coefs...]
-  n_re_total <- n_re + 2  # +2 for initial state random effects
+  n_re_total <- n_re + 2 # +2 for initial state random effects
   random_effects <- matrix(0, nrow(survival_data), n_re_total)
 
   list(

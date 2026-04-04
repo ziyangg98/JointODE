@@ -21,14 +21,17 @@ test_that("Posterior Laplace structure is valid", {
     expect_true(is.numeric(posteriors[[i]]$mode))
     expect_equal(length(posteriors[[i]]$mode), ncol(td$random_effects))
     expect_true(is.matrix(posteriors[[i]]$cov))
-    evals <- eigen(posteriors[[i]]$cov, symmetric = TRUE, only.values = TRUE)$values
+    evals <- eigen(
+      posteriors[[i]]$cov, symmetric = TRUE, only.values = TRUE
+    )$values
     expect_true(all(evals > 0))
   }
 })
 
 test_that("Posterior modes are close to true random effects", {
   n <- length(td$data_list)
-  posterior_modes <- t(vapply(posteriors, `[[`, numeric(ncol(td$random_effects)),
+  posterior_modes <- t(vapply(
+    posteriors, `[[`, numeric(ncol(td$random_effects)),
     "mode"
   ))
 

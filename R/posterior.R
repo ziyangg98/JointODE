@@ -6,7 +6,8 @@ NULL
 # Variance Updates =============================================================
 
 .update_measurement_error_sd <- function(data_list, parameters,
-                                         random_effects) {
+                                         random_effects,
+                                         posteriors = NULL) {
   n_total_obs <- sum(vapply(data_list, function(d) {
     length(d$longitudinal$measurements)
   }, integer(1)))
@@ -16,12 +17,26 @@ NULL
   )
   rss <- sum(vapply(seq_along(ode_solutions), function(k) {
     measurements <- data_list[[k]]$longitudinal$measurements
-    if (length(measurements) == 0) return(0)
+    if (length(measurements) == 0) {
+      return(0)
+    }
     obs_times <- data_list[[k]]$longitudinal$times
     match_idx <- match(obs_times, ode_solutions[[k]]$times)
     sum((measurements - ode_solutions[[k]]$biomarker[match_idx])^2)
   }, numeric(1)))
-  sqrt(rss / n_total_obs)
+
+  # Laplace correction: tr(H_rss_i %*% Cov_post_i)
+  correction <- 0
+  if (!is.null(posteriors)) {
+    correction <- sum(vapply(seq_along(data_list), function(k) {
+      h_rss <- .compute_rss_hessian(
+        random_effects[k, ], data_list[[k]], parameters
+      )
+      sum(h_rss * posteriors[[k]]$cov)
+    }, numeric(1)))
+  }
+
+  sqrt((rss + 0.5 * correction) / n_total_obs)
 }
 
 #' @noRd
@@ -49,7 +64,9 @@ NULL
   }
 
   n <- length(data_list)
-  if (!parallel || n <= 1) return(eval_chunk(seq_len(n)))
+  if (!parallel || n <= 1) {
+    return(eval_chunk(seq_len(n)))
+  }
 
   n_cores <- .resolve_cores(n_cores)
   chunks <- split(seq_len(n), cut(seq_len(n), min(n_cores, n),
@@ -94,7 +111,8 @@ NULL
   )
   if (fit$code >= 4) {
     warning(sprintf("Laplace nlm did not converge (code=%d)", fit$code),
-            call. = FALSE)
+      call. = FALSE
+    )
   }
 
   # Hessian only at mode (not during nlm iterations)
@@ -184,7 +202,6 @@ NULL
 
 #' @noRd
 .em_step <- function(data_list, parameters, random_effects, control) {
-  n <- length(data_list)
   n_re <- ncol(random_effects)
 
   # E-step: Laplace approximation — posterior mode + covariance
@@ -208,14 +225,16 @@ NULL
   obj <- eval_objective(theta, gradient = TRUE, hessian = TRUE)
   g <- as.vector(attr(obj, "gradient"))
   H <- as.matrix(attr(obj, "hessian"))
-  R_h <- .safe_chol(H)
-  direction <- -backsolve(R_h, forwardsolve(t(R_h), g))
+  r_h <- .safe_chol(H)
+  direction <- -backsolve(r_h, forwardsolve(t(r_h), g))
 
   theta_new <- theta + direction
   if (any(!is.finite(theta_new))) {
     stop("One-step Newton update produced non-finite parameters")
   }
-  f_new <- as.numeric(eval_objective(theta_new, gradient = FALSE, hessian = FALSE))
+  f_new <- as.numeric(
+    eval_objective(theta_new, gradient = FALSE, hessian = FALSE)
+  )
   if (!is.finite(f_new)) {
     stop("One-step Newton update produced non-finite objective")
   }
@@ -227,9 +246,12 @@ NULL
   parameters$coefficients$random_effect_sigma <-
     .update_random_effect_sigma(random_effects, posteriors)
 
-  # sigma_e at posterior modes
+  # Laplace-corrected sigma_e
   parameters$coefficients$measurement_error_sd <-
-    .update_measurement_error_sd(data_list, parameters, random_effects)
+    .update_measurement_error_sd(
+      data_list, parameters, random_effects,
+      posteriors
+    )
 
   list(
     parameters = parameters,

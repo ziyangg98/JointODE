@@ -39,17 +39,20 @@ test_that(".solve_batch_joint structure and accuracy", {
 
     expect_equal(
       unname(batch_sol[[i]]$biomarker[match_idx]),
-      true_data$biomarker, tolerance = 1e-4,
+      true_data$biomarker,
+      tolerance = 1e-4,
       info = sprintf("subject %s biomarker", subject_id)
     )
     expect_equal(
       unname(batch_sol[[i]]$velocity[match_idx]),
-      true_data$velocity, tolerance = 1e-4,
+      true_data$velocity,
+      tolerance = 1e-4,
       info = sprintf("subject %s velocity", subject_id)
     )
     expect_equal(
       unname(batch_sol[[i]]$acceleration[match_idx]),
-      true_data$acceleration, tolerance = 1e-4,
+      true_data$acceleration,
+      tolerance = 1e-4,
       info = sprintf("subject %s acceleration", subject_id)
     )
   }
@@ -72,7 +75,9 @@ test_that("hazard_quadrature Simpson quadrature convergence", {
     expect_equal(sol_k5[[i]]$times, sol_k1[[i]]$times)
 
     # Biomarker/velocity identical (both use exact matexp)
-    expect_equal(sol_k5[[i]]$biomarker, sol_k1[[i]]$biomarker, tolerance = 1e-10)
+    expect_equal(
+      sol_k5[[i]]$biomarker, sol_k1[[i]]$biomarker, tolerance = 1e-10
+    )
     expect_equal(sol_k5[[i]]$velocity, sol_k1[[i]]$velocity, tolerance = 1e-10)
 
     # Cumulative hazard converges: k=5 closer to k=50 than k=1

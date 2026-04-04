@@ -119,17 +119,12 @@ utils::globalVariables(c(
 #' # Load example dataset
 #' data(sim)
 #'
-#' # Prepare data
-#' longitudinal_data <- sim$data$longitudinal_data[
-#'   , c("id", "time", "observed", "x1", "x2")
-#' ]
-#'
 #' # Fit joint ODE model
 #' fit <- JointODE(
-#'   longitudinal_formula = observed ~ biomarker + velocity + x1 + x2 +
+#'   longitudinal_formula = observed ~ x1 + x2 +
 #'     (biomarker + velocity | id),
 #'   survival_formula = Surv(time, status) ~ w1 + w2,
-#'   longitudinal_data = longitudinal_data,
+#'   longitudinal_data = sim$data$longitudinal_data,
 #'   survival_data = sim$data$survival_data,
 #'   control = list(maxit = 5)
 #' )
@@ -1622,7 +1617,9 @@ plot.JointODE <- function(
 
   # Ensure column names
   if (is.null(colnames(random_effects))) {
-    colnames(random_effects) <- paste0("Random Effects", seq_len(ncol(random_effects)))
+    colnames(random_effects) <- paste0(
+      "Random Effects", seq_len(ncol(random_effects))
+    )
   }
 
   # Prepare data and plot

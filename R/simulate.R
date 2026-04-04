@@ -54,7 +54,7 @@
 #'         \item{shape}{Weibull shape parameter \eqn{\kappa > 0}
 #'           (default: 2.0)}
 #'         \item{scale}{Weibull scale parameter \eqn{\lambda > 0}
-#'           (default: 100.0)}
+#'           (default: 15.0)}
 #'       }
 #'     }
 #'     \item{value}{Association parameter \eqn{\alpha_1} linking current
@@ -85,8 +85,10 @@
 #' @param seed Integer seed for random number generation to ensure
 #'   reproducibility (default: 42)
 #'
-#' @return A list containing three components:
+#' @return A list with two elements:
 #' \describe{
+#'   \item{\code{data}}{A list containing three data components:
+#'   \describe{
 #'   \item{\code{longitudinal_data}}{Data frame comprising longitudinal
 #'     observations with columns:
 #'     \itemize{
@@ -121,6 +123,10 @@
 #'     state variability; \code{dyn_biomarker} and \code{dyn_velocity}
 #'     capture ODE coefficient variability corresponding to the formula
 #'     term \code{(biomarker + velocity | id)}.}
+#'   }}
+#'   \item{\code{init}}{A list of initial parameter values suitable for
+#'     passing to \code{JointODE()}, containing \code{$coefficients} and
+#'     \code{$configurations}.}
 #' }
 #'
 #' @details
@@ -482,13 +488,17 @@ simulate <- function(
 
   # Initial state random effects: deviations from mean
   init_final <- as.matrix(init[, c("biomarker", "velocity")])
-  state_means <- c(longitudinal$initial$biomarker["mean"],
-                    longitudinal$initial$velocity["mean"])
+  state_means <- c(
+    longitudinal$initial$biomarker["mean"],
+    longitudinal$initial$velocity["mean"]
+  )
   state_re <- sweep(init_final, 2, state_means)
 
   random_effects <- cbind(state_re, dyn_re)
-  colnames(random_effects) <- c("init_biomarker", "init_velocity",
-                                 "dyn_biomarker", "dyn_velocity")
+  colnames(random_effects) <- c(
+    "init_biomarker", "init_velocity",
+    "dyn_biomarker", "dyn_velocity"
+  )
   list(
     longitudinal_data = long_data,
     survival_data = surv_data,
@@ -565,8 +575,10 @@ simulate <- function(
       baseline = baseline_coef,
       hazard = hazard_coef,
       longitudinal = longitudinal_coef,
-      initial_state = c(biomarker = unname(long_params$initial$biomarker["mean"]),
-                        velocity = unname(long_params$initial$velocity["mean"])),
+      initial_state = c(
+        biomarker = unname(long_params$initial$biomarker["mean"]),
+        velocity = unname(long_params$initial$velocity["mean"])
+      ),
       measurement_error_sd = eval(coef_args$longitudinal$error_sd),
       random_effect_sigma = full_sigma
     ),
@@ -805,7 +817,9 @@ simulate <- function(
     biomarkers <- .solve_biomarker_ode(
       times,
       covariates[covariates$id == patient_id, names(covariates) != "id"],
-      initial_states[initial_states$id == patient_id, names(initial_states) != "id"],
+      initial_states[
+        initial_states$id == patient_id, names(initial_states) != "id"
+      ],
       dynamics[dynamics$id == patient_id, names(dynamics) != "id"]
     )
     biomarkers$id <- patient_id

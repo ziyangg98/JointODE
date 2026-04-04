@@ -160,12 +160,14 @@ test_that(".compute_marginal_objective gradient is correct", {
   theta <- c(-0.5, -0.3, 0.2)
 
   result <- .compute_marginal_objective(
-    theta, data_list, gradient = TRUE, hessian = FALSE
+    theta, data_list,
+    gradient = TRUE, hessian = FALSE
   )
   analytic <- attr(result, "gradient")
   numeric <- numDeriv::grad(function(x) {
     as.numeric(.compute_marginal_objective(
-      x, data_list, gradient = FALSE, hessian = FALSE
+      x, data_list,
+      gradient = FALSE, hessian = FALSE
     ))
   }, theta)
   expect_equal(analytic, numeric, tolerance = 1e-4)

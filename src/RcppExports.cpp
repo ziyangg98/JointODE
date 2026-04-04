@@ -43,6 +43,19 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// compute_rss_hessian
+NumericMatrix compute_rss_hessian(const NumericVector& random_effect, const List& data, const List& parameters);
+RcppExport SEXP _JointODE_compute_rss_hessian(SEXP random_effectSEXP, SEXP dataSEXP, SEXP parametersSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const NumericVector& >::type random_effect(random_effectSEXP);
+    Rcpp::traits::input_parameter< const List& >::type data(dataSEXP);
+    Rcpp::traits::input_parameter< const List& >::type parameters(parametersSEXP);
+    rcpp_result_gen = Rcpp::wrap(compute_rss_hessian(random_effect, data, parameters));
+    return rcpp_result_gen;
+END_RCPP
+}
 // compute_joint_logpost_batch
 NumericVector compute_joint_logpost_batch(const NumericMatrix& samples, const List& data, const List& parameters);
 RcppExport SEXP _JointODE_compute_joint_logpost_batch(SEXP samplesSEXP, SEXP dataSEXP, SEXP parametersSEXP) {
@@ -133,6 +146,7 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_JointODE_compute_joint_objective", (DL_FUNC) &_JointODE_compute_joint_objective, 7},
     {"_JointODE_compute_joint_logpost", (DL_FUNC) &_JointODE_compute_joint_logpost, 5},
+    {"_JointODE_compute_rss_hessian", (DL_FUNC) &_JointODE_compute_rss_hessian, 3},
     {"_JointODE_compute_joint_logpost_batch", (DL_FUNC) &_JointODE_compute_joint_logpost_batch, 3},
     {"_JointODE_compute_joint_state", (DL_FUNC) &_JointODE_compute_joint_state, 6},
     {"_JointODE_solve_batch_joint", (DL_FUNC) &_JointODE_solve_batch_joint, 3},

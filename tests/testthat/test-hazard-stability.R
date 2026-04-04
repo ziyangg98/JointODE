@@ -9,7 +9,8 @@ test_that("log_hazard output is clamped under extreme coefficients", {
   params$coefficients$hazard[] <- 1e6
   params$coefficients$baseline[] <- 50
 
-  re_zero <- matrix(0, nrow = nrow(td_hazard$random_effects),
+  re_zero <- matrix(0,
+    nrow = nrow(td_hazard$random_effects),
     ncol = ncol(td_hazard$random_effects)
   )
 
@@ -36,8 +37,12 @@ test_that("hazard quadrature remains finite under high curvature", {
   params_k20 <- params_k1
   params_k20$configurations$hazard_quadrature <- 20L
 
-  sol_k1 <- .solve_batch_joint(td_hazard$data_list, td_hazard$random_effects, params_k1)
-  sol_k20 <- .solve_batch_joint(td_hazard$data_list, td_hazard$random_effects, params_k20)
+  sol_k1 <- .solve_batch_joint(
+    td_hazard$data_list, td_hazard$random_effects, params_k1
+  )
+  sol_k20 <- .solve_batch_joint(
+    td_hazard$data_list, td_hazard$random_effects, params_k20
+  )
 
   for (i in seq_along(sol_k1)) {
     expect_true(all(is.finite(sol_k1[[i]]$cum_hazard)),

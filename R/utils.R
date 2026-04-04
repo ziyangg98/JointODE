@@ -116,7 +116,9 @@
 .parallel_apply <- function(
   indices, fn, parallel = TRUE, n_cores = 0, setup = TRUE
 ) {
-  if (!parallel) return(lapply(indices, fn))
+  if (!parallel) {
+    return(lapply(indices, fn))
+  }
 
   if (setup) {
     cleanup <- .setup_parallel_plan(n_cores)
@@ -323,16 +325,19 @@
 #' @noRd
 .safe_chol <- function(H) {
   R <- try(chol(H), silent = TRUE)
-  if (!inherits(R, "try-error")) return(R)
+  if (!inherits(R, "try-error")) {
+    return(R)
+  }
   tau <- 1e-4 * max(abs(diag(H)), 1)
   for (k in seq_len(10)) {
     R <- try(chol(H + diag(tau, nrow(H))), silent = TRUE)
-    if (!inherits(R, "try-error")) return(R)
+    if (!inherits(R, "try-error")) {
+      return(R)
+    }
     tau <- tau * 10
   }
   stop("Hessian is not positive definite")
 }
-
 
 
 # Parameter Counting & Conversion =============================================
@@ -347,15 +352,19 @@
 
 #' @noRd
 .coef_to_vector <- function(parameters) {
-  with(parameters$coefficients,
-       c(baseline, hazard, longitudinal, initial_state))
+  with(
+    parameters$coefficients,
+    c(baseline, hazard, longitudinal, initial_state)
+  )
 }
 
 #' @noRd
 .vector_to_coef <- function(parameters, theta) {
   cf <- parameters$coefficients
-  n <- c(length(cf$baseline), length(cf$hazard),
-         length(cf$longitudinal), length(cf$initial_state))
+  n <- c(
+    length(cf$baseline), length(cf$hazard),
+    length(cf$longitudinal), length(cf$initial_state)
+  )
   idx <- cumsum(n)
 
   parameters$coefficients$baseline <- theta[1:idx[1]]

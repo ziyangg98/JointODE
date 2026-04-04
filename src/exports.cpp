@@ -98,9 +98,14 @@ static void eval_subject_nll(
   }
   ll -= ADdouble(0.5 * qf + re_const);
 
-  // Finish outer tape: NLL = -ll
+  // Laplace correction: 0.5 * log|H_b(theta)|
+  ADdouble laplace = laplace_correction_subject(ode,
+      std::vector<double>(random_effect.begin(), random_effect.end()),
+      inv_sigma_b, re_const);
+
+  // Finish outer tape: NLL = -ll + laplace_correction
   CppAD::ADFun<double> tape;
-  tape.Dependent(ad_theta, ADvector{-ll});
+  tape.Dependent(ad_theta, ADvector{-ll + laplace});
   tape.optimize();
   tape.check_for_nan(false);
   obj_out = weight * tape.Forward(0, theta_vec)[0];
@@ -170,8 +175,9 @@ NumericVector compute_joint_objective(
 
       std::vector<double> re_vec(re.begin(), re.end());
       double nll_i = -eval_logpost(re_vec, ode_val, inv_sigma_b, re_const);
-
-      total_obj += subject_weights[i] * nll_i;
+      double lc_i = laplace_correction_subject(ode_val, re_vec,
+                                                inv_sigma_b, re_const);
+      total_obj += subject_weights[i] * (nll_i + lc_i);
     }
 
     NumericVector result(1);
@@ -262,6 +268,41 @@ NumericVector compute_joint_logpost(
   CppAD::ADFun<double> tape;
   tape.Dependent(ad_re, ADvector{lp});
   return eval_tape(tape, re_vec, n_re, gradient, hessian);
+}
+
+// [[Rcpp::export(.compute_rss_hessian)]]
+NumericMatrix compute_rss_hessian(
+    const NumericVector& random_effect,
+    const List& data, const List& parameters) {
+  const int n_re = random_effect.size();
+  const std::vector<double> re_vec(random_effect.begin(), random_effect.end());
+
+  // Only need branch classification, not inv_sigma_b/re_const
+  ODEParams<double> base;
+  load_params(base, parameters);
+  NumericVector lc = as<List>(parameters["coefficients"])["longitudinal"];
+  NumericVector cr(random_effect.begin() + 2, random_effect.end());
+  update_branch(base.branch, lc, cr,
+    base.biomarker_random, base.velocity_random);
+
+  ADvector ad_re(n_re);
+  std::copy(re_vec.begin(), re_vec.end(), ad_re.begin());
+  CppAD::Independent(ad_re);
+
+  ODEParams<ADdouble> ode = base.template promote<ADdouble>();
+  load_subject(ode.subject, data,
+      std::vector<ADdouble>(ad_re.begin() + 2, ad_re.end()));
+  ADdouble rss = eval_rss({ad_re.begin(), ad_re.end()}, ode);
+
+  CppAD::ADFun<double> tape;
+  tape.Dependent(ad_re, ADvector{rss});
+  auto hess = tape.Hessian(re_vec, 0);
+
+  NumericMatrix result(n_re, n_re);
+  for (int i = 0; i < n_re; i++)
+    for (int j = 0; j < n_re; j++)
+      result(i, j) = hess[i * n_re + j];
+  return result;
 }
 
 // ============================================================================

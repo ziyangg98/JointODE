@@ -95,6 +95,23 @@ struct SubjectData {
   std::vector<std::vector<double>> longitudinal_covariates_fixed;
   std::vector<std::vector<double>> longitudinal_covariates_random;
   std::vector<double> survival_covariates;
+
+  template <typename S2>
+  SubjectData<S2> promote() const {
+    SubjectData<S2> dst;
+    dst.event_time = event_time;
+    dst.status = status;
+    dst.initial_state = initial_state;
+    dst.random_effect.resize(random_effect.size());
+    for (size_t j = 0; j < random_effect.size(); j++)
+      dst.random_effect[j] = S2(random_effect[j]);
+    dst.longitudinal_times = longitudinal_times;
+    dst.longitudinal_measurements = longitudinal_measurements;
+    dst.longitudinal_covariates_fixed = longitudinal_covariates_fixed;
+    dst.longitudinal_covariates_random = longitudinal_covariates_random;
+    dst.survival_covariates = survival_covariates;
+    return dst;
+  }
 };
 
 // ODE parameters combining subject data and model coefficients
@@ -123,6 +140,37 @@ struct ODEParams {
   MatExpBranch branch;
   double biomarker_clamp;
   int hazard_quadrature;  // Simpson sub-intervals for hazard integration
+
+  // Promote Scalar -> S2 (e.g. ADdouble -> AD<ADdouble>) for nested AD
+  template <typename S2>
+  ODEParams<S2> promote() const {
+    ODEParams<S2> dst;
+    dst.subject = subject.template promote<S2>();
+    auto pv = [](const std::vector<Scalar>& v) {
+      std::vector<S2> out(v.size());
+      for (size_t j = 0; j < v.size(); j++) out[j] = S2(v[j]);
+      return out;
+    };
+    dst.longitudinal_coefs = pv(longitudinal_coefs);
+    dst.baseline_coefs = pv(baseline_coefs);
+    dst.hazard_coefs = pv(hazard_coefs);
+    dst.initial_state_coefs = pv(initial_state_coefs);
+    dst.log_sigma_e = S2(log_sigma_e);
+    dst.measurement_error_sd = measurement_error_sd;
+    dst.random_effect_sigma = random_effect_sigma;
+    dst.spline_degree = spline_degree;
+    dst.spline_knots = spline_knots;
+    dst.spline_boundary = spline_boundary;
+    dst.gamma = gamma;
+    dst.biomarker_fixed = biomarker_fixed;
+    dst.biomarker_random = biomarker_random;
+    dst.velocity_fixed = velocity_fixed;
+    dst.velocity_random = velocity_random;
+    dst.branch = branch;
+    dst.biomarker_clamp = biomarker_clamp;
+    dst.hazard_quadrature = hazard_quadrature;
+    return dst;
+  }
 };
 
 // Marginal ODE parameters (longitudinal only, no survival)
@@ -816,6 +864,66 @@ inline Scalar eval_logpost(
       qf += re[i] * Scalar(inv_sigma_b(i, j)) * re[j];
   lp -= Scalar(0.5) * qf + Scalar(re_const);
   return lp;
+}
+
+// Compute RSS = sum((y - m(b))^2) for one subject (longitudinal only)
+template <typename Scalar>
+inline Scalar eval_rss(
+    const std::vector<Scalar>& re,
+    ODEParams<Scalar>& ode) {
+  const auto times = time_grid(ode.subject.longitudinal_times,
+                                  ode.subject.event_time);
+  const std::vector<Scalar> y0 = {Scalar(0.0),
+      ode.initial_state_coefs[0] + re[0],
+      ode.initial_state_coefs[1] + re[1]};
+  const auto sol = ode_solve_joint(y0, times, ode);
+
+  Scalar rss(0.0);
+  const int n_obs = ode.subject.longitudinal_times.size();
+  for (int i = 0; i < n_obs; i++) {
+    const int idx = time_index(times, ode.subject.longitudinal_times[i]);
+    if (idx >= 0) {
+      Scalar r = Scalar(ode.subject.longitudinal_measurements[i]) - sol[idx][1];
+      rss += r * r;
+    }
+  }
+  return rss;
+}
+
+// 0.5 * log|H_b(theta)| via nested AD (inner tape over b, outer tracks theta)
+template <typename Scalar>
+inline Scalar laplace_correction_subject(
+    const ODEParams<Scalar>& ode,
+    const std::vector<double>& b_hat,
+    const arma::mat& inv_sigma_b,
+    double re_const) {
+  typedef AD<Scalar> S2;
+  const int n_re = b_hat.size();
+
+  CppAD::vector<S2> ad2_b(n_re);
+  for (int j = 0; j < n_re; j++)
+    ad2_b[j] = S2(Scalar(b_hat[j]));
+  CppAD::Independent(ad2_b);
+
+  ODEParams<S2> ode2 = ode.template promote<S2>();
+  std::vector<S2> b_std(ad2_b.begin(), ad2_b.end());
+
+  CppAD::ADFun<Scalar> inner;
+  inner.Dependent(ad2_b, CppAD::vector<S2>{
+      -eval_logpost(b_std, ode2, inv_sigma_b, re_const)});
+
+  std::vector<Scalar> b_s(n_re);
+  for (int j = 0; j < n_re; j++)
+    b_s[j] = Scalar(b_hat[j]);
+
+  CppAD::vector<Scalar> A(n_re * n_re);
+  auto hess = inner.Hessian(b_s, 0);
+  for (int j = 0; j < n_re * n_re; j++) A[j] = hess[j];
+
+  CppAD::vector<Scalar> B(n_re, Scalar(0)), X(n_re);
+  Scalar logdet;
+  CppAD::LuSolve(n_re, 1, A, B, X, logdet);
+  return Scalar(0.5) * logdet;
 }
 
 #endif  // SOLVER_H
