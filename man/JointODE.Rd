@@ -10,7 +10,7 @@ JointODE(
   longitudinal_data,
   survival_data,
   gamma = 1,
-  spline_baseline = list(degree = 3, n_knots = 2, knot_placement = "equal",
+  spline_baseline = list(degree = 2, n_knots = 1, knot_placement = "equal",
     boundary_knots = NULL),
   init = "default",
   control = list(),
@@ -47,9 +47,9 @@ squared velocity. Default is 1 (default: 1).}
 baseline hazard function with the following components:
 \describe{
 \item{\code{degree}}{Polynomial degree of the B-spline basis functions
-(default: 3, cubic splines)}
+(default: 2, quadratic splines)}
 \item{\code{n_knots}}{Number of interior knots for flexibility
-(default: 2)}
+(default: 1)}
 \item{\code{knot_placement}}{Strategy for positioning knots:
 \code{"quantile"} places knots at quantiles of observed event times,
 \code{"equal"} uses equally-spaced knots (default: \code{"equal"})}
@@ -90,7 +90,7 @@ spline configuration from \code{spline_baseline}}
 \describe{
 \item{\code{maxit}}{Maximum number of EM iterations (default: 200)}
 \item{\code{tol}}{Convergence tolerance on max absolute
-parameter change (default: 1e-3)}
+parameter change (default: 1e-4)}
 \item{\code{verbose}}{Verbosity level: FALSE/0 for silent, TRUE/1 for
 progress messages, 2 for detailed output (default: FALSE)}
 \item{\code{parallel}}{Logical flag enabling parallel computation
@@ -162,12 +162,12 @@ Two association structures are supported:
 slope
 }
 
-Parameter estimation employs a Monte Carlo EM (MCEM) algorithm with:
+Parameter estimation employs a Laplace EM (PQL) algorithm with:
 \itemize{
-\item E-step: Laplace proposal plus importance sampling for posterior
-moments of random effects
-\item M-step: damped Newton step on the self-normalized
-importance-weighted objective
+\item E-step: Laplace approximation for posterior mode and covariance
+of random effects
+\item M-step: one-step Newton update on the complete-data log-likelihood
+evaluated at posterior modes
 }
 }
 \examples{

@@ -32,9 +32,9 @@
 #'   baseline hazard function with the following components:
 #'   \describe{
 #'     \item{\code{degree}}{Polynomial degree of the B-spline basis functions
-#'       (default: 3, cubic splines)}
+#'       (default: 2, quadratic splines)}
 #'     \item{\code{n_knots}}{Number of interior knots for flexibility
-#'       (default: 2)}
+#'       (default: 1)}
 #'     \item{\code{knot_placement}}{Strategy for positioning knots:
 #'       \code{"quantile"} places knots at quantiles of observed event times,
 #'       \code{"equal"} uses equally-spaced knots (default: \code{"equal"})}
@@ -73,7 +73,7 @@
 #'   \describe{
 #'     \item{\code{maxit}}{Maximum number of EM iterations (default: 200)}
 #'     \item{\code{tol}}{Convergence tolerance on max absolute
-#'       parameter change (default: 1e-3)}
+#'       parameter change (default: 1e-4)}
 #'     \item{\code{verbose}}{Verbosity level: FALSE/0 for silent, TRUE/1 for
 #'       progress messages, 2 for detailed output (default: FALSE)}
 #'     \item{\code{parallel}}{Logical flag enabling parallel computation
@@ -135,12 +135,12 @@
 #'     slope
 #' }
 #'
-#' Parameter estimation employs a Monte Carlo EM (MCEM) algorithm with:
+#' Parameter estimation employs a Laplace EM (PQL) algorithm with:
 #' \itemize{
-#'   \item E-step: Laplace proposal plus importance sampling for posterior
-#'     moments of random effects
-#'   \item M-step: damped Newton step on the self-normalized
-#'     importance-weighted objective
+#'   \item E-step: Laplace approximation for posterior mode and covariance
+#'     of random effects
+#'   \item M-step: one-step Newton update on the complete-data log-likelihood
+#'     evaluated at posterior modes
 #' }
 #'
 #' @importFrom utils modifyList
@@ -198,8 +198,8 @@ JointODE <- function(
   survival_data,
   gamma = 1,
   spline_baseline = list(
-    degree = 3,
-    n_knots = 2,
+    degree = 2,
+    n_knots = 1,
     knot_placement = "equal",
     boundary_knots = NULL
   ),
@@ -289,7 +289,7 @@ JointODE <- function(
   random_effects <- model_config$random_effects
   coef_names <- model_config$coef_names
 
-  # Initialize state RE from first observations
+  # Initialize state random effects from first observations
   for (i in seq_along(data_list)) {
     obs <- data_list[[i]]$longitudinal
     if (length(obs$measurements) >= 1) {
@@ -305,7 +305,7 @@ JointODE <- function(
     }
   }
 
-  # MCEM Algorithm
+  # Laplace EM Algorithm
   if (control$verbose > 0) {
     cli::cli_h2("Joint ODE Model Estimation")
     cli::cli_text(sprintf(
@@ -322,7 +322,7 @@ JointODE <- function(
     on.exit(parallel_cleanup(), add = TRUE)
   }
 
-  # MCEM loop
+  # EM loop
   curr <- list(
     parameters = parameters,
     random_effects = random_effects,
@@ -335,12 +335,6 @@ JointODE <- function(
   delta_loglik_history <- rep(NA_real_, control$maxit)
 
   for (em_iter in seq_len(control$maxit)) {
-    # Double mc_samples when near convergence to reduce MC error
-    if (em_iter > 1 && delta_theta_history[em_iter - 1] < control$tol * 10) {
-      control$mc_samples <- min(control$mc_samples * 2L,
-                                control$mc_samples_max)
-    }
-
     curr <- .em_step(
       data_list, curr$parameters, curr$random_effects, control
     )

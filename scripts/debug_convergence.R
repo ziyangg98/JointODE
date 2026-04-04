@@ -9,6 +9,6 @@ fit <- JointODE(
     , c("id", "time", "observed", "x1", "x2")
   ],
   survival_data = sim$data$survival_data,
-  init = sim$init,
-  control = list(maxit = 20, parallel = TRUE, verbose = 2)
+  init = "marginal",
+  control = list(verbose = 3, parallel = TRUE)
 )

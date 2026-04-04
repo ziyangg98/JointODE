@@ -265,6 +265,42 @@ NumericVector compute_joint_logpost(
 }
 
 // ============================================================================
+// Joint: batch log-posterior for M samples (value-only, no AD)
+// ============================================================================
+
+// [[Rcpp::export(.compute_joint_logpost_batch)]]
+NumericVector compute_joint_logpost_batch(
+    const NumericMatrix& samples,
+    const List& data, const List& parameters) {
+  const int M = samples.nrow();
+  const int n_re = samples.ncol();
+
+  // Setup once: params, inverse sigma, constant
+  NumericVector re0 = samples(0, _);
+  mat inv_sigma_b;
+  double re_const;
+  ODEParams<double> base_params = setup_logpost(parameters, re0,
+      inv_sigma_b, re_const);
+
+  NumericVector result(M);
+  for (int m = 0; m < M; m++) {
+    NumericVector re = samples(m, _);
+    std::vector<double> re_vec(re.begin(), re.end());
+
+    // Update branch for this sample's RE coefficients
+    NumericVector coef_re(re.begin() + 2, re.end());
+    NumericVector lc = as<List>(parameters["coefficients"])["longitudinal"];
+    update_branch(base_params.branch, lc, coef_re,
+                  base_params.biomarker_random, base_params.velocity_random);
+
+    load_subject(base_params.subject, data,
+        std::vector<double>(coef_re.begin(), coef_re.end()));
+    result[m] = eval_logpost(re_vec, base_params, inv_sigma_b, re_const);
+  }
+  return result;
+}
+
+// ============================================================================
 // Joint: state optimization w.r.t. initial state [m(0), v(0)]
 // ============================================================================
 

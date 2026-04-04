@@ -1,0 +1,72 @@
+
+
+
+
+=== Posterior shape at true values ===
+
+  true RE:  -0.0739 -0.2395 -0.0399  0.0613
+  mode:     -0.0787 -0.2505 -0.0331 -0.0235
+  diff:     -0.0048 -0.0110  0.0068 -0.0848
+  logpost: true=68.54, mode=68.93, zero=41.67
+  cov diag: 1.53e-04, 1.53e-03, 4.00e-04, 1.93e-02
+  cov cond: 2235.1
+  Posterior profiles (centered at mode, conditional SD):
+    m0: cond_sd=0.0031, max_gauss_dev=0.00, skew=-0.00, true_at=1.6*sd
+    v0: cond_sd=0.0098, max_gauss_dev=0.00, skew=0.00, true_at=1.1*sd
+    dyn_value: cond_sd=0.0193, max_gauss_dev=0.31, skew=-0.17, true_at=-0.4*sd
+    dyn_slope: cond_sd=0.1221, max_gauss_dev=3.24, skew=-1.20, true_at=0.7*sd
+
+  true RE:  -0.0521 -0.1619 -0.0130  0.1564
+  mode:     -0.0383 -0.1222 -0.0276  0.0656
+  diff:      0.0137  0.0397 -0.0146 -0.0908
+  logpost: true=93.75, mode=95.62, zero=88.20
+  cov diag: 1.23e-04, 1.21e-03, 6.23e-04, 1.53e-02
+  cov cond: 1761.4
+  Posterior profiles (centered at mode, conditional SD):
+    m0: cond_sd=0.0031, max_gauss_dev=0.00, skew=-0.00, true_at=-4.4*sd
+    v0: cond_sd=0.0097, max_gauss_dev=0.00, skew=-0.00, true_at=-4.1*sd
+    dyn_value: cond_sd=0.0228, max_gauss_dev=0.29, skew=-0.16, true_at=0.6*sd
+    dyn_slope: cond_sd=0.1132, max_gauss_dev=3.09, skew=-1.13, true_at=0.8*sd
+
+  true RE:  -0.0993 -0.3156 -0.0658 -0.2154
+  mode:     -0.0861 -0.2751 -0.0605 -0.1541
+  diff:      0.0132  0.0405  0.0053  0.0614
+  logpost: true=96.45, mode=96.98, zero=64.15
+  cov diag: 1.65e-04, 1.67e-03, 2.69e-04, 1.99e-02
+  cov cond: 2301.8
+  Posterior profiles (centered at mode, conditional SD):
+    m0: cond_sd=0.0031, max_gauss_dev=0.00, skew=-0.00, true_at=-4.3*sd
+    v0: cond_sd=0.0098, max_gauss_dev=0.00, skew=-0.00, true_at=-4.1*sd
+    dyn_value: cond_sd=0.0161, max_gauss_dev=0.29, skew=-0.16, true_at=-0.3*sd
+    dyn_slope: cond_sd=0.1237, max_gauss_dev=2.52, skew=-0.97, true_at=-0.5*sd
+
+  true RE:   0.0754  0.2324 -0.0271 -0.2574
+  mode:      0.0636  0.2035 -0.0339 -0.2082
+  diff:     -0.0118 -0.0288 -0.0068  0.0492
+  logpost: true=68.94, mode=69.79, zero=47.33
+  cov diag: 1.56e-04, 1.57e-03, 6.94e-04, 3.82e-03
+  cov cond: 486.3
+  Posterior profiles (centered at mode, conditional SD):
+    m0: cond_sd=0.0031, max_gauss_dev=0.00, skew=-0.00, true_at=3.8*sd
+    v0: cond_sd=0.0098, max_gauss_dev=0.00, skew=-0.00, true_at=2.9*sd
+    dyn_value: cond_sd=0.0254, max_gauss_dev=0.19, skew=-0.11, true_at=0.3*sd
+    dyn_slope: cond_sd=0.0561, max_gauss_dev=0.72, skew=-0.37, true_at=-0.9*sd
+
+  true RE:   0.0523  0.1544 -0.0008 -0.0536
+  mode:      0.0646  0.2064 -0.0152 -0.0299
+  diff:      0.0123  0.0520 -0.0144  0.0238
+  logpost: true=44.74, mode=47.15, zero=27.58
+  cov diag: 1.41e-04, 1.41e-03, 1.09e-03, 4.38e-03
+  cov cond: 538.2
+  Posterior profiles (centered at mode, conditional SD):
+    m0: cond_sd=0.0031, max_gauss_dev=0.00, skew=-0.00, true_at=-3.9*sd
+    v0: cond_sd=0.0098, max_gauss_dev=0.00, skew=-0.00, true_at=-5.3*sd
+    dyn_value: cond_sd=0.0315, max_gauss_dev=0.03, skew=-0.02, true_at=0.5*sd
+    dyn_slope: cond_sd=0.0610, max_gauss_dev=0.72, skew=-0.37, true_at=-0.4*sd
+
+=== Summary: Laplace mode vs true RE (all subjects) ===
+  RE               bias     RMSE      cor
+  m0             0.0007   0.0126   0.9922
+  v0             0.0022   0.0411   0.9918
+  dyn_value     -0.0006   0.0243   0.7995
+  dyn_slope      0.0201   0.0904   0.9006

@@ -621,7 +621,7 @@
 }
 
 #' @noRd
-.validate_marginal <- function(formula, data, time, id, state) {
+.validate_marginal <- function(formula, data, time, id) {
   stopifnot(
     "formula must be a formula" = inherits(formula, "formula"),
     "data must be a data.frame or matrix" =
@@ -633,12 +633,6 @@
     stopifnot(
       "time column not found in data" = time %in% names(data),
       "id column not found in data" = id %in% names(data)
-    )
-  }
-  if (!is.null(state)) {
-    stopifnot(
-      "state must be a matrix with 2 columns" =
-        is.matrix(state) && ncol(state) == 2
     )
   }
 }

@@ -48,8 +48,8 @@
 # Constants ====================================================================
 
 .default_spline <- list(
-  degree = 3,
-  n_knots = 2,
+  degree = 2,
+  n_knots = 1,
   knot_placement = "equal",
   boundary_knots = NULL
 )
@@ -290,8 +290,8 @@
 #' @noRd
 .get_spline_config <- function(
   x,
-  degree = 3,
-  n_knots = 5,
+  degree = 2,
+  n_knots = 1,
   knot_placement = "quantile",
   boundary_knots = NULL
 ) {
@@ -373,7 +373,7 @@
     delta_l <- curr$loglik - prev$loglik
     rel_l <- abs(delta_l) / (abs(curr$loglik) + 1)
 
-    # Parameter change: max relative change across fixed effects + variance
+    # Parameter change: max absolute change across fixed effects + variance
     theta_curr <- c(
       .coef_to_vector(curr$parameters),
       curr$parameters$coefficients$measurement_error_sd,
@@ -426,7 +426,7 @@
     if (!is.null(re)) {
       for (k in seq_len(ncol(re))) {
         cli::cli_text(sprintf(
-          "    RE[,%d] range: [%.3f, %.3f]",
+          "    Random effect[,%d] range: [%.3f, %.3f]",
           k, min(re[, k]), max(re[, k])
         ))
       }
@@ -443,13 +443,6 @@
       cli::cli_alert_warning("Log-likelihood is NA at iteration {iter}")
     }
     return(list(converged = FALSE, metrics = metrics))
-  }
-
-  if (iter > 1 && metrics$delta_l < -1e-6 && control$verbose > 0) {
-    cli::cli_alert_warning(sprintf(
-      "Log-likelihood decreased by %.4e at iteration %d",
-      abs(metrics$delta_l), iter
-    ))
   }
 
   converged <- iter > 1 && metrics$delta_theta < control$tol

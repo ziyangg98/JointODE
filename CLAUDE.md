@@ -37,8 +37,8 @@ R CMD INSTALL --no-docs --no-multiarch .
 
 `JointODE()` in `R/JointODE.R` is the main entry point. It runs a PQL-ECM loop:
 
-1. **E-step** (`R/posterior.R`): MCMC sampling of random effects via `MCMCpack::MCMCmetrop1R` (random-walk Metropolis). Laplace approximation provides starting values and proposal covariance. Uses `.safe_chol()` (Gill-Murray) when the posterior Hessian is not positive definite.
-2. **M-step** (`R/posterior.R`): Trust region optimization (`trust::trust`) of Laplace marginal likelihood. The C++ objective (`compute_joint_objective`) includes `-0.5·log|H_z(θ)|` via nested AD (`AD<AD<double>>`). Fixed effects θ = [baseline, hazard, longitudinal, initial_state]; σ_e and Σ_b are fixed during M-step.
+1. **E-step** (`R/posterior.R`): For each subject, find posterior mode of random effects via Laplace approximation (`nlm`). Calls `.compute_joint_logpost()` (C++). Uses `.safe_chol()` (Gill-Murray) when the posterior Hessian is not positive definite.
+2. **M-step** (`R/posterior.R`): One-step Newton update on complete-data log-likelihood evaluated at posterior modes. The C++ objective (`compute_joint_objective`) provides gradient and Hessian via AD. Fixed effects θ = [baseline, hazard, longitudinal, initial_state]; σ_e and Σ_b updated separately.
 3. **Variance updates** (`R/posterior.R`): Laplace-corrected closed form — Σ_b = (1/n)Σ(b̂b̂ᵀ + H_z⁻¹), σ_e = sqrt(RSS/N).
 4. **SEM vcov** (`R/posterior.R`): Post-convergence variance-covariance via supplemented EM (Louis formula). Numerical Jacobian of EM map.
 
@@ -62,7 +62,7 @@ Composite Simpson's rule over configurable sub-intervals (`hazard_quadrature` co
 
 ### Key R Modules
 
-- `R/posterior.R` — E-step (MCMC via MCMCpack), M-step (one-step Newton), SEM vcov
+- `R/posterior.R` — E-step (Laplace), M-step (trust region + nested AD Laplace correction), SEM vcov
 - `R/utils.R` — Formula parsing, `.safe_chol` (Gill-Murray), parameter conversion, convergence tracking
 - `R/process.R` — Data preprocessing: parses formulas, builds per-subject data lists for C++
 - `R/initial.R` — Default parameter construction and `MarginalODE`-based initial value computation
@@ -79,8 +79,7 @@ Composite Simpson's rule over configurable sub-intervals (`hazard_quadrature` co
 Tests use the bundled `sim` dataset (`data/sim.rda`), structured as:
 - `sim$data$longitudinal_data` — data frame with columns: id, time, biomarker, velocity, observed, x1, x2
 - `sim$data$survival_data` — data frame with columns: id, time, status, w1, w2
-- `sim$data$state` — matrix (n x 2): initial biomarker and velocity per subject
-- `sim$data$random_effects` — matrix (n x 2): dyn_value, dyn_slope random effects
+- `sim$data$random_effects` — matrix (n x 4): init_biomarker, init_velocity, dyn_biomarker, dyn_velocity
 - `sim$init` — initial parameter list with `$coefficients` and `$configurations`, suitable for direct use in model fitting and test helpers
 
 ## Conventions
@@ -91,25 +90,3 @@ Tests use the bundled `sim` dataset (`data/sim.rda`), structured as:
 - testthat edition 3; test helpers in `tests/testthat/helper-*.R`
 - Tests rely on the bundled `sim` dataset (`data/sim.rda`) for processed data, initial parameters, and random effects
 - Ad-hoc test scripts (PBC, sim benchmarks) go in `scripts/`, not `tests/`
-
-## Performance Baseline
-
-```bash
-# Generate baseline CSV (sequential + optional parallel)
-Rscript scripts/perf-baseline.R --n=20 --reps=3 --maxit=10 --tol=1e-2 --out=perf-base.csv
-
-# Generate candidate CSV after code changes
-Rscript scripts/perf-baseline.R --n=20 --reps=3 --maxit=10 --tol=1e-2 --out=perf-new.csv
-
-# Compare elapsed_mean; fail if slowdown > 10%
-Rscript scripts/perf-compare.R --base=perf-base.csv --new=perf-new.csv --metric=elapsed_mean --fail_pct=10
-```
-
-## Formula Syntax
-
-`longitudinal_formula`: `observed ~ biomarker + velocity + x1 + x2 + (biomarker + velocity | id)`
-- `biomarker` and `velocity` are reserved names for ODE state variables (value and slope)
-- Other terms (`x1`, `x2`) are external covariates affecting the forcing function
-- `(biomarker + velocity | id)` specifies subject-specific random effects on ODE coefficients
-
-`survival_formula`: `Surv(time, status) ~ w1 + w2` — standard Cox-style formula

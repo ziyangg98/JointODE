@@ -13,8 +13,8 @@ e2e_sim <- JointODE::simulate(
     period = c(mean = 6, sd = 0.1),
     excitation = list(offset = 0, covariates = c(x1 = 0.5)),
     initial = list(
-      offset = c(biomarker = -0.5, velocity = -0.1),
-      covariates = list(biomarker = c(x1 = 0.08), velocity = c(x1 = 0.1))
+      biomarker = c(mean = -0.5, sd = 0.1),
+      velocity = c(mean = -0.1, sd = 0.1)
     ),
     error_sd = 0.1, n_measurements = 15
   ),
@@ -83,8 +83,8 @@ marginal_sim <- JointODE::simulate(
     period = c(mean = 6, sd = 0.1),
     excitation = list(offset = 0, covariates = c(x1 = 0.5)),
     initial = list(
-      offset = c(biomarker = -0.5, velocity = -0.1),
-      covariates = list(biomarker = c(x1 = 0.08), velocity = c(x1 = 0.1))
+      biomarker = c(mean = -0.5, sd = 0.1),
+      velocity = c(mean = -0.1, sd = 0.1)
     ),
     error_sd = 0.1, n_measurements = 15
   ),
@@ -98,25 +98,15 @@ marginal_sim <- JointODE::simulate(
 
 # --- Fitting ---
 
-test_that("MarginalODE fits with provided state", {
-  fit <- MarginalODE(
-    formula = observed ~ x1,
-    data = marginal_sim$longitudinal_data,
-    state = marginal_sim$state
-  )
-  expect_s3_class(fit, "MarginalODE")
-  expect_true(fit$convergence$converged)
-  expect_equal(length(fit$parameters), 4)
-  expect_true(fit$measurement_error_sd > 0)
-})
-
-test_that("MarginalODE fits without state (iterative)", {
+test_that("MarginalODE fits and estimates initial states", {
   fit <- MarginalODE(
     formula = observed ~ x1,
     data = marginal_sim$longitudinal_data,
     control = list(maxit = 20, tol = 1e-3)
   )
   expect_s3_class(fit, "MarginalODE")
+  expect_equal(length(fit$parameters), 4)
+  expect_true(fit$measurement_error_sd > 0)
   expect_equal(nrow(fit$initial_states), 10)
   expect_equal(ncol(fit$initial_states), 2)
 })
@@ -126,7 +116,7 @@ test_that("MarginalODE fits without state (iterative)", {
 marginal_fit <- MarginalODE(
   formula = observed ~ x1,
   data = marginal_sim$longitudinal_data,
-  state = marginal_sim$state
+  control = list(maxit = 20, tol = 1e-3)
 )
 
 test_that("MarginalODE S3 methods work", {
@@ -165,7 +155,7 @@ test_that("MarginalODE parameters are named", {
 test_that(".compute_marginal_objective gradient is correct", {
   data_list <- JointODE:::.process_marginal(
     observed ~ x1, marginal_sim$longitudinal_data,
-    "time", "id", marginal_sim$state
+    "time", "id"
   )
   theta <- c(-0.5, -0.3, 0.2)
 
@@ -184,7 +174,7 @@ test_that(".compute_marginal_objective gradient is correct", {
 test_that(".solve_batch_marginal returns correct structure", {
   data_list <- JointODE:::.process_marginal(
     observed ~ x1, marginal_sim$longitudinal_data,
-    "time", "id", marginal_sim$state
+    "time", "id"
   )
   sols <- .solve_batch_marginal(data_list, c(-0.5, -0.3, 0.2))
   expect_equal(length(sols), length(data_list))
@@ -195,7 +185,7 @@ test_that(".solve_batch_marginal returns correct structure", {
 test_that(".compute_marginal_state gradient is correct", {
   data_list <- JointODE:::.process_marginal(
     observed ~ x1, marginal_sim$longitudinal_data,
-    "time", "id", marginal_sim$state
+    "time", "id"
   )
   theta <- c(-0.5, -0.3, 0.2)
   state0 <- c(0.5, 0.1)

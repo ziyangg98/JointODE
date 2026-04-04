@@ -11,17 +11,15 @@ JointODE.control(
   parallel = FALSE,
   n_cores = 0,
   hazard_quadrature = 1,
-  mc_samples = 200,
-  mc_burnin = 200,
   .list = NULL,
   ...
 )
 }
 \arguments{
-\item{maxit}{Maximum number of MCEM iterations (default: 200)}
+\item{maxit}{Maximum number of EM iterations (default: 200)}
 
-\item{tol}{Convergence tolerance. The MCEM algorithm converges
-when max|theta_new - theta_old| < tol (default: 1e-4)}
+\item{tol}{Convergence tolerance on maximum absolute parameter
+change: max|delta_theta| < tol (default: 1e-4)}
 
 \item{verbose}{Logical or numeric; controls verbosity level. FALSE/0 for
 silent, TRUE/1 for basic progress, 2 for detailed output (default: FALSE)}
@@ -33,13 +31,6 @@ If 0, uses all available cores (default: 0)}
 
 \item{hazard_quadrature}{Integer; number of Simpson sub-intervals per
 observation interval for hazard integration (default: 1)}
-
-\item{mc_samples}{Integer; number of MCMC samples per subject for
-Monte Carlo EM (MCEM). Must be a positive integer.
-Recommended range: 50-500 for MCEM (default: 200).}
-
-\item{mc_burnin}{Integer; number of burn-in iterations for the
-random-walk Metropolis sampler in the MCEM E-step (default: 200).}
 
 \item{.list}{Optional list of control parameters to process}
 

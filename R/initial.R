@@ -243,8 +243,8 @@
   if (parsed_long$velocity$fixed) long_names <- c(long_names, "velocity")
   long_names <- c(long_names, long_fixed_names)
 
-  # RE layout: [b_m0, b_v0, b_coef...] — front 2 are state RE
-  n_re_total <- n_re + 2  # +2 for initial state RE
+  # Random effects layout: [init_biomarker, init_velocity, dyn_coefs...]
+  n_re_total <- n_re + 2  # +2 for initial state random effects
   random_effects <- matrix(0, nrow(survival_data), n_re_total)
 
   list(
@@ -254,7 +254,7 @@
       baseline = paste0("bs", seq_len(sbc$df)),
       hazard = c("alpha_1", "alpha_2", surv_names),
       longitudinal = long_names,
-      initial_state = c("m0", "v0")
+      initial_state = c("biomarker", "velocity")
     ),
     spline_baseline_config = sbc
   )

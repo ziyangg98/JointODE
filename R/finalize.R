@@ -72,7 +72,7 @@
 #' @noRd
 .finalize_marginal <- function(
   theta, sse, data_list, biomarker_clamp,
-  param_names, converged, n_iter, has_state,
+  param_names, converged, n_iter,
   control, cl
 ) {
   hess <- attr(
@@ -107,13 +107,11 @@
     control = control, call = cl
   ), class = "MarginalODE")
 
-  if (!has_state) {
-    mat <- do.call(
-      rbind, lapply(data_list, `[[`, "initial_state")
-    )
-    dimnames(mat) <- list(names(data_list), c("m0", "v0"))
-    result$initial_states <- mat
-  }
+  mat <- do.call(
+    rbind, lapply(data_list, `[[`, "initial_state")
+  )
+  dimnames(mat) <- list(names(data_list), c("biomarker", "velocity"))
+  result$initial_states <- mat
 
   result
 }

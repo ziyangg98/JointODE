@@ -30,9 +30,7 @@ Imports:
     cli,
     numDeriv,
     MASS,
-    MCMCpack,
     splines2,
-    mvQuad,
     Rcpp,
     ggplot2,
     patchwork,
@@ -50,8 +48,7 @@ Suggests:
     nlme,
     purrr,
     gridExtra,
-    latex2exp,
-    JMbayes2
+    latex2exp
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 Depends:

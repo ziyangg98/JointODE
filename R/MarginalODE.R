@@ -13,9 +13,6 @@ NULL
 #' @param data Data frame with longitudinal measurements
 #' @param time Time variable name (default: \code{"time"})
 #' @param id Subject identifier name (default: \code{"id"})
-#' @param state Optional \eqn{n \times 2} matrix of initial
-#'   conditions \eqn{[m(0), \dot{m}(0)]}. If \code{NULL},
-#'   estimated from data.
 #' @param control List of control parameters.
 #'   See \code{\link{MarginalODE.control}}.
 #'
@@ -25,8 +22,7 @@ NULL
 #' \dontrun{
 #' fit <- MarginalODE(
 #'   formula = observed ~ x1 + x2,
-#'   data = sim$data$longitudinal_data,
-#'   state = as.matrix(sim$data$state)
+#'   data = sim$data$longitudinal_data
 #' )
 #' }
 #'
@@ -36,10 +32,10 @@ NULL
 MarginalODE <- function(
   formula, data,
   time = "time", id = "id",
-  state = NULL, control = list()
+  control = list()
 ) {
   cl <- match.call()
-  .validate_marginal(formula, data, time, id, state)
+  .validate_marginal(formula, data, time, id)
 
   if (is.null(control)) {
     control <- MarginalODE.control()
@@ -49,13 +45,12 @@ MarginalODE <- function(
     stop("control must be a list or NULL")
   }
 
-  data_list <- .process_marginal(formula, data, time, id, state)
+  data_list <- .process_marginal(formula, data, time, id)
   n_covariates <- attr(data_list, "n_covariates")
   covariate_names <- attr(data_list, "covariate_names")
   biomarker_clamp <- attr(data_list, "biomarker_clamp")
   n_params <- 2 + n_covariates
   param_names <- c("value", "slope", covariate_names)
-  has_state <- !is.null(state)
 
   if (control$verbose > 0) {
     cli::cli_h2("Marginal ODE Model Estimation")
@@ -70,26 +65,23 @@ MarginalODE <- function(
     on.exit(cleanup(), add = TRUE)
   }
 
-  # Optimization loop (1 iteration when state provided)
   theta <- rep(0, n_params)
   sse <- Inf
 
-  for (iter in seq_len(if (has_state) 1L else control$maxit)) {
-    if (!has_state) {
-      opt <- .parallel_apply(
-        seq_along(data_list),
-        function(i) {
-          .estimate_marginal_state(
-            data_list[[i]]$initial_state, data_list[[i]],
-            theta, biomarker_clamp
-          )
-        },
-        control$parallel, control$n_cores,
-        setup = FALSE
-      )
-      for (i in seq_along(data_list)) {
-        data_list[[i]]$initial_state <- opt[[i]]
-      }
+  for (iter in seq_len(control$maxit)) {
+    opt <- .parallel_apply(
+      seq_along(data_list),
+      function(i) {
+        .estimate_marginal_state(
+          data_list[[i]]$initial_state, data_list[[i]],
+          theta, biomarker_clamp
+        )
+      },
+      control$parallel, control$n_cores,
+      setup = FALSE
+    )
+    for (i in seq_along(data_list)) {
+      data_list[[i]]$initial_state <- opt[[i]]
     }
 
     fit <- nlm(
@@ -116,12 +108,8 @@ MarginalODE <- function(
     if (iter > 1 && rel < control$tol) break
   }
 
-  converged <- if (has_state) {
-    fit$code <= 2
-  } else {
-    iter > 1 && rel < control$tol
-  }
-  n_iter <- if (has_state) fit$iterations else iter
+  converged <- iter > 1 && rel < control$tol
+  n_iter <- iter
 
   if (control$verbose > 0) {
     cli::cli_alert_info(sprintf(
@@ -133,7 +121,7 @@ MarginalODE <- function(
 
   .finalize_marginal(
     theta, sse, data_list, biomarker_clamp,
-    param_names, converged, n_iter, has_state,
+    param_names, converged, n_iter,
     control, cl
   )
 }

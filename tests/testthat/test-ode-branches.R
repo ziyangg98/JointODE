@@ -17,7 +17,7 @@ test_that(".solve_batch_joint is stable across ODE branch regimes", {
     case <- .branch_cases[[case_name]]
     params <- td_branch$parameters
 
-    # longitudinal[1:2] map to dyn_value (b1) and dyn_slope (b2)
+    # longitudinal[1:2] map to dyn_biomarker (b1) and dyn_velocity (b2)
     params$coefficients$longitudinal[1] <- unname(case["b1"])
     params$coefficients$longitudinal[2] <- unname(case["b2"])
 

@@ -630,7 +630,7 @@ test_that(".validate checks init$coefficients$baseline", {
       ),
       survival_data = data.frame(id = 1:2, time = c(2, 3), status = c(1, 0)),
       gamma = 1,
-      spline_baseline = list(degree = 3, n_knots = 2),
+      spline_baseline = list(degree = 2, n_knots = 1),
       init = list(coefficients = list(baseline = c(1, 2))) # Wrong length
     ),
     "baseline.*wrong length"

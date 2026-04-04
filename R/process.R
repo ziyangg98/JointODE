@@ -111,7 +111,7 @@
 
 #' @importFrom stats model.frame model.matrix model.response
 #' @noRd
-.process_marginal <- function(formula, data, time, id, state) {
+.process_marginal <- function(formula, data, time, id) {
   if (is.matrix(data)) data <- as.data.frame(data)
   stopifnot(
     "Data cannot be empty" = nrow(data) > 0,
@@ -135,11 +135,7 @@
     t_subj <- times[idx]
     list(
       time = max(t_subj),
-      initial_state = if (!is.null(state)) {
-        c(state[i, 1], state[i, 2])
-      } else {
-        c(0, 0)
-      },
+      initial_state = c(0, 0),
       longitudinal = list(
         times = t_subj,
         measurements = y[idx],

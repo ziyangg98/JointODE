@@ -4,7 +4,7 @@
 
 # --- Shared data (computed once) ---
 
-td <- .make_test_data(10)
+td <- .make_test_data(20)
 
 posteriors <- JointODE:::.compute_posteriors(
   td$data_list, td$parameters, td$random_effects,

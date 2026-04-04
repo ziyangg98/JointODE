@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(R CMD INSTALL --no-docs --no-multiarch .)"
+    ]
+  }
+}

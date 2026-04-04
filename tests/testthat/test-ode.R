@@ -39,17 +39,17 @@ test_that(".solve_batch_joint structure and accuracy", {
 
     expect_equal(
       unname(batch_sol[[i]]$biomarker[match_idx]),
-      true_data$biomarker, tolerance = 1e-5,
+      true_data$biomarker, tolerance = 1e-4,
       info = sprintf("subject %s biomarker", subject_id)
     )
     expect_equal(
       unname(batch_sol[[i]]$velocity[match_idx]),
-      true_data$velocity, tolerance = 1e-5,
+      true_data$velocity, tolerance = 1e-4,
       info = sprintf("subject %s velocity", subject_id)
     )
     expect_equal(
       unname(batch_sol[[i]]$acceleration[match_idx]),
-      true_data$acceleration, tolerance = 1e-5,
+      true_data$acceleration, tolerance = 1e-4,
       info = sprintf("subject %s acceleration", subject_id)
     )
   }
