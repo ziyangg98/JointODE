@@ -47,86 +47,6 @@ MarginalODE <- function(
 
   stop("MarginalODE is not yet available in the TMB version. ",
        "Use init = 'default' in JointODE().", call. = FALSE)
-
-  data_list <- .process_marginal(formula, data, time, id)
-  n_covariates <- attr(data_list, "n_covariates")
-  covariate_names <- attr(data_list, "covariate_names")
-  biomarker_clamp <- attr(data_list, "biomarker_clamp")
-  n_params <- 2 + n_covariates
-  param_names <- c("value", "slope", covariate_names)
-
-  if (control$verbose > 0) {
-    cli::cli_h2("Marginal ODE Model Estimation")
-    cli::cli_text(sprintf(
-      "Data: %d subjects, %d obs, %d params",
-      length(data_list), .n_obs(data_list), n_params
-    ))
-  }
-
-  if (control$parallel) {
-    cleanup <- .setup_parallel_plan(control$n_cores)
-    on.exit(cleanup(), add = TRUE)
-  }
-
-  theta <- rep(0, n_params)
-  sse <- Inf
-
-  for (iter in seq_len(control$maxit)) {
-    opt <- .parallel_apply(
-      seq_along(data_list),
-      function(i) {
-        .estimate_marginal_state(
-          data_list[[i]]$initial_state, data_list[[i]],
-          theta, biomarker_clamp
-        )
-      },
-      control$parallel, control$n_cores,
-      setup = FALSE
-    )
-    for (i in seq_along(data_list)) {
-      data_list[[i]]$initial_state <- opt[[i]]
-    }
-
-    fit <- nlm(
-      function(th) {
-        .compute_marginal_objective(
-          th, data_list, biomarker_clamp, TRUE, TRUE
-        )
-      },
-      theta,
-      print.level = 0,
-      hessian = FALSE, check.analyticals = FALSE
-    )
-    theta <- fit$estimate
-    prev_sse <- sse
-    sse <- fit$minimum
-
-    if (control$verbose > 1) {
-      cli::cli_alert_info(sprintf(
-        "Iter %d: SSE=%.4f", iter, sse
-      ))
-    }
-
-    rel <- abs(sse - prev_sse) / (abs(sse) + 1)
-    if (iter > 1 && rel < control$tol) break
-  }
-
-  converged <- iter > 1 && rel < control$tol
-  n_iter <- iter
-
-  if (control$verbose > 0) {
-    cli::cli_alert_info(sprintf(
-      "%s after %d iterations",
-      if (converged) "Converged" else "Did not converge",
-      n_iter
-    ))
-  }
-
-  .finalize_marginal(
-    theta, sse, data_list, biomarker_clamp,
-    param_names, converged, n_iter,
-    control, cl
-  )
 }
 
 # -- S3 methods ---------------------------------------------------------------
@@ -258,53 +178,7 @@ print.summary.MarginalODE <- function(
 #' @return A data.frame with id, time, biomarker, velocity, acceleration
 #' @concept model-prediction
 #' @export
-predict.MarginalODE <- function(
-  object, newdata = NULL, times = NULL,
-  parallel = FALSE, n_cores = 0, ...
-) {
-  if (!is.null(newdata)) stop("newdata not yet supported")
-
-  data_list <- object$data
-
-  pred_data <- if (!is.null(times)) {
-    lapply(seq_along(data_list), function(i) {
-      subj <- data_list[[i]]
-      obs_t <- subj$longitudinal$times
-      pred_t <- if (is.list(times)) {
-        tv <- times[[names(data_list)[i]]]
-        if (!is.null(tv)) sort(unique(tv)) else obs_t
-      } else {
-        sort(unique(times))
-      }
-      subj$longitudinal$times <- pred_t
-      subj$longitudinal$measurements <- rep(0, length(pred_t))
-      subj$longitudinal$covariates$fixed <- .extend_covariates(
-        subj$longitudinal$covariates$fixed, obs_t, pred_t
-      )
-      subj
-    })
-  } else {
-    data_list
-  }
-
-  sols <- .solve_batch_marginal(
-    pred_data, object$parameters,
-    attr(object$data, "biomarker_clamp")
-  )
-
-  result <- do.call(rbind, lapply(
-    seq_along(sols),
-    function(i) {
-      data.frame(
-        id = names(data_list)[i],
-        time = sols[[i]]$times,
-        biomarker = sols[[i]]$biomarker,
-        velocity = sols[[i]]$velocity,
-        acceleration = sols[[i]]$acceleration,
-        stringsAsFactors = FALSE
-      )
-    }
-  ))
-  rownames(result) <- NULL
-  result
+predict.MarginalODE <- function(object, newdata = NULL, times = NULL, ...) {
+  stop("MarginalODE predict is not yet available in the TMB version.",
+       call. = FALSE)
 }

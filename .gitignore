@@ -21,3 +21,4 @@ tests/*.rds
 renv/library/
 renv/staging/
 renv/sandbox/
+src/*.o.tmp

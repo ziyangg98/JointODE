@@ -251,28 +251,6 @@
   return(3L)                       # REPEATED
 }
 
-#' Classify branch for all subjects from fitted longitudinal coefs
-#' @noRd
-.classify_disc_from_coefs <- function(fitted_long, configs, n_subjects = NULL) {
-  fi <- 0L
-  b1 <- if (configs$biomarker$fixed) fitted_long[fi <- fi + 1L] else 0
-  b2 <- if (configs$velocity$fixed) fitted_long[fi <- fi + 1L] else 0
-  branch <- .classify_disc(b1, b2)
-  if (!is.null(n_subjects)) rep(branch, n_subjects) else branch
-}
-
-#' Update TMB parameter list from optimizer output for warm restart
-#' @noRd
-.update_tmb_params_from_opt <- function(tmb_params, par, par_names) {
-  for (nm in c("baseline", "hazard", "longitudinal", "initial_state")) {
-    tmb_params[[nm]] <- par[par_names == nm]
-  }
-  tmb_params$log_sigma_e <- par[par_names == "log_sigma_e"]
-  tmb_params$log_sd_re <- par[par_names == "log_sd_re"]
-  tmb_params$corr_par <- par[par_names == "corr_par"]
-  tmb_params
-}
-
 #' @importFrom stats model.frame model.matrix model.response
 #' @noRd
 .process_marginal <- function(formula, data, time, id) {

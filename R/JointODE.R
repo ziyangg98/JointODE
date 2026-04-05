@@ -143,10 +143,8 @@ JointODE <- function(
   )
 
   if (is.character(init) && init == "marginal") {
-    parameters <- .initialize_from_marginal(
-      longitudinal_data, survival_data, gamma, control,
-      parsed_long, parsed_surv, model_config
-    )
+    stop("init = 'marginal' is not yet available in the TMB version. ",
+         "Use init = 'default' or provide a parameter list.", call. = FALSE)
   } else if (is.list(init)) {
     parameters <- init
   } else {
@@ -157,11 +155,9 @@ JointODE <- function(
   }
 
   parameters$configurations$baseline <- model_config$spline_baseline_config
-  response <- stats::model.response(stats::model.frame(
-    .build_formula(parsed_long$fixed_terms, response = parsed_long$response),
-    longitudinal_data
-  ))
-  parameters$configurations$biomarker_clamp <- max(abs(response)) * 5
+  parameters$configurations$biomarker_clamp <- max(abs(unlist(
+    lapply(data_list, function(d) d$longitudinal$measurements)
+  ))) * 5
   parameters$configurations$hazard_quadrature <- control$hazard_quadrature
   parameters$configurations$gamma <- gamma
 
@@ -318,12 +314,8 @@ summary.JointODE <- function(object, ...) {
   }
 
   n_subjects <- length(object$data)
-  n_observations <- sum(vapply(object$data, function(subject) {
-    length(subject$longitudinal$measurements)
-  }, integer(1)))
-  n_events <- sum(vapply(object$data, function(subject) {
-    subject$status
-  }, numeric(1)))
+  n_observations <- .n_obs(object$data)
+  n_events <- sum(vapply(object$data, `[[`, numeric(1), "status"))
   event_rate <- n_events / n_subjects
 
   structure(

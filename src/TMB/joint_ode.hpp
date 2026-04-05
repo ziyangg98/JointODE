@@ -101,28 +101,34 @@ void ode_step(Type& biomarker, Type& velocity,
 // De Boor algorithm with repeated boundary knots
 // ============================================================================
 
-vector<double> bspline_basis(double t, int degree,
-                             const vector<double>& interior_knots,
-                             const vector<double>& boundary_knots) {
+// Build full knot vector once (called before subject loop)
+vector<double> build_knot_vector(int degree,
+                                 const vector<double>& interior_knots,
+                                 const vector<double>& boundary_knots) {
   int n_interior = interior_knots.size();
   int n_knots = n_interior + 2 * (degree + 1);
-  int n_basis = n_knots - degree - 1;
-
-  // Build full knot vector with repeated boundaries
   vector<double> knots(n_knots);
   for (int i = 0; i <= degree; i++) knots(i) = boundary_knots(0);
   for (int i = 0; i < n_interior; i++) knots(degree + 1 + i) = interior_knots(i);
   for (int i = 0; i <= degree; i++) knots(degree + 1 + n_interior + i) = boundary_knots(1);
+  return knots;
+}
 
-  t = std::max(boundary_knots(0), std::min(boundary_knots(1), t));
+// Evaluate B-spline basis at t using pre-built knot vector
+vector<double> bspline_basis(double t, int degree,
+                             const vector<double>& knots) {
+  int n_knots = knots.size();
+  int n_basis = n_knots - degree - 1;
 
-  // Find knot span
+  t = std::max(knots(0), std::min(knots(n_knots - 1), t));
+
   int span = degree;
   if (t >= knots(n_knots - degree - 1)) span = n_knots - degree - 2;
   else for (int i = degree; i < n_knots - degree - 1; ++i)
     if (t < knots(i + 1)) { span = i; break; }
 
-  // De Boor recursion
+  // De Boor recursion — only iterate over [span-degree, span] range
+  int lo = std::max(0, span - degree), hi = std::min(n_basis - 1, span);
   vector<double> current(n_basis), previous(n_basis);
   current.setZero();
   if (span < n_basis) current(span) = 1.0;
@@ -130,14 +136,15 @@ vector<double> bspline_basis(double t, int degree,
   for (int p = 1; p <= degree; p++) {
     previous = current;
     current.setZero();
-    for (int i = 0; i < n_basis; i++) {
+    int lo_p = std::max(0, span - p), hi_p = std::min(n_basis - 1, span);
+    for (int i = lo_p; i <= hi_p; i++) {
       if (i < n_knots - p) {
-        double denom = knots(i + p) - knots(i);
-        if (denom > 1e-8) current(i) += previous(i) * (t - knots(i)) / denom;
+        double d = knots(i + p) - knots(i);
+        if (d > 1e-8) current(i) += previous(i) * (t - knots(i)) / d;
       }
       if (i + 1 < n_knots - p) {
-        double denom = knots(i + p + 1) - knots(i + 1);
-        if (denom > 1e-8) current(i) += previous(i + 1) * (knots(i + p + 1) - t) / denom;
+        double d = knots(i + p + 1) - knots(i + 1);
+        if (d > 1e-8) current(i) += previous(i + 1) * (knots(i + p + 1) - t) / d;
       }
     }
   }
@@ -153,15 +160,12 @@ vector<double> bspline_basis(double t, int degree,
 template <class Type>
 Type eval_hazard(Type biomarker, Type velocity, double t,
                  int spline_degree,
-                 const vector<double>& spline_interior_knots,
-                 const vector<double>& spline_boundary_knots,
+                 const vector<double>& knot_vector,
                  const vector<Type>& baseline_coefs,
                  const vector<Type>& hazard_coefs,
                  const vector<double>& survival_covariates,
                  double gamma_power) {
-  vector<double> basis = bspline_basis(t, spline_degree,
-                                        spline_interior_knots,
-                                        spline_boundary_knots);
+  vector<double> basis = bspline_basis(t, spline_degree, knot_vector);
   Type log_h(0);
   for (int k = 0; k < baseline_coefs.size(); k++)
     log_h += Type(basis(k)) * baseline_coefs(k);
@@ -252,6 +256,9 @@ Type objective_function<Type>::operator()() {
   vector<double> knots_d(spline_knots.size()), boundary_d(spline_boundary.size());
   for (int i = 0; i < knots_d.size(); i++) knots_d(i) = asDouble(spline_knots(i));
   for (int i = 0; i < boundary_d.size(); i++) boundary_d(i) = asDouble(spline_boundary(i));
+  // Pre-build knot vector once (avoids rebuilding per bspline_basis call)
+  vector<double> full_knots = build_knot_vector(spline_degree, knots_d, boundary_d);
+  int sp_d = spline_degree;
 
   // Pre-compute per-subject observation offsets for parallel access
   vector<int> obs_offset(n_subjects), fixed_offset(n_subjects);
@@ -354,7 +361,7 @@ Type objective_function<Type>::operator()() {
         forcing += bi(forcing_re_start + k) * Type(X_random(cov_idx, k));
 
       // Composite Simpson's rule for cumulative hazard
-      Type h_left = eval_hazard(m, v, t0, spline_degree, knots_d, boundary_d,
+      Type h_left = eval_hazard(m, v, t0, sp_d, full_knots,
                                 baseline, hazard, surv_cov, gamma_val);
       for (int q = 0; q < n_quadrature; q++) {
         double t_start = t0 + q * sub_dt;
@@ -364,14 +371,14 @@ Type objective_function<Type>::operator()() {
         m_mid = clamp(m_mid, -BC, BC);
         v_mid = clamp(v_mid, -BC, BC);
         Type h_mid = eval_hazard(m_mid, v_mid, t_start + sub_dt * 0.5,
-                                 spline_degree, knots_d, boundary_d,
+                                 sp_d, full_knots,
                                  baseline, hazard, surv_cov, gamma_val);
         // Right endpoint
         ode_step(m_mid, v_mid, b1, b2, forcing, Type(sub_dt * 0.5), branch);
         m_mid = clamp(m_mid, -BC, BC);
         v_mid = clamp(v_mid, -BC, BC);
         Type h_right = eval_hazard(m_mid, v_mid, t_start + sub_dt,
-                                   spline_degree, knots_d, boundary_d,
+                                   sp_d, full_knots,
                                    baseline, hazard, surv_cov, gamma_val);
         cum_haz += Type(sub_dt / 6.0) * (h_left + Type(4) * h_mid + h_right);
         m = m_mid;  v = v_mid;  h_left = h_right;
@@ -394,7 +401,7 @@ Type objective_function<Type>::operator()() {
     if (event_idx >= 0) {
       nll += sol_H(event_idx);  // cumulative hazard contributes to nll
       Type h_event = eval_hazard(sol_m(event_idx), sol_v(event_idx),
-                                 event_time, spline_degree, knots_d, boundary_d,
+                                 event_time, sp_d, full_knots,
                                  baseline, hazard, surv_cov, gamma_val);
       Type log_h_event = log(h_event);
       if (status == 1) nll -= log_h_event;

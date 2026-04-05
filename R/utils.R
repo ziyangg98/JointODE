@@ -26,17 +26,6 @@
   printCoefmat(x, digits = digits, signif.stars = signif.stars, ...)
 }
 
-#' @noRd
-.extend_covariates <- function(cov_mat, orig_times, pred_times) {
-  if (is.null(cov_mat)) return(NULL)
-  if (is.matrix(cov_mat) && length(cov_mat) == 0) {
-    return(matrix(numeric(0), nrow = length(pred_times), ncol = 0))
-  }
-  indices <- findInterval(pred_times, orig_times)
-  indices[indices == 0L] <- 1L
-  if (is.matrix(cov_mat)) cov_mat[indices, , drop = FALSE] else cov_mat[indices]
-}
-
 # Constants ====================================================================
 
 .default_spline <- list(
@@ -47,20 +36,6 @@
 )
 
 .reserved_words <- c("biomarker", "velocity")
-
-# Formatting ===================================================================
-
-#' @importFrom utils head
-#' @noRd
-.format_vector <- function(x, n = 4) {
-  if (!length(x)) return("[]")
-  shown <- head(x, n)
-  rest <- length(x) - n
-  paste0(
-    "[", paste(sprintf("%.3f", shown), collapse = ", "),
-    if (rest > 0) paste0(", ...+", rest) else "", "]"
-  )
-}
 
 # Formula Parsing ==============================================================
 
