@@ -1,3 +1,5 @@
+#' @importFrom utils head
+#' @noRd
 .validate_joint <- function(
   longitudinal_formula,
   survival_formula,

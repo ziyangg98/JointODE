@@ -45,8 +45,92 @@ MarginalODE <- function(
     stop("control must be a list or NULL")
   }
 
-  stop("MarginalODE is not yet available in the TMB version. ",
-       "Use init = 'default' in JointODE().", call. = FALSE)
+  # Parse formula (same as JointODE, supports (... | id) RE syntax)
+  parsed_long <- .parse_longitudinal_formula(formula)
+  if (is.null(parsed_long$grouping)) parsed_long$grouping <- id
+
+  # Process data
+  data_list <- .process_marginal(formula, data, time, id, parsed_long)
+  n_subjects <- length(data_list)
+
+  # Determine RE structure
+  has_re_covs <- !is.null(parsed_long$random_terms)
+  random_terms <- if (has_re_covs) parsed_long$random_terms else character(0)
+  n_long_random <- if (length(random_terms) > 0) {
+    ncol(model.matrix(
+      .build_formula(random_terms, is_random = TRUE), data
+    ))
+  } else {
+    0L
+  }
+  n_re <- 2L + n_long_random +  # +2 for initial state
+    sum(parsed_long$biomarker$random, parsed_long$velocity$random)
+
+  # Longitudinal coefficient names
+  fixed_formula <- .build_formula(parsed_long$fixed_terms,
+                                  response = parsed_long$response)
+  fixed_names <- colnames(model.matrix(
+    fixed_formula, model.frame(fixed_formula, data)
+  ))
+  long_names <- character(0)
+  if (parsed_long$biomarker$fixed) long_names <- c(long_names, "biomarker")
+  if (parsed_long$velocity$fixed) long_names <- c(long_names, "velocity")
+  long_names <- c(long_names, fixed_names)
+
+  n_long_coef <- length(long_names)
+  coef_names <- list(
+    longitudinal = long_names,
+    initial_state = c("biomarker", "velocity")
+  )
+
+  # Summary statistics for initialization
+  all_y <- unlist(lapply(data_list, function(d) d$longitudinal$measurements))
+  mean_y <- mean(all_y)
+  sd_y <- sd(all_y)
+
+  # Pack TMB inputs
+  tmb_data <- .pack_marginal_data(data_list, parsed_long, n_re)
+  tmb_params <- .pack_marginal_params(n_long_coef, n_re, n_subjects,
+                                      mean_y, sd_y)
+
+  # Configure OpenMP
+  if (control$parallel && control$n_cores > 0) {
+    TMB::openmp(control$n_cores)
+  }
+
+  if (control$verbose > 0) cli::cli_h2("Marginal ODE Model Estimation (TMB)")
+
+  obj <- TMB::MakeADFun(
+    data = tmb_data,
+    parameters = tmb_params,
+    random = "random_effects",
+    DLL = "JointODE",
+    silent = control$verbose < 2
+  )
+
+  opt <- stats::nlminb(
+    start = obj$par,
+    objective = obj$fn,
+    gradient = obj$gr,
+    control = list(iter.max = control$maxit, eval.max = control$maxit * 2,
+                   rel.tol = control$tol)
+  )
+
+  results <- .finalize_marginal(obj, opt, coef_names, n_re, n_subjects)
+
+  if (control$verbose > 0) {
+    if (results$convergence$converged) {
+      cli::cli_alert_success(results$convergence$message)
+    } else {
+      cli::cli_alert_warning(results$convergence$message)
+    }
+    cli::cli_alert_info(sprintf("Log-likelihood: %.2f", results$logLik))
+  }
+
+  structure(c(results, list(
+    data = data_list, control = control, call = cl,
+    tmb_obj = obj, tmb_opt = opt
+  )), class = "MarginalODE")
 }
 
 # -- S3 methods ---------------------------------------------------------------

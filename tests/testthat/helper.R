@@ -4,10 +4,8 @@
 
 # nolint start: object_usage_linter
 
-# Load required packages
 library(survival)
 
-# Load bundled test data
 data("sim", package = "JointODE", envir = environment())
 
 #' Subset sim data into processed test data
@@ -28,7 +26,8 @@ data("sim", package = "JointODE", envir = environment())
   list(
     data_list = data_list,
     random_effects = sim$data$random_effects[seq_len(n), , drop = FALSE],
-    params = JointODE:::.coef_to_vector(sim$init),
+    params = with(sim$init$coefficients,
+      c(baseline, hazard, longitudinal, initial_state)),
     parameters = sim$init
   )
 }
@@ -47,8 +46,7 @@ data("sim", package = "JointODE", envir = environment())
     c("value", "slope", "w1", "w2")
   )
 
-  n_params <- .count_params(parameters)
-  n_re <- nrow(parameters$coefficients$random_effect_sigma)
+  n_params <- JointODE:::.count_params(parameters)
   coef_names <- c(
     paste0("baseline:", names(parameters$coefficients$baseline)),
     paste0("hazard:", names(parameters$coefficients$hazard)),
@@ -81,24 +79,6 @@ data("sim", package = "JointODE", envir = environment())
     ),
     class = "JointODE"
   )
-}
-
-#' Central finite difference gradient helper
-.finite_diff_gradient <- function(func, x, eps = 1e-5) {
-  grad <- numeric(length(x))
-  for (i in seq_along(x)) {
-    x_plus <- x
-    x_minus <- x
-    x_plus[i] <- x_plus[i] + eps
-    x_minus[i] <- x_minus[i] - eps
-    grad[i] <- (func(x_plus) - func(x_minus)) / (2 * eps)
-  }
-  grad
-}
-
-#' Zero random effects matrix with same shape as td$random_effects
-.zero_random_effects <- function(td) {
-  matrix(0, nrow = nrow(td$random_effects), ncol = ncol(td$random_effects))
 }
 
 #' Expect all values finite

@@ -22,3 +22,9 @@ renv/library/
 renv/staging/
 renv/sandbox/
 src/*.o.tmp
+
+# Compiled objects
+src/*.o
+src/*.so
+src/*.dll
+src/*.o.tmp

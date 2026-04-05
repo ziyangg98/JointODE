@@ -198,13 +198,13 @@ JointODE <- function(
   }
 
   # Build TMB data and parameter lists
-  tmb_data <- .build_tmb_data(data_list, parameters, control)
-  tmb_params <- .build_tmb_parameters(parameters)
+  tmb_data <- .pack_data(data_list, parameters, control)
+  tmb_params <- .pack_params(parameters)
 
   obj <- TMB::MakeADFun(
     data = tmb_data,
     parameters = tmb_params,
-    random = "b",
+    random = "random_effects",
     DLL = "JointODE",
     silent = control$verbose < 2
   )
@@ -221,7 +221,7 @@ JointODE <- function(
   )
 
   # Extract results
-  results <- .extract_tmb_results(obj, opt, parameters, coef_names,
+  results <- .finalize_joint(obj, opt, parameters, coef_names,
                                   data_list, tmb_data$n_random_effects, control)
 
   structure(c(results, list(
@@ -327,7 +327,9 @@ summary.JointODE <- function(object, ...) {
       coef_initial = coef_initial,
       derived_params = derived_params,
       sigma = c(sigma_e = object$parameters$coefficients$measurement_error_sd),
+      sigma_se = c(sigma_e = object$parameters$coefficients$measurement_error_sd_se),
       sigma_b_matrix = object$parameters$coefficients$random_effect_sigma,
+      sigma_b_matrix_se = object$parameters$coefficients$random_effect_sigma_se,
       logLik = object$logLik,
       AIC = object$AIC,
       BIC = object$BIC,
@@ -401,7 +403,8 @@ print.summary.JointODE <- function(
   }
 
   cat("\nVariance Components:\n")
-  cat(sprintf("Measurement Error SD: %.6f\n", x$sigma["sigma_e"]))
+  cat(sprintf("Measurement Error SD: %.6f (SE: %.6f)\n",
+              x$sigma["sigma_e"], x$sigma_se["sigma_e"]))
   if (!is.null(x$sigma_b_matrix)) {
     cat("Random Effect Covariance Matrix:\n")
     print(x$sigma_b_matrix, digits = 4)
