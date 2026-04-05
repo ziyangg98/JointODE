@@ -66,17 +66,7 @@ MarginalODE <- function(
   mean_y <- mean(all_y)
   parameters$coefficients$initial_state <- c(mean_y, 0)
 
-  random_effects_init <- matrix(0, nrow = n_subjects, ncol = n_re)
-  for (i in seq_along(data_list)) {
-    obs <- data_list[[i]]$longitudinal
-    if (length(obs$measurements) >= 1)
-      random_effects_init[i, 1] <- obs$measurements[1] - mean_y
-    if (length(obs$measurements) >= 2) {
-      dt <- obs$times[2] - obs$times[1]
-      if (dt > 0)
-        random_effects_init[i, 2] <- (obs$measurements[2] - obs$measurements[1]) / dt
-    }
-  }
+  random_effects_init <- .init_re_from_observations(data_list, mean_y, 0, n_re)
   re_sds <- pmax(apply(random_effects_init, 2, sd), 1e-4)
   parameters$coefficients$measurement_error_sd <- sd(all_y)
   parameters$coefficients$random_effect_sigma <- diag(re_sds^2, n_re)
@@ -88,10 +78,7 @@ MarginalODE <- function(
   tmb_data <- .pack_marginal_data(data_list, parsed_long, n_re)
   tmb_params <- .pack_marginal_params(parameters)
 
-  # Configure OpenMP
-  if (control$parallel && control$n_cores > 0) {
-    TMB::openmp(control$n_cores)
-  }
+  .setup_openmp(control)
 
   if (control$verbose > 0) cli::cli_h2("Marginal ODE Model Estimation (TMB)")
 
@@ -258,6 +245,26 @@ print.summary.MarginalODE <- function(
 #' @concept model-prediction
 #' @export
 predict.MarginalODE <- function(object, newdata = NULL, times = NULL, ...) {
-  stop("MarginalODE predict is not yet available in the TMB version.",
-       call. = FALSE)
+  if (!is.null(newdata)) stop("newdata not yet supported")
+
+  reported <- object$tmb_obj$report()
+  data_list <- object$data
+
+  obs_offset <- 0L
+  results <- vector("list", length(data_list))
+  for (i in seq_along(data_list)) {
+    ni <- length(data_list[[i]]$longitudinal$measurements)
+    idx <- obs_offset + seq_len(ni)
+
+    results[[i]] <- data.frame(
+      id = names(data_list)[i],
+      time = data_list[[i]]$longitudinal$times,
+      biomarker = as.numeric(reported$fitted_biomarker[idx]),
+      velocity = as.numeric(reported$fitted_velocity[idx]),
+      stringsAsFactors = FALSE
+    )
+    obs_offset <- obs_offset + ni
+  }
+
+  do.call(rbind, results)
 }

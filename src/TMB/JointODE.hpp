@@ -2,8 +2,8 @@
 #ifndef JOINT_ODE_HPP
 #define JOINT_ODE_HPP
 
-#include "utils.hpp"
-#include "MarginalODE.hpp"
+#include "../utils.hpp"
+#include "../MarginalODE.hpp"
 
 // ============================================================================
 // Joint model: longitudinal ODE + Cox PH survival with shared random effects

@@ -26,6 +26,32 @@
   printCoefmat(x, digits = digits, signif.stars = signif.stars, ...)
 }
 
+#' @noRd
+.setup_openmp <- function(control) {
+  if (control$parallel) {
+    n_cores <- if (control$n_cores > 0) control$n_cores else parallel::detectCores()
+    TMB::openmp(n_cores)
+  }
+}
+
+#' Initialize RE columns 1-2 from first observations
+#' @noRd
+.init_re_from_observations <- function(data_list, m0, v0 = 0, n_re = 2L) {
+  n_subjects <- length(data_list)
+  re <- matrix(0, nrow = n_subjects, ncol = max(n_re, 2L))
+  for (i in seq_along(data_list)) {
+    obs <- data_list[[i]]$longitudinal
+    if (length(obs$measurements) >= 1)
+      re[i, 1] <- obs$measurements[1] - m0
+    if (length(obs$measurements) >= 2) {
+      dt <- obs$times[2] - obs$times[1]
+      if (dt > 0)
+        re[i, 2] <- (obs$measurements[2] - obs$measurements[1]) / dt - v0
+    }
+  }
+  re
+}
+
 # Constants ====================================================================
 
 .default_spline <- list(

@@ -172,32 +172,22 @@ JointODE <- function(
 
   coef_names <- model_config$coef_names
 
-  # Initialize random effects
-  random_effects <- model_config$random_effects
-  for (i in seq_along(data_list)) {
-    obs <- data_list[[i]]$longitudinal
-    if (length(obs$measurements) >= 1) {
-      random_effects[i, 1] <- obs$measurements[1] -
-        parameters$coefficients$initial_state[1]
-    }
-    if (length(obs$measurements) >= 2) {
-      dt <- obs$times[2] - obs$times[1]
-      if (dt > 0) {
-        random_effects[i, 2] <- (obs$measurements[2] - obs$measurements[1]) /
-          dt - parameters$coefficients$initial_state[2]
-      }
-    }
+  # Initialize random effects (skip if already set by marginal init)
+  if (is.null(parameters$random_effects_init)) {
+    n_re <- ncol(model_config$random_effects)
+    parameters$random_effects_init <- .init_re_from_observations(
+      data_list,
+      parameters$coefficients$initial_state[1],
+      parameters$coefficients$initial_state[2],
+      n_re
+    )
   }
-  parameters$random_effects_init <- random_effects
 
   if (control$verbose > 0) {
     cli::cli_h2("Joint ODE Model Estimation (TMB)")
   }
 
-  # Enable OpenMP if requested
-  if (control$parallel && control$n_cores > 0) {
-    TMB::openmp(control$n_cores)
-  }
+  .setup_openmp(control)
 
   # Build TMB data and parameter lists
   tmb_data <- .pack_joint_data(data_list, parameters, control)
@@ -512,49 +502,24 @@ print.JointODE <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
 predict.JointODE <- function(object, newdata = NULL, times = NULL, ...) {
   if (!is.null(newdata)) stop("newdata not yet supported")
 
+  reported <- object$tmb_obj$report()
   data_list <- object$data
-  reported <- object$tmb_report
-  cf <- object$parameters$coefficients
-
-  # ODE coefficients for acceleration computation
-  configs <- object$parameters$configurations
-  fi <- 0L
-  b1_pop <- if (configs$biomarker$fixed) cf$longitudinal[fi <- fi + 1L] else 0
-  b2_pop <- if (configs$velocity$fixed) cf$longitudinal[fi <- fi + 1L] else 0
 
   obs_offset <- 0L
   results <- vector("list", length(data_list))
   for (i in seq_along(data_list)) {
     ni <- length(data_list[[i]]$longitudinal$measurements)
     idx <- obs_offset + seq_len(ni)
-    m <- as.numeric(reported$fitted_biomarker[idx])
-    v <- as.numeric(reported$fitted_velocity[idx])
-    cum_h <- as.numeric(reported$cumulative_hazard[i])
-    log_h <- as.numeric(reported$log_hazard_at_event[i])
-
-    # Per-subject b1, b2 (population + random effects)
-    re <- object$random_effects[i, ]
-    ri <- 2L
-    b1 <- b1_pop
-    b2 <- b2_pop
-    if (configs$biomarker$random) b1 <- b1 + re[ri <- ri + 1L]
-    if (configs$velocity$random) b2 <- b2 + re[ri <- ri + 1L]
 
     results[[i]] <- data.frame(
       id = names(data_list)[i],
       time = data_list[[i]]$longitudinal$times,
-      biomarker = m,
-      velocity = v,
-      acceleration = b1 * m + b2 * v,
-      cumhaz = cum_h,
-      survival = exp(-cum_h),
-      log_hazard = log_h,
+      biomarker = as.numeric(reported$fitted_biomarker[idx]),
+      velocity = as.numeric(reported$fitted_velocity[idx]),
       stringsAsFactors = FALSE
     )
     obs_offset <- obs_offset + ni
   }
 
-  result_df <- do.call(rbind, results)
-  rownames(result_df) <- NULL
-  result_df
+  do.call(rbind, results)
 }

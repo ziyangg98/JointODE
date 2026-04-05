@@ -53,6 +53,9 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
   Type sigma_e = exp(log_sigma_e);
   Type BC = Type(clamp_val);
 
+  int n_total_obs = obs_times.size();
+  vector<Type> fitted_biomarker(n_total_obs), fitted_velocity(n_total_obs);
+
   parallel_accumulator<Type> nll(obj);
 
   for (int i = 0; i < n_subjects; i++) {
@@ -118,10 +121,16 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
     // Gaussian likelihood
     for (int j = 0; j < ni; j++) {
       int time_idx = find_time_index(time_pts, obs_t(j));
-      if (time_idx >= 0)
+      if (time_idx >= 0) {
         nll -= dnorm(Type(obs_y(j)), sol_m(time_idx), sigma_e, true);
+        fitted_biomarker(oi + j) = sol_m(time_idx);
+        fitted_velocity(oi + j) = sol_v(time_idx);
+      }
     }
   }
+
+  REPORT(fitted_biomarker);
+  REPORT(fitted_velocity);
 
   // Reconstruct Sigma_b for reporting
   matrix<Type> Sigma_b = corr_structure.cov();
