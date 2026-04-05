@@ -346,7 +346,7 @@
     n_random_covariates = as.integer(n_random_covariates),
     long_fixed_covariates = flatten_design("fixed"),
     long_random_covariates = flatten_design("random"),
-    ode_branch = 0L,  # BR_REAL default
+    ode_branch = 4L,  # BR_ZERO (b1=b2=0 at initialization)
     clamp_value = clamp_value,
     biomarker_fixed = as.integer(parsed_long$biomarker$fixed),
     biomarker_random = as.integer(parsed_long$biomarker$random),
@@ -385,7 +385,7 @@
   names(longitudinal) <- coef_names$longitudinal
   initial_state <- as.numeric(par[pn == "initial_state"])
   names(initial_state) <- coef_names$initial_state
-  sigma_e <- exp(par[pn == "log_sigma_e"])
+  sigma_e <- unname(exp(par[pn == "log_sigma_e"]))
 
   parameters <- c(longitudinal, initial_state)
 

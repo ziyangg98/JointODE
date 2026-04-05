@@ -80,18 +80,40 @@ MarginalODE <- function(
   n_long_coef <- length(long_names)
   coef_names <- list(
     longitudinal = long_names,
-    initial_state = c("biomarker", "velocity")
+    initial_state = c("init_biomarker", "init_velocity")
   )
 
-  # Summary statistics for initialization
+  # Initialize from data
   all_y <- unlist(lapply(data_list, function(d) d$longitudinal$measurements))
   mean_y <- mean(all_y)
   sd_y <- sd(all_y)
 
+  # Initialize random effects from observations (like JointODE)
+  random_effects_init <- matrix(0, nrow = n_subjects, ncol = n_re)
+  for (i in seq_along(data_list)) {
+    obs <- data_list[[i]]$longitudinal
+    if (length(obs$measurements) >= 1)
+      random_effects_init[i, 1] <- obs$measurements[1] - mean_y
+    if (length(obs$measurements) >= 2) {
+      dt <- obs$times[2] - obs$times[1]
+      if (dt > 0)
+        random_effects_init[i, 2] <- (obs$measurements[2] - obs$measurements[1]) / dt
+    }
+  }
+
+  # RE SD from empirical variation
+  re_sds <- pmax(apply(random_effects_init, 2, sd), 1e-4)
+
   # Pack TMB inputs
   tmb_data <- .pack_marginal_data(data_list, parsed_long, n_re)
-  tmb_params <- .pack_marginal_params(n_long_coef, n_re, n_subjects,
-                                      mean_y, sd_y)
+  tmb_params <- list(
+    longitudinal = rep(0, n_long_coef),
+    initial_state = c(mean_y, 0),
+    log_sigma_e = log(sd_y),
+    log_sd_re = log(re_sds),
+    corr_par = rep(0, n_re * (n_re - 1) / 2),
+    random_effects = random_effects_init
+  )
 
   # Configure OpenMP
   if (control$parallel && control$n_cores > 0) {
