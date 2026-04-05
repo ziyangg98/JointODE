@@ -53,42 +53,19 @@ MarginalODE <- function(
   data_list <- .process_marginal(formula, data, time, id, parsed_long)
   n_subjects <- length(data_list)
 
-  # Determine RE structure
-  has_re_covs <- !is.null(parsed_long$random_terms)
-  random_terms <- if (has_re_covs) parsed_long$random_terms else character(0)
-  n_long_random <- if (length(random_terms) > 0) {
-    ncol(model.matrix(
-      .build_formula(random_terms, is_random = TRUE), data
-    ))
-  } else {
-    0L
-  }
-  n_re <- 2L + n_long_random +  # +2 for initial state
-    sum(parsed_long$biomarker$random, parsed_long$velocity$random)
+  # Model setup
+  model_config <- .setup_marginal_model(data, parsed_long)
+  coef_names <- model_config$coef_names
+  n_re <- model_config$n_re
 
-  # Longitudinal coefficient names
-  fixed_formula <- .build_formula(parsed_long$fixed_terms,
-                                  response = parsed_long$response)
-  fixed_names <- colnames(model.matrix(
-    fixed_formula, model.frame(fixed_formula, data)
-  ))
-  long_names <- character(0)
-  if (parsed_long$biomarker$fixed) long_names <- c(long_names, "biomarker")
-  if (parsed_long$velocity$fixed) long_names <- c(long_names, "velocity")
-  long_names <- c(long_names, fixed_names)
+  # Build parameters (default or user-provided)
+  parameters <- .default_marginal_parameters(model_config, parsed_long)
 
-  n_long_coef <- length(long_names)
-  coef_names <- list(
-    longitudinal = long_names,
-    initial_state = c("init_biomarker", "init_velocity")
-  )
-
-  # Initialize from data
+  # Initialize RE from observations
   all_y <- unlist(lapply(data_list, function(d) d$longitudinal$measurements))
   mean_y <- mean(all_y)
-  sd_y <- sd(all_y)
+  parameters$coefficients$initial_state <- c(mean_y, 0)
 
-  # Initialize random effects from observations (like JointODE)
   random_effects_init <- matrix(0, nrow = n_subjects, ncol = n_re)
   for (i in seq_along(data_list)) {
     obs <- data_list[[i]]$longitudinal
@@ -100,20 +77,16 @@ MarginalODE <- function(
         random_effects_init[i, 2] <- (obs$measurements[2] - obs$measurements[1]) / dt
     }
   }
-
-  # RE SD from empirical variation
   re_sds <- pmax(apply(random_effects_init, 2, sd), 1e-4)
+  parameters$coefficients$measurement_error_sd <- sd(all_y)
+  parameters$coefficients$random_effect_sigma <- diag(re_sds^2, n_re)
+  parameters$random_effects_init <- random_effects_init
+
+  parameters$configurations$biomarker_clamp <- max(abs(all_y)) * 5
 
   # Pack TMB inputs
   tmb_data <- .pack_marginal_data(data_list, parsed_long, n_re)
-  tmb_params <- list(
-    longitudinal = rep(0, n_long_coef),
-    initial_state = c(mean_y, 0),
-    log_sigma_e = log(sd_y),
-    log_sd_re = log(re_sds),
-    corr_par = rep(0, n_re * (n_re - 1) / 2),
-    random_effects = random_effects_init
-  )
+  tmb_params <- .pack_marginal_params(parameters)
 
   # Configure OpenMP
   if (control$parallel && control$n_cores > 0) {

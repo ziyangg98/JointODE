@@ -28,7 +28,7 @@
   )
 }
 
-#' @importFrom stats cov predict reformulate var
+#' @importFrom stats cov reformulate var
 #' @noRd
 .initialize_from_marginal <- function(
   longitudinal_data, survival_data, gamma, control,
@@ -43,14 +43,17 @@
 
   if (verbose > 0) cli::cli_alert_info("Initializing with MarginalODE...")
 
-  # Fit marginal model
+  # Fit marginal model (with RE to get per-subject estimates)
+
   id <- parsed_long$grouping
   time <- parsed_surv$time_var
+  marginal_formula <- .build_formula(
+    parsed_long$fixed_terms, response = parsed_long$response
+  )
   marginal_fit <- MarginalODE(
-    .build_formula(parsed_long$fixed_terms, response = parsed_long$response),
-    longitudinal_data, time, id,
+    marginal_formula, longitudinal_data, time, id,
     control = MarginalODE.control(
-      maxit = 200, verbose = control$verbose,
+      maxit = 200, verbose = max(0, control$verbose - 1),
       parallel = control$parallel, n_cores = control$n_cores
     )
   )
@@ -58,42 +61,41 @@
     stop("MarginalODE failed to converge", call. = FALSE)
   }
 
-  params$coefficients$longitudinal <- marginal_fit$parameters
+  # Transfer longitudinal coefficients
+  mpar <- marginal_fit$parameters
+  long_coef <- params$coefficients$longitudinal
+  for (nm in names(mpar)) {
+    if (nm %in% names(long_coef)) long_coef[nm] <- mpar[nm]
+  }
+  params$coefficients$longitudinal <- long_coef
   params$coefficients$measurement_error_sd <- marginal_fit$measurement_error_sd
 
-  # Initial state: population mean from per-subject estimates
-  pred <- predict(marginal_fit)
-  subj_m0 <- tapply(pred$biomarker, pred[[id]], function(x) x[1])
-  subj_v0 <- tapply(pred$velocity, pred[[id]], function(x) x[1])
-  params$coefficients$initial_state <- c(
-    mean(subj_m0, na.rm = TRUE),
-    mean(subj_v0, na.rm = TRUE)
-  )
+  # Initial state from marginal fit
+  if ("init_biomarker" %in% names(mpar)) {
+    params$coefficients$initial_state <- c(
+      mpar["init_biomarker"], mpar["init_velocity"]
+    )
+    names(params$coefficients$initial_state) <- c("biomarker", "velocity")
+  }
 
-  # Random effect covariance: [state(2), coef(...)]
+  # Random effect covariance from marginal RE posterior
   n_re <- dims$n_random_effects
   sigma <- diag(1e-2, n_re)
-
-  # State block (2×2) from empirical variance of initial conditions
-  state_mat <- cbind(
-    subj_m0 - mean(subj_m0, na.rm = TRUE),
-    subj_v0 - mean(subj_v0, na.rm = TRUE)
-  )
-  state_cov <- cov(state_mat, use = "complete.obs")
-  state_cov[is.na(state_cov)] <- 1e-2
-  diag(state_cov) <- pmax(diag(state_cov), 1e-4)
-  sigma[1:2, 1:2] <- state_cov
-
-  # Coef block from between-subject biomarker/velocity variance
-  coef_vars <- c(
-    var(tapply(pred$biomarker, pred[[id]], mean), na.rm = TRUE),
-    var(tapply(pred$velocity, pred[[id]], mean), na.rm = TRUE)
-  )
-  coef_vars[is.na(coef_vars) | coef_vars < 1e-4] <- 1e-2
-  for (k in 3:n_re) sigma[k, k] <- coef_vars[((k - 3) %% 2) + 1]
+  marginal_re <- marginal_fit$random_effects
+  if (!is.null(marginal_re) && nrow(marginal_re) > 1) {
+    n_marginal_re <- ncol(marginal_re)
+    n_shared <- min(n_marginal_re, n_re)
+    re_cov <- cov(marginal_re[, seq_len(n_shared), drop = FALSE],
+                  use = "complete.obs")
+    re_cov[is.na(re_cov)] <- 1e-2
+    diag(re_cov) <- pmax(diag(re_cov), 1e-4)
+    sigma[seq_len(n_shared), seq_len(n_shared)] <- re_cov
+  }
   params$coefficients$random_effect_sigma <- sigma
 
-  # Hazard from time-varying Cox model
+  if (verbose > 0) cli::cli_alert_success("Longitudinal initialized from MarginalODE")
+
+  # Hazard from Cox model using marginal RE as subject-level covariates
   surv_vars <- c(parsed_surv$time_var, parsed_surv$status_var)
   surv_cov_names <- if (is.null(parsed_surv$covariate_terms)) {
     character(0)
@@ -101,19 +103,32 @@
     parsed_surv$covariate_terms
   }
 
-  merged <- .build_counting_process(pred, survival_data, id, surv_vars)
+  # Build per-subject biomarker/velocity estimates from RE + population mean
+  m0_pop <- params$coefficients$initial_state[1]
+  v0_pop <- params$coefficients$initial_state[2]
+  subj_biomarker <- if (!is.null(marginal_re)) marginal_re[, 1] + m0_pop else m0_pop
+  subj_velocity <- if (!is.null(marginal_re)) marginal_re[, 2] + v0_pop else v0_pop
+
+  # Match subjects to survival data
+  unique_ids <- unique(longitudinal_data[[id]])
+  surv_idx <- match(unique_ids, survival_data[[id]])
+  cox_data <- survival_data[surv_idx, , drop = FALSE]
+  cox_data$biomarker <- subj_biomarker
+  cox_data$velocity <- subj_velocity
+
   cox_predictors <- c("biomarker", "velocity", surv_cov_names)
-  cox_fit <- survival::coxph(
-    reformulate(cox_predictors, response = quote(Surv(start, stop, event))),
-    data = merged[, c("start", "stop", "event", cox_predictors)]
+  cox_formula <- reformulate(
+    cox_predictors,
+    response = call("Surv", as.name(surv_vars[1]), as.name(surv_vars[2]))
   )
+  cox_fit <- survival::coxph(cox_formula, data = cox_data)
 
   hazard <- coef(cox_fit)[cox_predictors]
   if (any(is.na(hazard))) {
     stop("Cox model produced NA coefficients.", call. = FALSE)
   }
   params$coefficients$hazard <- hazard
-  if (verbose > 0) cli::cli_alert_success("Hazard initialized")
+  if (verbose > 0) cli::cli_alert_success("Hazard initialized from Cox model")
 
   # Baseline hazard via Weibull fit → B-spline projection
   weibull_fit <- survival::survreg(

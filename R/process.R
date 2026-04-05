@@ -111,7 +111,7 @@
 
 #' Pack per-subject data into flat TMB input
 #' @noRd
-.pack_data <- function(data_list, parameters, control) {
+.pack_joint_data <- function(data_list, parameters, control) {
   n_subjects <- length(data_list)
   configs <- parameters$configurations
   coefs <- parameters$coefficients
@@ -196,7 +196,7 @@
 
 #' Convert R parameters to TMB parameterization
 #' @noRd
-.pack_params <- function(parameters) {
+.pack_joint_params <- function(parameters) {
   coefs <- parameters$coefficients
   n_random_effects <- ncol(parameters$random_effects_init)
   sigma_matrix <- coefs$random_effect_sigma
@@ -355,21 +355,92 @@
   )
 }
 
-#' Build marginal TMB parameter list
+#' Setup marginal model dimensions and coefficient names
 #' @noRd
-.pack_marginal_params <- function(n_long_coef, n_re, n_subjects,
-                                  mean_y, sd_y) {
-  # Decompose identity Sigma_b
-  marginal_sds <- rep(1, n_re)
-  n_corr <- n_re * (n_re - 1) / 2
+.setup_marginal_model <- function(data, parsed_long) {
+  fixed_formula <- .build_formula(parsed_long$fixed_terms,
+                                  response = parsed_long$response)
+  fixed_names <- colnames(model.matrix(
+    fixed_formula, model.frame(fixed_formula, data)
+  ))
+
+  long_names <- character(0)
+  if (parsed_long$biomarker$fixed) long_names <- c(long_names, "biomarker")
+  if (parsed_long$velocity$fixed) long_names <- c(long_names, "velocity")
+  long_names <- c(long_names, fixed_names)
+
+  # RE dimension
+  has_re_covs <- !is.null(parsed_long$random_terms)
+  random_terms <- if (has_re_covs) parsed_long$random_terms else character(0)
+  n_long_random <- if (length(random_terms) > 0) {
+    ncol(model.matrix(.build_formula(random_terms, is_random = TRUE), data))
+  } else {
+    0L
+  }
+  n_re <- 2L + n_long_random +
+    sum(parsed_long$biomarker$random, parsed_long$velocity$random)
 
   list(
-    longitudinal = rep(0, n_long_coef),
-    initial_state = c(mean_y, 0),
-    log_sigma_e = log(sd_y),
-    log_sd_re = log(marginal_sds),
-    corr_par = rep(0, n_corr),
-    random_effects = matrix(0, nrow = n_subjects, ncol = n_re)
+    n_longitudinal_coef = length(long_names),
+    n_re = n_re,
+    coef_names = list(
+      longitudinal = long_names,
+      initial_state = c("init_biomarker", "init_velocity")
+    )
+  )
+}
+
+#' Default parameters for MarginalODE
+#' @noRd
+.default_marginal_parameters <- function(model_config, parsed_long) {
+  list(
+    coefficients = list(
+      longitudinal = rep(0, model_config$n_longitudinal_coef),
+      initial_state = c(0, 0),
+      measurement_error_sd = 1,
+      random_effect_sigma = diag(1, model_config$n_re)
+    ),
+    configurations = list(
+      biomarker = list(
+        fixed = parsed_long$biomarker$fixed,
+        random = parsed_long$biomarker$random
+      ),
+      velocity = list(
+        fixed = parsed_long$velocity$fixed,
+        random = parsed_long$velocity$random
+      )
+    )
+  )
+}
+
+#' Convert marginal parameters to TMB parameterization
+#' @noRd
+.pack_marginal_params <- function(parameters) {
+  coefs <- parameters$coefficients
+  n_re <- ncol(parameters$random_effects_init)
+  sigma_matrix <- coefs$random_effect_sigma
+
+  marginal_sds <- sqrt(diag(sigma_matrix))
+  scale_inv <- diag(1 / pmax(marginal_sds, 1e-10))
+  corr_matrix <- scale_inv %*% sigma_matrix %*% scale_inv
+
+  corr_theta <- numeric(n_re * (n_re - 1) / 2)
+  idx <- 1L
+  for (col in seq_len(n_re - 1)) {
+    for (row in (col + 1):n_re) {
+      rho <- max(-0.99, min(0.99, corr_matrix[row, col]))
+      corr_theta[idx] <- rho / sqrt(1 - rho^2)
+      idx <- idx + 1L
+    }
+  }
+
+  list(
+    longitudinal = coefs$longitudinal,
+    initial_state = coefs$initial_state,
+    log_sigma_e = log(coefs$measurement_error_sd),
+    log_sd_re = log(pmax(marginal_sds, 1e-10)),
+    corr_par = corr_theta,
+    random_effects = parameters$random_effects_init
   )
 }
 

@@ -143,8 +143,10 @@ JointODE <- function(
   )
 
   if (is.character(init) && init == "marginal") {
-    stop("init = 'marginal' is not yet available in the TMB version. ",
-         "Use init = 'default' or provide a parameter list.", call. = FALSE)
+    parameters <- .initialize_from_marginal(
+      longitudinal_data, survival_data, gamma, control,
+      parsed_long, parsed_surv, model_config
+    )
   } else if (is.list(init)) {
     parameters <- init
   } else {
@@ -198,8 +200,8 @@ JointODE <- function(
   }
 
   # Build TMB data and parameter lists
-  tmb_data <- .pack_data(data_list, parameters, control)
-  tmb_params <- .pack_params(parameters)
+  tmb_data <- .pack_joint_data(data_list, parameters, control)
+  tmb_params <- .pack_joint_params(parameters)
 
   obj <- TMB::MakeADFun(
     data = tmb_data,
