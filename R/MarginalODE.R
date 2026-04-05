@@ -45,6 +45,9 @@ MarginalODE <- function(
     stop("control must be a list or NULL")
   }
 
+  stop("MarginalODE is not yet available in the TMB version. ",
+       "Use init = 'default' in JointODE().", call. = FALSE)
+
   data_list <- .process_marginal(formula, data, time, id)
   n_covariates <- attr(data_list, "n_covariates")
   covariate_names <- attr(data_list, "covariate_names")

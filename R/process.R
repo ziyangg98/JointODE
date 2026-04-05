@@ -109,6 +109,170 @@
   data_process
 }
 
+#' Build TMB data list from processed data
+#' @noRd
+.build_tmb_data <- function(data_list, parameters, control) {
+  n_subjects <- length(data_list)
+  configs <- parameters$configurations
+  coefs <- parameters$coefficients
+
+  # Count observations per subject
+  n_obs <- vapply(data_list, function(d) {
+    length(d$longitudinal$measurements)
+  }, integer(1))
+
+  # Concatenate observation times and values
+  obs_times_all <- unlist(lapply(data_list, function(d) d$longitudinal$times))
+  obs_values_all <- unlist(lapply(data_list, function(d) d$longitudinal$measurements))
+  if (is.null(obs_times_all)) obs_times_all <- numeric(0)
+  if (is.null(obs_values_all)) obs_values_all <- numeric(0)
+
+  # Covariate dimensions per subject
+  cov_dims <- t(vapply(data_list, function(d) {
+    c(ncol(d$longitudinal$covariates$fixed),
+      ncol(d$longitudinal$covariates$random))
+  }, integer(2)))
+
+  # Concatenate covariates (row-major flat)
+  X_fixed_all <- unlist(lapply(data_list, function(d) {
+    as.vector(t(d$longitudinal$covariates$fixed))
+  }))
+  X_random_all <- unlist(lapply(data_list, function(d) {
+    as.vector(t(d$longitudinal$covariates$random))
+  }))
+  if (is.null(X_fixed_all)) X_fixed_all <- numeric(0)
+  if (is.null(X_random_all)) X_random_all <- numeric(0)
+
+  # Event data
+  event_times <- vapply(data_list, `[[`, numeric(1), "time")
+  event_status <- vapply(data_list, `[[`, numeric(1), "status")
+
+  # Survival covariates
+  n_surv_cov <- if (is.data.frame(data_list[[1]]$covariates) &&
+                    ncol(data_list[[1]]$covariates) > 0) {
+    ncol(data_list[[1]]$covariates)
+  } else if (is.matrix(data_list[[1]]$covariates)) {
+    ncol(data_list[[1]]$covariates)
+  } else {
+    0L
+  }
+
+  W_surv_all <- if (n_surv_cov > 0) {
+    unlist(lapply(data_list, function(d) as.numeric(d$covariates)))
+  } else {
+    numeric(0)
+  }
+
+  # Classify ODE branch from initial b1/b2
+  b1_val <- if (configs$biomarker$fixed) coefs$longitudinal[1] else 0
+  b2_val <- if (configs$velocity$fixed) {
+    coefs$longitudinal[1 + configs$biomarker$fixed]
+  } else {
+    0
+  }
+  branches <- rep(.classify_disc(b1_val, b2_val), n_subjects)
+
+  sbc <- configs$baseline
+
+  list(
+    n_subjects = as.integer(n_subjects),
+    n_random_effects = as.integer(ncol(parameters$random_effects_init)),
+    n_observations = as.integer(n_obs),
+    event_times = event_times,
+    event_status = as.integer(event_status),
+    obs_times_all = obs_times_all,
+    obs_values_all = obs_values_all,
+    covariate_dims = matrix(as.integer(cov_dims), nrow = n_subjects, ncol = 2),
+    X_fixed_all = X_fixed_all,
+    X_random_all = X_random_all,
+    W_survival_all = W_surv_all,
+    n_survival_covariates = as.integer(n_surv_cov),
+    ode_branch = as.integer(branches),
+    biomarker_clamp = configs$biomarker_clamp,
+    hazard_quadrature = as.integer(control$hazard_quadrature),
+    gamma = configs$gamma,
+    spline_degree = as.integer(sbc$degree),
+    spline_knots = if (length(sbc$knots) > 0) sbc$knots else numeric(0),
+    spline_boundary = sbc$boundary_knots,
+    biomarker_fixed = as.integer(configs$biomarker$fixed),
+    biomarker_random = as.integer(configs$biomarker$random),
+    velocity_fixed = as.integer(configs$velocity$fixed),
+    velocity_random = as.integer(configs$velocity$random)
+  )
+}
+
+#' Build TMB parameter list
+#' @noRd
+.build_tmb_parameters <- function(parameters) {
+  coefs <- parameters$coefficients
+  n_re <- ncol(parameters$random_effects_init)
+  Sigma <- coefs$random_effect_sigma
+
+  # Decompose Sigma_b into SDs + correlation parameters
+  sds <- sqrt(diag(Sigma))
+  # Correlation matrix
+  D_inv <- diag(1 / pmax(sds, 1e-10))
+  R <- D_inv %*% Sigma %*% D_inv
+  # Off-diagonal correlation -> theta parameterization: theta = rho / sqrt(1 - rho^2)
+  corr_par <- numeric(n_re * (n_re - 1) / 2)
+  idx <- 1L
+  for (j in seq_len(n_re - 1)) {
+    for (i_row in (j + 1):n_re) {
+      rho <- R[i_row, j]
+      rho <- max(-0.99, min(0.99, rho))
+      corr_par[idx] <- rho / sqrt(1 - rho^2)
+      idx <- idx + 1L
+    }
+  }
+
+  list(
+    baseline = coefs$baseline,
+    hazard = coefs$hazard,
+    longitudinal = coefs$longitudinal,
+    initial_state = coefs$initial_state,
+    log_sigma_e = log(coefs$measurement_error_sd),
+    log_sd_re = log(pmax(sds, 1e-10)),
+    corr_par = corr_par,
+    b = parameters$random_effects_init
+  )
+}
+
+#' Classify ODE branch from discriminant (R version)
+#' @noRd
+.classify_disc <- function(b1, b2) {
+  eps <- 1e-8
+  disc_tol <- 1e-12
+  if (abs(b1) < eps) {
+    return(if (abs(b2) > eps) 1L else 4L) # FIRST_ORD or ZERO
+  }
+  D <- b2^2 + 4 * b1
+  if (D > disc_tol) return(0L)   # REAL
+  if (D < -disc_tol) return(2L)  # COMPLEX
+  return(3L)                       # REPEATED
+}
+
+#' Classify branch for all subjects from fitted longitudinal coefs
+#' @noRd
+.classify_disc_from_coefs <- function(fitted_long, configs, n_subjects = NULL) {
+  fi <- 0L
+  b1 <- if (configs$biomarker$fixed) fitted_long[fi <- fi + 1L] else 0
+  b2 <- if (configs$velocity$fixed) fitted_long[fi <- fi + 1L] else 0
+  branch <- .classify_disc(b1, b2)
+  if (!is.null(n_subjects)) rep(branch, n_subjects) else branch
+}
+
+#' Update TMB parameter list from optimizer output for warm restart
+#' @noRd
+.update_tmb_params_from_opt <- function(tmb_params, par, par_names) {
+  for (nm in c("baseline", "hazard", "longitudinal", "initial_state")) {
+    tmb_params[[nm]] <- par[par_names == nm]
+  }
+  tmb_params$log_sigma_e <- par[par_names == "log_sigma_e"]
+  tmb_params$log_sd_re <- par[par_names == "log_sd_re"]
+  tmb_params$corr_par <- par[par_names == "corr_par"]
+  tmb_params
+}
+
 #' @importFrom stats model.frame model.matrix model.response
 #' @noRd
 .process_marginal <- function(formula, data, time, id) {

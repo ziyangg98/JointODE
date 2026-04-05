@@ -1,5 +1,4 @@
 #' @useDynLib JointODE, .registration = TRUE
-#' @importFrom Rcpp sourceCpp
 NULL
 
 #' Re-exported from survival

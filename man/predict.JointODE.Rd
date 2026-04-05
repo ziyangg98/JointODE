@@ -4,14 +4,7 @@
 \alias{predict.JointODE}
 \title{Predict Method for JointODE Objects}
 \usage{
-\method{predict}{JointODE}(
-  object,
-  newdata = NULL,
-  times = NULL,
-  parallel = FALSE,
-  n_cores = 0,
-  ...
-)
+\method{predict}{JointODE}(object, newdata = NULL, times = NULL, ...)
 }
 \arguments{
 \item{object}{An object of class \code{JointODE}}
@@ -19,37 +12,16 @@
 \item{newdata}{Optional data frame with new subjects. If NULL, uses the
 training data from the model fit.}
 
-\item{times}{Optional time points for prediction. Can be:
-\itemize{
-\item A numeric vector for the same times across all subjects
-\item A named list with subject-specific time vectors
-\item NULL to use observation times from the data (default)
-}}
-
-\item{parallel}{Logical flag for parallel computation (default: FALSE)}
-
-\item{n_cores}{Number of cores for parallel processing. If 0, automatically
-detects available cores (default: 0)}
+\item{times}{Optional time points for prediction (currently unused).}
 
 \item{...}{Additional arguments (currently unused)}
 }
 \value{
-A data.frame with columns:
-\describe{
-\item{\code{id}}{Subject identifier}
-\item{\code{time}}{Time points for predictions}
-\item{\code{cumhaz}}{Predicted cumulative hazard at each time point}
-\item{\code{survival}}{Predicted survival probability, computed as
-\eqn{S(t) = \exp(-\text{cumhaz})}}
-\item{\code{log_hazard}}{Log instantaneous hazard at each time point}
-\item{\code{biomarker}}{Predicted biomarker values}
-\item{\code{velocity}}{Predicted velocity (first derivative)}
-\item{\code{acceleration}}{Predicted acceleration (second derivative)}
-}
+A data.frame with columns id, time, biomarker, velocity.
 }
 \description{
 Computes predicted biomarker trajectories, velocities, and accelerations
-for subjects based on the fitted joint ODE model. Predictions incorporate
-both fixed effects and subject-specific random effects.
+for subjects based on the fitted joint ODE model. Predictions are obtained
+from the TMB REPORT output.
 }
 \concept{model-prediction}

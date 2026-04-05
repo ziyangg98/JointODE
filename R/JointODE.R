@@ -50,142 +50,27 @@
 #'     \item A list with the same structure as the fitted model's
 #'       \code{parameters} component for full manual control.
 #'   }
-#'   When providing a list, it should have elements:
-#'   \describe{
-#'     \item{\code{coefficients}}{A list containing:
-#'       \itemize{
-#'         \item \code{baseline}: Vector of B-spline coefficients for baseline
-#'           hazard (length = number of spline basis functions)
-#'         \item \code{hazard}: Vector of hazard parameters including
-#'           association parameters (2) and survival covariates
-#'         \item \code{longitudinal}: Vector of longitudinal fixed effects
-#'           including intercept and covariates
-#'         \item \code{measurement_error_sd}: Residual standard deviation
-#'           (positive scalar)
-#'         \item \code{random_effect_sigma}: Random effect covariance matrix
-#'           (positive definite matrix)
-#'       }}
-#'     \item{\code{configurations}}{Optional; if not provided, will use
-#'       spline configuration from \code{spline_baseline}}
-#'   }
 #' @param control A list of control parameters for optimization, or output from
-#'   \code{\link{JointODE.control}}. Key parameters include:
-#'   \describe{
-#'     \item{\code{maxit}}{Maximum number of EM iterations (default: 200)}
-#'     \item{\code{tol}}{Convergence tolerance on max absolute
-#'       parameter change (default: 1e-4)}
-#'     \item{\code{verbose}}{Verbosity level: FALSE/0 for silent, TRUE/1 for
-#'       progress messages, 2 for detailed output (default: FALSE)}
-#'     \item{\code{parallel}}{Logical flag enabling parallel computation
-#'       (default: FALSE)}
-#'     \item{\code{n_cores}}{Number of CPU cores for parallel processing.
-#'       If 0, automatically detects available cores (default: 0)}
-#'   }
-#'   See \code{\link{JointODE.control}} for complete details and examples.
+#'   \code{\link{JointODE.control}}.
 #' @param ... Additional arguments passed to internal optimization routines.
 #'
 #' @return An S3 object of class \code{"JointODE"} containing fitted model
-#'   results:
-#'   \describe{
-#'     \item{\code{parameters}}{A list containing all estimated parameters:
-#'       \itemize{
-#'         \item \code{coefficients}: Named list with \code{baseline} (B-spline
-#'           coefficients for baseline hazard), \code{hazard} (association and
-#'           survival covariate effects), \code{longitudinal} (longitudinal
-#'           fixed effects), \code{measurement_error_sd} (residual standard
-#'           deviation), and \code{random_effect_sigma} (random effect
-#'           covariance matrix)
-#'         \item \code{configurations}: Model configuration including spline
-#'           basis specifications
-#'       }}
-#'     \item{\code{logLik}}{Maximum log-likelihood value achieved at
-#'       convergence}
-#'     \item{\code{AIC}}{Akaike Information Criterion for model comparison}
-#'     \item{\code{BIC}}{Bayesian Information Criterion adjusted for sample
-#'       size}
-#'     \item{\code{cindex}}{Concordance index (C-index) measuring the model's
-#'       discrimination ability for survival prediction}
-#'     \item{\code{convergence}}{List containing convergence diagnostics:
-#'       \itemize{
-#'         \item \code{converged}: Logical indicating convergence status
-#'         \item \code{iterations}: Number of EM iterations performed
-#'         \item \code{message}: Descriptive convergence message
-#'       }}
-#'     \item{\code{random_effects}}{Matrix of posterior mode random effects
-#'       (n_subjects x n_re)}
-#'     \item{\code{data}}{Processed data used for model fitting in internal
-#'       format}
-#'     \item{\code{control}}{List of control parameters used in optimization}
-#'     \item{\code{call}}{The matched function call for reproducibility}
-#'   }
-#'
-#' @details
-#' The joint modeling framework integrates longitudinal and survival processes
-#' through a shared random effects structure. The longitudinal biomarker
-#' evolution is characterized by a system of ODEs that can accommodate
-#' non-linear dynamics, feedback mechanisms, and complex temporal patterns.
-#' The survival component employs a proportional hazards model where the
-#' instantaneous risk depends on
-#' features derived from the longitudinal trajectory.
-#'
-#' Two association structures are supported:
-#' \itemize{
-#'   \item Current value: hazard depends on the biomarker level at time t
-#'   \item Rate of change: hazard depends on the biomarker's instantaneous
-#'     slope
-#' }
-#'
-#' Parameter estimation employs a Laplace EM (PQL) algorithm with:
-#' \itemize{
-#'   \item E-step: Laplace approximation for posterior mode and covariance
-#'     of random effects
-#'   \item M-step: one-step Newton update on the complete-data log-likelihood
-#'     evaluated at posterior modes
-#' }
+#'   results.
 #'
 #' @importFrom utils modifyList
 #' @importFrom survival Surv
 #' @importFrom cli cli_h2 cli_text cli_alert_success
 #' @importFrom cli cli_alert_warning cli_alert_info
-#' @importFrom future.apply future_lapply
-#' @importFrom numDeriv jacobian
 #'
 #' @examples
 #' \dontrun{
-#' # Generate example data
-#' sim <- simulate(JointODE, n_subjects = 100)
-#'
-#' # Fit with default control parameters
-#' fit1 <- JointODE(
+#' fit <- JointODE(
 #'   longitudinal_formula = observed ~ x1 + x2,
 #'   survival_formula = Surv(time, status) ~ w1 + w2,
 #'   longitudinal_data = sim$data$longitudinal_data,
 #'   survival_data = sim$data$survival_data
 #' )
-#'
-#' # Fit with custom control parameters using JointODE.control()
-#' control <- JointODE.control(
-#'   maxit = 200, tol = 1e-4, verbose = TRUE
-#' )
-#' fit2 <- JointODE(
-#'   longitudinal_formula = observed ~ x1 + x2,
-#'   survival_formula = Surv(event_time, event) ~ x1 + x2,
-#'   longitudinal_data = sim$longitudinal_data,
-#'   survival_data = sim$survival_data,
-#'   control = control
-#' )
-#'
-#' # Fit with control parameters as a list
-#' # By default, uses MarginalODE for initialization (init = NULL)
-#' fit3 <- JointODE(
-#'   longitudinal_formula = observed ~ x1 + x2,
-#'   survival_formula = Surv(event_time, event) ~ x1 + x2,
-#'   longitudinal_data = sim$longitudinal_data,
-#'   survival_data = sim$survival_data,
-#'   control = list(maxit = 50, verbose = TRUE)
-#' )
-#'
-#' summary(fit1)
+#' summary(fit)
 #' }
 #'
 #' @concept model-fitting
@@ -278,6 +163,7 @@ JointODE <- function(
   ))
   parameters$configurations$biomarker_clamp <- max(abs(response)) * 5
   parameters$configurations$hazard_quadrature <- control$hazard_quadrature
+  parameters$configurations$gamma <- gamma
 
   names(parameters$coefficients$baseline) <- model_config$coef_names$baseline
   names(parameters$coefficients$hazard) <- model_config$coef_names$hazard
@@ -286,10 +172,10 @@ JointODE <- function(
   names(parameters$coefficients$initial_state) <-
     model_config$coef_names$initial_state
 
-  random_effects <- model_config$random_effects
   coef_names <- model_config$coef_names
 
-  # Initialize state random effects from first observations
+  # Initialize random effects
+  random_effects <- model_config$random_effects
   for (i in seq_along(data_list)) {
     obs <- data_list[[i]]$longitudinal
     if (length(obs$measurements) >= 1) {
@@ -304,94 +190,48 @@ JointODE <- function(
       }
     }
   }
+  parameters$random_effects_init <- random_effects
 
-  # Laplace EM Algorithm
   if (control$verbose > 0) {
-    cli::cli_h2("Joint ODE Model Estimation")
-    cli::cli_text(sprintf(
-      "Convergence: tol=%.1e, max_iter=%d",
-      control$tol,
-      control$maxit
-    ))
-    cli::cli_text("")
+    cli::cli_h2("Joint ODE Model Estimation (TMB)")
   }
 
-  # Set up parallel plan once before EM loop
-  if (control$parallel) {
-    parallel_cleanup <- .setup_parallel_plan(control$n_cores)
-    on.exit(parallel_cleanup(), add = TRUE)
+  # Enable OpenMP if requested
+  if (control$parallel && control$n_cores > 0) {
+    TMB::openmp(control$n_cores)
   }
 
-  # EM loop
-  curr <- list(
-    parameters = parameters,
-    random_effects = random_effects,
-    loglik = -Inf
+  # Build TMB data and parameter lists
+  tmb_data <- .build_tmb_data(data_list, parameters, control)
+  tmb_params <- .build_tmb_parameters(parameters)
+
+  obj <- TMB::MakeADFun(
+    data = tmb_data,
+    parameters = tmb_params,
+    random = "b",
+    DLL = "JointODE",
+    silent = control$verbose < 2
   )
-  prev <- curr
-  converged <- FALSE
-  loglik_history <- rep(NA_real_, control$maxit)
-  delta_theta_history <- rep(NA_real_, control$maxit)
-  delta_loglik_history <- rep(NA_real_, control$maxit)
 
-  for (em_iter in seq_len(control$maxit)) {
-    curr <- .em_step(
-      data_list, curr$parameters, curr$random_effects, control
+  opt <- stats::nlminb(
+    start = obj$par,
+    objective = obj$fn,
+    gradient = obj$gr,
+    control = list(
+      iter.max = control$maxit,
+      eval.max = control$maxit * 10,
+      rel.tol = control$tol
     )
-
-    status <- .track(em_iter, curr, prev, control)
-    loglik_history[em_iter] <- curr$loglik
-    delta_theta_history[em_iter] <- status$metrics$delta_theta
-    delta_loglik_history[em_iter] <- status$metrics$delta_l
-
-    if (status$converged) {
-      converged <- TRUE
-      break
-    }
-    prev <- curr
-  }
-
-  n_iter <- if (converged) em_iter else control$maxit
-
-  # Finalize model
-  final_results <- .finalize_joint(
-    data_list = data_list,
-    parameters = curr$parameters,
-    loglik = curr$loglik,
-    control = control,
-    coef_names = coef_names,
-    converged = converged,
-    random_effects = curr$random_effects
   )
 
-  # Return fitted model
-  structure(
-    list(
-      parameters = final_results$parameters,
-      logLik = final_results$loglik,
-      AIC = final_results$aic,
-      BIC = final_results$bic,
-      cindex = final_results$cindex,
-      convergence = list(
-        converged = converged,
-        iterations = n_iter,
-        message = sprintf(
-          "%s after %d iterations",
-          if (converged) "Converged" else "Did not converge",
-          n_iter
-        ),
-        loglik_history = loglik_history[seq_len(n_iter)],
-        delta_theta_history = delta_theta_history[seq_len(n_iter)],
-        delta_loglik_history = delta_loglik_history[seq_len(n_iter)]
-      ),
-      random_effects = final_results$random_effects,
-      vcov = final_results$vcov,
-      data = data_list,
-      control = control,
-      call = cl
-    ),
-    class = "JointODE"
-  )
+  # Extract results
+  results <- .extract_tmb_results(obj, opt, parameters, coef_names,
+                                  data_list, tmb_data$n_random_effects, control)
+
+  structure(c(results, list(
+    data = data_list, control = control, call = cl,
+    tmb_obj = obj, tmb_opt = opt
+  )), class = "JointODE")
 }
 
 #' Summary of JointODE Model
@@ -443,65 +283,40 @@ summary.JointODE <- function(object, ...) {
   # Delta method for derived parameters (period and xi)
   derived_params <- NULL
   if (!is.null(object$vcov) && n_longitudinal >= 2) {
-    # Extract coefficients from the longitudinal ODE equation:
-    # d²y/dt² = β₁ * y + β₂ * dy/dt + ...
-    # Comparing with damped harmonic oscillator: ẍ = -ω²x - 2ξωẋ + kω²f
-    # We have: β₁ = -ω² and β₂ = -2ξω
-
-    value_coef <- coefs[idx_longitudinal[1]] # β₁ = -ω²
-    slope_coef <- coefs[idx_longitudinal[2]] # β₂ = -2ξω
-
-    # Variances and covariance
+    value_coef <- coefs[idx_longitudinal[1]]
+    slope_coef <- coefs[idx_longitudinal[2]]
     var_value <- object$vcov[idx_longitudinal[1], idx_longitudinal[1]]
     var_slope <- object$vcov[idx_longitudinal[2], idx_longitudinal[2]]
     cov_value_slope <- object$vcov[idx_longitudinal[1], idx_longitudinal[2]]
 
-    # Check if value_coef is negative (as expected for -ω²)
     if (value_coef < 0) {
-      # Calculate omega_n from β₁ = -ωₙ²
-      # ωₙ = √(-β₁)
       omega_est <- sqrt(-value_coef)
-
-      # Calculate period T = 2π/ωₙ
       period_est <- 2 * pi / omega_est
-
-      # Calculate xi from β₂ = -2ξωₙ
-      # ξ = -β₂ / (2ωₙ) = -β₂ / (2√(-β₁))
       xi_est <- -slope_coef / (2 * omega_est)
 
-      # Delta method for period
-      # T = 2π/ωₙ = 2π/√(-β₁)
-      # ∂T/∂β₁ = π/((-β₁)^(3/2))
       grad_period_value <- pi / ((-value_coef)^(3 / 2))
       var_period <- grad_period_value^2 * var_value
       se_period <- sqrt(var_period)
 
-      # Delta method for xi
-      # ξ = -β₂/(2√(-β₁))
-      # ∂ξ/∂β₁ = -β₂/(4*(-β₁)^(3/2))
-      # ∂ξ/∂β₂ = -1/(2√(-β₁))
       grad_xi_value <- -slope_coef / (4 * (-value_coef)^(3 / 2))
       grad_xi_slope <- -1 / (2 * sqrt(-value_coef))
-
-      # Variance of xi using Delta method with covariance
-      var_xi <- grad_xi_value^2 *
-        var_value +
+      var_xi <- grad_xi_value^2 * var_value +
         grad_xi_slope^2 * var_slope +
         2 * grad_xi_value * grad_xi_slope * cov_value_slope
       se_xi <- sqrt(var_xi)
 
-      # Create coefficient matrix for derived parameters
       derived_params <- cbind(
         Estimate = c(period_est, xi_est),
         `Std. Error` = c(se_period, se_xi),
         `z value` = c(period_est / se_period, xi_est / se_xi),
-        `Pr(>|z|)` = 2 * pnorm(-abs(c(period_est / se_period, xi_est / se_xi)))
+        `Pr(>|z|)` = 2 * pnorm(-abs(c(
+          period_est / se_period, xi_est / se_xi
+        )))
       )
       rownames(derived_params) <- c("T (period)", "xi (damping ratio)")
     }
   }
 
-  # Count longitudinal observations and events from data
   n_subjects <- length(object$data)
   n_observations <- sum(vapply(object$data, function(subject) {
     length(subject$longitudinal$measurements)
@@ -547,84 +362,52 @@ print.summary.JointODE <- function(
   cat("\nCall:\n")
   print(x$call)
 
-  # Data Descriptives
   cat("\nData Descriptives:\n")
   cat("Longitudinal Process            Survival Process\n")
   cat(sprintf(
     "Number of Observations: %-7d Number of Events: %d (%.0f%%)\n",
-    x$n_observations,
-    x$n_events,
-    x$event_rate * 100
+    x$n_observations, x$n_events, x$event_rate * 100
   ))
   cat(sprintf("Number of Subjects: %d\n", x$nobs))
 
-  # Model fit statistics
   cat(sprintf("\n%10s %10s %10s\n", "AIC", "BIC", "logLik"))
   cat(sprintf("%10.3f %10.3f %10.3f\n", x$AIC, x$BIC, x$logLik))
 
   cat("\nCoefficients:\n")
 
-  # Longitudinal Process (ODE model)
   cat("Longitudinal Process: Second-Order ODE Model\n")
   if (!is.null(x$coef_longitudinal)) {
-    .print_coefmat(
-      x$coef_longitudinal,
-      digits = digits,
-      signif.stars = signif.stars,
-      ...
-    )
+    .print_coefmat(x$coef_longitudinal, digits = digits,
+                   signif.stars = signif.stars, ...)
   }
 
-  # Derived ODE characteristics
   if (!is.null(x$derived_params)) {
     cat("\nODE System Characteristics:\n")
-    .print_coefmat(
-      x$derived_params,
-      digits = digits,
-      signif.stars = signif.stars,
-      ...
-    )
+    .print_coefmat(x$derived_params, digits = digits,
+                   signif.stars = signif.stars, ...)
   }
 
-  # Survival Process
   cat("\nSurvival Process: Proportional Hazards Model\n")
   if (!is.null(x$coef_survival)) {
-    .print_coefmat(
-      x$coef_survival,
-      digits = digits,
-      signif.stars = signif.stars,
-      ...
-    )
+    .print_coefmat(x$coef_survival, digits = digits,
+                   signif.stars = signif.stars, ...)
   }
 
-  # Baseline hazard (spline coefficients - optional, summarized)
   if (!is.null(x$coef_baseline)) {
-    cat(
-      "\nBaseline Hazard: B-spline with",
-      nrow(x$coef_baseline),
-      "basis functions\n"
-    )
-    cat(
-      "(Coefficients range:",
-      sprintf(
-        "[%.3f, %.3f]",
-        min(x$coef_baseline[, "Estimate"]),
-        max(x$coef_baseline[, "Estimate"])
-      ),
-      ")\n"
-    )
+    cat("\nBaseline Hazard: B-spline with", nrow(x$coef_baseline),
+        "basis functions\n")
+    cat("(Coefficients range:",
+        sprintf("[%.3f, %.3f]",
+                min(x$coef_baseline[, "Estimate"]),
+                max(x$coef_baseline[, "Estimate"])), ")\n")
   }
 
-  # Initial State
   if (!is.null(x$coef_initial)) {
     cat("\nInitial State: Population Mean\n")
-    .print_coefmat(
-      x$coef_initial,
-      digits = digits, signif.stars = signif.stars, ...
-    )
+    .print_coefmat(x$coef_initial, digits = digits,
+                   signif.stars = signif.stars, ...)
   }
 
-  # Variance Components
   cat("\nVariance Components:\n")
   cat(sprintf("Measurement Error SD: %.6f\n", x$sigma["sigma_e"]))
   if (!is.null(x$sigma_b_matrix)) {
@@ -632,7 +415,6 @@ print.summary.JointODE <- function(
     print(x$sigma_b_matrix, digits = 4)
   }
 
-  # Model diagnostics
   cat("\nModel Diagnostics:\n")
   if (!is.na(x$cindex)) {
     cat(sprintf("C-index (Concordance): %.3f\n", x$cindex))
@@ -652,12 +434,11 @@ print.summary.JointODE <- function(
 coef.JointODE <- function(object, ...) {
   cf <- object$parameters$coefficients
   coefs <- c(cf$baseline, cf$hazard, cf$longitudinal, cf$initial_state)
-  names(coefs) <- c(
-    paste0("baseline:", names(cf$baseline)),
-    paste0("hazard:", names(cf$hazard)),
-    paste0("longitudinal:", names(cf$longitudinal)),
-    paste0("initial state:", names(cf$initial_state))
-  )
+  names(coefs) <- .prefixed_coef_names(lapply(
+    list(baseline = cf$baseline, hazard = cf$hazard,
+         longitudinal = cf$longitudinal, initial_state = cf$initial_state),
+    names
+  ))
   coefs
 }
 
@@ -699,7 +480,7 @@ logLik.JointODE <- function(object, ...) {
 #' @importFrom stats coef
 #' @export
 print.JointODE <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
-  cat("\nJoint ODE Model\n")
+  cat("\nJoint ODE Model (TMB)\n")
   cat("Call: ")
   print(x$call)
 
@@ -707,17 +488,10 @@ print.JointODE <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
   cat(
     "\nLog-likelihood:",
     format(x$logLik, digits = digits),
-    "on",
-    n_params,
-    "degrees of freedom\n"
+    "on", n_params, "degrees of freedom\n"
   )
-  cat(
-    "AIC:",
-    format(x$AIC, digits = digits),
-    "  BIC:",
-    format(x$BIC, digits = digits),
-    "\n"
-  )
+  cat("AIC:", format(x$AIC, digits = digits),
+      "  BIC:", format(x$BIC, digits = digits), "\n")
   invisible(x)
 }
 
@@ -725,139 +499,63 @@ print.JointODE <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
 #'
 #' @description
 #' Computes predicted biomarker trajectories, velocities, and accelerations
-#' for subjects based on the fitted joint ODE model. Predictions incorporate
-#' both fixed effects and subject-specific random effects.
+#' for subjects based on the fitted joint ODE model. Predictions are obtained
+#' from the TMB REPORT output.
 #'
 #' @param object An object of class \code{JointODE}
 #' @param newdata Optional data frame with new subjects. If NULL, uses the
 #'   training data from the model fit.
-#' @param times Optional time points for prediction. Can be:
-#'   \itemize{
-#'     \item A numeric vector for the same times across all subjects
-#'     \item A named list with subject-specific time vectors
-#'     \item NULL to use observation times from the data (default)
-#'   }
-#' @param parallel Logical flag for parallel computation (default: FALSE)
-#' @param n_cores Number of cores for parallel processing. If 0, automatically
-#'   detects available cores (default: 0)
+#' @param times Optional time points for prediction (currently unused).
 #' @param ... Additional arguments (currently unused)
 #'
-#' @return A data.frame with columns:
-#'   \describe{
-#'     \item{\code{id}}{Subject identifier}
-#'     \item{\code{time}}{Time points for predictions}
-#'     \item{\code{cumhaz}}{Predicted cumulative hazard at each time point}
-#'     \item{\code{survival}}{Predicted survival probability, computed as
-#'       \eqn{S(t) = \exp(-\text{cumhaz})}}
-#'     \item{\code{log_hazard}}{Log instantaneous hazard at each time point}
-#'     \item{\code{biomarker}}{Predicted biomarker values}
-#'     \item{\code{velocity}}{Predicted velocity (first derivative)}
-#'     \item{\code{acceleration}}{Predicted acceleration (second derivative)}
-#'   }
+#' @return A data.frame with columns id, time, biomarker, velocity.
 #'
 #' @concept model-prediction
 #' @export
-predict.JointODE <- function(
-  object,
-  newdata = NULL,
-  times = NULL,
-  parallel = FALSE,
-  n_cores = 0,
-  ...
-) {
-  if (!is.null(newdata)) {
-    stop("newdata not yet supported")
-  }
+predict.JointODE <- function(object, newdata = NULL, times = NULL, ...) {
+  if (!is.null(newdata)) stop("newdata not yet supported")
 
-  parameters <- object$parameters
   data_list <- object$data
+  reported <- object$tmb_report
+  cf <- object$parameters$coefficients
 
-  random_effects <- object$random_effects
+  # ODE coefficients for acceleration computation
+  configs <- object$parameters$configurations
+  fi <- 0L
+  b1_pop <- if (configs$biomarker$fixed) cf$longitudinal[fi <- fi + 1L] else 0
+  b2_pop <- if (configs$velocity$fixed) cf$longitudinal[fi <- fi + 1L] else 0
 
-  # Prepare prediction data for all subjects
-  pred_data_list <- lapply(seq_along(data_list), function(i) {
-    subj <- data_list[[i]]
-    subj_id <- names(data_list)[i]
+  obs_offset <- 0L
+  results <- vector("list", length(data_list))
+  for (i in seq_along(data_list)) {
+    ni <- length(data_list[[i]]$longitudinal$measurements)
+    idx <- obs_offset + seq_len(ni)
+    m <- as.numeric(reported$fitted_biomarker[idx])
+    v <- as.numeric(reported$fitted_velocity[idx])
+    cum_h <- as.numeric(reported$cumulative_hazard[i])
+    log_h <- as.numeric(reported$log_hazard_at_event[i])
 
-    pred_times <- if (!is.null(times)) {
-      time_vec <- if (is.list(times)) {
-        if (!is.null(times[[subj_id]])) {
-          times[[subj_id]]
-        } else {
-          subj$longitudinal$times
-        }
-      } else {
-        times
-      }
-      sort(unique(time_vec))
-    } else {
-      subj$longitudinal$times
-    }
+    # Per-subject b1, b2 (population + random effects)
+    re <- object$random_effects[i, ]
+    ri <- 2L
+    b1 <- b1_pop
+    b2 <- b2_pop
+    if (configs$biomarker$random) b1 <- b1 + re[ri <- ri + 1L]
+    if (configs$velocity$random) b2 <- b2 + re[ri <- ri + 1L]
 
-    if (length(pred_times) == 0) {
-      return(NULL)
-    }
-
-    # Extend longitudinal covariates to match pred_times
-    # Use last observation carried forward (LOCF) for times beyond observed data
-    orig_times <- subj$longitudinal$times
-
-    extended_fixed <- .extend_covariates(
-      subj$longitudinal$covariates$fixed, orig_times, pred_times
-    )
-    extended_random <- .extend_covariates(
-      subj$longitudinal$covariates$random, orig_times, pred_times
-    )
-
-    extended_time <- if (!is.null(times)) {
-      max(pred_times)
-    } else {
-      subj$time
-    }
-
-    list(
-      id = subj$id,
-      time = extended_time,
-      status = subj$status,
-      covariates = subj$covariates,
-      longitudinal = list(
-        times = pred_times,
-        measurements = rep(0, length(pred_times)),
-        covariates = list(
-          fixed = extended_fixed,
-          random = extended_random
-        )
-      )
-    )
-  })
-
-  # Remove NULL entries
-  valid_idx <- !vapply(pred_data_list, is.null, logical(1))
-  pred_data_list <- pred_data_list[valid_idx]
-  valid_random_effects <- random_effects[valid_idx, , drop = FALSE]
-  valid_ids <- names(data_list)[valid_idx]
-
-  # Solve ODE for all subjects at once
-  ode_solutions <- .solve_batch_joint(
-    data_list = pred_data_list,
-    random_effects = valid_random_effects,
-    parameters = parameters
-  )
-
-  # Combine results
-  results <- lapply(seq_along(ode_solutions), function(i) {
-    data.frame(
-      id = valid_ids[i],
-      time = ode_solutions[[i]]$times,
-      cumhaz = ode_solutions[[i]]$cum_hazard,
-      survival = exp(-ode_solutions[[i]]$cum_hazard),
-      log_hazard = ode_solutions[[i]]$log_hazard,
-      biomarker = ode_solutions[[i]]$biomarker,
-      velocity = ode_solutions[[i]]$velocity,
-      acceleration = ode_solutions[[i]]$acceleration,
+    results[[i]] <- data.frame(
+      id = names(data_list)[i],
+      time = data_list[[i]]$longitudinal$times,
+      biomarker = m,
+      velocity = v,
+      acceleration = b1 * m + b2 * v,
+      cumhaz = cum_h,
+      survival = exp(-cum_h),
+      log_hazard = log_h,
       stringsAsFactors = FALSE
     )
-  })
+    obs_offset <- obs_offset + ni
+  }
 
   result_df <- do.call(rbind, results)
   rownames(result_df) <- NULL
