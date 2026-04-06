@@ -6,24 +6,17 @@
 #' process a list to fill in missing values with defaults.
 #'
 #' @param maxit Maximum number of EM iterations (default: 200)
-#' @param atol Absolute tolerance for parameter convergence. The EM algorithm
-#'   converges when the maximum absolute change in any parameter (including
-#'   variance parameters) is less than this value:
-#'   max(|theta_new - theta_old|) < atol (default: 1e-4)
-#' @param rtol Relative tolerance for log-likelihood convergence. The EM
-#'   algorithm converges when the relative change in log-likelihood is less
-#'   than this value: |L_new - L_old| / (|L_new| + epsilon) < rtol, where
-#'   epsilon = 1e-8 prevents division by zero (default: 1e-5)
+#' @param tol Convergence tolerance. The EM algorithm converges
+#'   when max|theta_new - theta_old| < tol (default: 1e-3)
 #' @param verbose Logical or numeric; controls verbosity level. FALSE/0 for
 #'   silent, TRUE/1 for basic progress, 2 for detailed output (default: FALSE)
 #' @param parallel Logical; whether to use parallel computation (default: FALSE)
 #' @param n_cores Integer; number of cores to use for parallel computation.
 #'   If 0, uses all available cores (default: 0)
 #' @param quad_level Integer; quadrature level for numerical integration
-#'   (default: 4)
-#' @param n_early Integer; number of early time points to use for quadratic
-#'   fitting when estimating initial states. Using 15 points balances capturing
-#'   initial curvature while avoiding overfitting (default: 15)
+#'   (default: 3)
+#' @param hazard_quadrature Integer; number of Simpson sub-intervals per
+#'   observation interval for hazard integration (default: 1)
 #' @param .list Optional list of control parameters to process
 #' @param ... Additional control parameters
 #'
@@ -38,7 +31,7 @@
 #' control <- JointODE.control()
 #'
 #' # Custom settings for faster exploration
-#' control <- JointODE.control(maxit = 30, atol = 1e-4, rtol = 1e-4)
+#' control <- JointODE.control(maxit = 30, tol = 1e-3)
 #'
 #' # Verbose output for debugging
 #' control <- JointODE.control(verbose = TRUE)
@@ -54,81 +47,111 @@
 # nolint next: object_name_linter
 JointODE.control <- function(
   maxit = 200,
-  atol = 1e-4,
-  rtol = 1e-5,
+  tol = 1e-3,
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,
-  quad_level = 4,
-  n_early = 15,
+  quad_level = 3,
+  hazard_quadrature = 1,
   .list = NULL,
   ...
 ) {
-  # Define defaults (use function arguments as source of truth)
   defaults <- list(
-    maxit = maxit,
-    atol = atol,
-    rtol = rtol,
-    verbose = verbose,
-    parallel = parallel,
-    n_cores = n_cores,
-    quad_level = quad_level,
-    n_early = n_early
+    maxit = maxit, tol = tol, verbose = verbose,
+    parallel = parallel, n_cores = n_cores, quad_level = quad_level,
+    hazard_quadrature = hazard_quadrature
   )
 
-  # If a list is provided, merge with defaults
   if (!is.null(.list)) {
-    if (!is.list(.list)) {
-      stop(".list must be a list or NULL")
-    }
+    if (!is.list(.list)) stop(".list must be a list or NULL")
     control <- defaults
-    for (name in names(.list)) {
-      control[[name]] <- .list[[name]]
-    }
+    for (name in names(.list)) control[[name]] <- .list[[name]]
   } else {
     control <- defaults
   }
 
-  # Add any additional parameters
   dots <- list(...)
-  if (length(dots) > 0) {
-    for (name in names(dots)) {
-      control[[name]] <- dots[[name]]
-    }
-  }
+  for (name in names(dots)) control[[name]] <- dots[[name]]
 
-  # Process verbose parameter - ensure it's numeric
-  if (!is.null(control$verbose)) {
-    if (is.logical(control$verbose)) {
-      control$verbose <- as.numeric(control$verbose)
-    } else if (!is.numeric(control$verbose)) {
-      stop("verbose must be logical (TRUE/FALSE) or numeric (0, 1, 2)")
-    }
-  } else {
-    control$verbose <- 0
-  }
+  control$verbose <- as.numeric(control$verbose)
 
-  # Validate parameters
-  if (control$maxit <= 0) {
-    stop("maxit must be positive")
-  }
-  if (control$atol <= 0) {
-    stop("atol must be positive")
-  }
-  if (control$rtol <= 0) {
-    stop("rtol must be positive")
-  }
-  if (!is.logical(control$parallel)) {
-    stop("parallel must be TRUE or FALSE")
-  }
+  if (control$maxit <= 0) stop("maxit must be positive")
+  if (control$tol <= 0) stop("tol must be positive")
+  if (!is.logical(control$parallel)) stop("parallel must be TRUE or FALSE")
   if (!is.numeric(control$n_cores) || control$n_cores < 0) {
     stop("n_cores must be a non-negative integer")
   }
   if (!is.numeric(control$quad_level) || control$quad_level < 1) {
     stop("quad_level must be a positive integer")
   }
-  if (!is.numeric(control$n_early) || control$n_early < 4) {
-    stop("n_early must be an integer >= 4")
+  if (!is.numeric(control$hazard_quadrature) || control$hazard_quadrature < 1 ||
+      control$hazard_quadrature != as.integer(control$hazard_quadrature)) {
+    stop("hazard_quadrature must be a positive integer")
+  }
+
+  control
+}
+
+#' Control Parameters for MarginalODE
+#'
+#' @description
+#' Construct control parameters for the MarginalODE optimization.
+#'
+#' @param maxit Maximum number of alternating optimization iterations
+#'   (default: 200)
+#' @param tol Convergence tolerance on max absolute parameter
+#'   change (default: 1e-3)
+#' @param verbose Logical or numeric; FALSE/0 for silent, TRUE/1 for basic
+#'   progress, 2 for detailed output (default: FALSE)
+#' @param parallel Logical; whether to use parallel computation (default: FALSE)
+#' @param n_cores Integer; number of cores (0 = auto) (default: 0)
+#' @param .list Optional list of control parameters to process
+#' @param ... Additional control parameters
+#'
+#' @return A list of control parameters with all defaults filled in
+#'
+#' @concept model-fitting
+#' @keywords internal
+#' @export
+#'
+#' @examples
+#' control <- MarginalODE.control()
+#' control <- MarginalODE.control(maxit = 50, tol = 1e-3)
+#'
+#' @seealso \code{\link{MarginalODE}}
+# nolint next: object_name_linter
+MarginalODE.control <- function(
+  maxit = 200,
+  tol = 1e-3,
+  verbose = FALSE,
+  parallel = FALSE,
+  n_cores = 0,
+  .list = NULL,
+  ...
+) {
+  defaults <- list(
+    maxit = maxit, tol = tol, verbose = verbose,
+    parallel = parallel, n_cores = n_cores
+  )
+
+  if (!is.null(.list)) {
+    if (!is.list(.list)) stop(".list must be a list or NULL")
+    control <- defaults
+    for (name in names(.list)) control[[name]] <- .list[[name]]
+  } else {
+    control <- defaults
+  }
+
+  dots <- list(...)
+  for (name in names(dots)) control[[name]] <- dots[[name]]
+
+  control$verbose <- as.numeric(control$verbose)
+
+  if (control$maxit <= 0) stop("maxit must be positive")
+  if (control$tol <= 0) stop("tol must be positive")
+  if (!is.logical(control$parallel)) stop("parallel must be TRUE or FALSE")
+  if (!is.numeric(control$n_cores) || control$n_cores < 0) {
+    stop("n_cores must be a non-negative integer")
   }
 
   control

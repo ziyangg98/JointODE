@@ -6,13 +6,12 @@
 \usage{
 JointODE.control(
   maxit = 200,
-  atol = 1e-04,
-  rtol = 1e-05,
+  tol = 0.001,
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,
-  quad_level = 4,
-  n_early = 15,
+  quad_level = 3,
+  hazard_quadrature = 1,
   .list = NULL,
   ...
 )
@@ -20,15 +19,8 @@ JointODE.control(
 \arguments{
 \item{maxit}{Maximum number of EM iterations (default: 200)}
 
-\item{atol}{Absolute tolerance for parameter convergence. The EM algorithm
-converges when the maximum absolute change in any parameter (including
-variance parameters) is less than this value:
-max(|theta_new - theta_old|) < atol (default: 1e-4)}
-
-\item{rtol}{Relative tolerance for log-likelihood convergence. The EM
-algorithm converges when the relative change in log-likelihood is less
-than this value: |L_new - L_old| / (|L_new| + epsilon) < rtol, where
-epsilon = 1e-8 prevents division by zero (default: 1e-5)}
+\item{tol}{Convergence tolerance. The EM algorithm converges
+when max|theta_new - theta_old| < tol (default: 1e-3)}
 
 \item{verbose}{Logical or numeric; controls verbosity level. FALSE/0 for
 silent, TRUE/1 for basic progress, 2 for detailed output (default: FALSE)}
@@ -39,11 +31,10 @@ silent, TRUE/1 for basic progress, 2 for detailed output (default: FALSE)}
 If 0, uses all available cores (default: 0)}
 
 \item{quad_level}{Integer; quadrature level for numerical integration
-(default: 4)}
+(default: 3)}
 
-\item{n_early}{Integer; number of early time points to use for quadratic
-fitting when estimating initial states. Using 15 points balances capturing
-initial curvature while avoiding overfitting (default: 15)}
+\item{hazard_quadrature}{Integer; number of Simpson sub-intervals per
+observation interval for hazard integration (default: 1)}
 
 \item{.list}{Optional list of control parameters to process}
 
@@ -62,7 +53,7 @@ process a list to fill in missing values with defaults.
 control <- JointODE.control()
 
 # Custom settings for faster exploration
-control <- JointODE.control(maxit = 30, atol = 1e-4, rtol = 1e-4)
+control <- JointODE.control(maxit = 30, tol = 1e-3)
 
 # Verbose output for debugging
 control <- JointODE.control(verbose = TRUE)

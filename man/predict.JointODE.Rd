@@ -41,6 +41,7 @@ A data.frame with columns:
 \item{\code{cumhaz}}{Predicted cumulative hazard at each time point}
 \item{\code{survival}}{Predicted survival probability, computed as
 \eqn{S(t) = \exp(-\text{cumhaz})}}
+\item{\code{log_hazard}}{Log instantaneous hazard at each time point}
 \item{\code{biomarker}}{Predicted biomarker values}
 \item{\code{velocity}}{Predicted velocity (first derivative)}
 \item{\code{acceleration}}{Predicted acceleration (second derivative)}

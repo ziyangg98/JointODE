@@ -3,4 +3,4 @@ linters: linters_with_defaults(
   object_name_linter(styles = c("snake_case", "symbols", "CamelCase")),
   trailing_whitespace_linter()
   )
-exclusions: list("R/RcppExports.R", "tests/testthat.R")
+exclusions: list("R/RcppExports.R", "tests/testthat.R", "tests/testthat/helper-mock.R")

@@ -14,65 +14,32 @@ MarginalODE(
 )
 }
 \arguments{
-\item{formula}{A formula object specifying the response variable and
-covariates (e.g., \code{biomarker ~ x1 + x2} or \code{biomarker ~ 1}
-for intercept-only)}
+\item{formula}{Response and covariates
+(e.g., \code{biomarker ~ x1 + x2})}
 
-\item{data}{A data frame containing the longitudinal measurements}
+\item{data}{Data frame with longitudinal measurements}
 
-\item{time}{Character string specifying the time variable name
-(default: \code{"time"})}
+\item{time}{Time variable name (default: \code{"time"})}
 
-\item{id}{Character string specifying the subject identifier variable name
-(default: \code{"id"})}
+\item{id}{Subject identifier name (default: \code{"id"})}
 
-\item{state}{Optional matrix of initial conditions with two columns:
-\itemize{
-\item Column 1: Initial biomarker values \eqn{m(0)}
-\item Column 2: Initial velocities \eqn{\dot{m}(0)}
-}
-Each row corresponds to one subject. If \code{NULL}, initial values are
-estimated from the data.}
+\item{state}{Optional \eqn{n \times 2} matrix of initial
+conditions \eqn{[m(0), \dot{m}(0)]}. If \code{NULL},
+estimated from data.}
 
-\item{control}{A list of control parameters for optimization, or output
-from \code{\link{JointODE.control}}. Key parameters include:
-\describe{
-\item{\code{verbose}}{Verbosity level (default: FALSE)}
-\item{\code{parallel}}{Logical flag enabling parallel computation
-(default: FALSE)}
-\item{\code{n_cores}}{Number of CPU cores for parallel processing.
-If 0, automatically detects available cores (default: 0)}
-}
-See \code{\link{JointODE.control}} for complete details.}
+\item{control}{List of control parameters.
+See \code{\link{MarginalODE.control}}.}
 }
 \value{
-A list (S3 class \code{MarginalODE}) containing:
-\describe{
-\item{\code{parameters}}{Named numeric vector of parameter estimates
-(value, slope, and covariate coefficients)}
-\item{\code{measurement_error_sd}}{Residual standard deviation}
-\item{\code{logLik}}{Log-likelihood value}
-\item{\code{AIC}}{Akaike Information Criterion}
-\item{\code{BIC}}{Bayesian Information Criterion}
-\item{\code{convergence}}{List with \code{converged} (logical),
-\code{iterations}, and \code{message}}
-\item{\code{vcov}}{Variance-covariance matrix from inverse Hessian
-(may be NA matrix if Hessian is singular)}
-\item{\code{data}}{Processed data list used for fitting}
-\item{\code{control}}{Control parameters used}
-\item{\code{call}}{Matched function call}
-}
+S3 object of class \code{MarginalODE}
 }
 \description{
-Estimates population-level (marginal) ODE parameters for longitudinal
-biomarker trajectories using the second-order differential equation with
-covariate support:
-\deqn{\ddot{m}(t) = \text{value} \cdot m(t) +
-  \text{slope} \cdot \dot{m}(t) + X\beta}
+Estimates population-level ODE parameters for longitudinal
+biomarker trajectories:
+\eqn{\ddot{m}(t) = \beta_1 m(t) + \beta_2 \dot{m}(t) + X\beta}
 }
 \examples{
 \dontrun{
-# Generate simulated data
 fit <- MarginalODE(
   formula = observed ~ x1 + x2,
   data = sim$data$longitudinal_data,

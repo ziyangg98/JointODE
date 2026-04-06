@@ -64,7 +64,6 @@ Here's a basic example using the included simulated dataset:
 
 ```{r example}
 library(JointODE)
-library(survival)
 
 # Load example dataset (200 subjects with longitudinal and survival data)
 data(sim)
@@ -73,14 +72,17 @@ data(sim)
 longitudinal_data <- sim$data$longitudinal_data[
   , c("id", "time", "observed", "x1", "x2")
 ]
+t0 <- proc.time()
 fit <- JointODE(
   longitudinal_formula = observed ~ biomarker + velocity + x1 + x2 +
     (biomarker + velocity | id),
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = longitudinal_data,
   survival_data = sim$data$survival_data,
-  control = list(atol = 1e-3, verbose = 3)
+  init = "marginal",
+  control = list(parallel = TRUE)
 )
+cat(sprintf("Elapsed: %.1f s\n", (proc.time() - t0)["elapsed"]))
 ```
 
 ```{r output}

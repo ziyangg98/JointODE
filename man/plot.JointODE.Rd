@@ -6,8 +6,10 @@
 \usage{
 \method{plot}{JointODE}(
   x,
-  type = c("overview", "biomarker", "velocity", "phase", "survival", "residuals",
-    "residuals_time", "qq", "random_effects"),
+  type = c("overview", "trajectory_biomarker", "trajectory_velocity",
+    "phase_biomarker_velocity", "phase_velocity_acceleration", "survival",
+    "diagnostic_residuals", "diagnostic_residuals_time", "diagnostic_qq",
+    "diagnostic_random_effects", "diagnostic_association"),
   subject_ids = NULL,
   show_observed = TRUE,
   show_individual = TRUE,
@@ -25,18 +27,24 @@
 \itemize{
 \item \code{"overview"}: Panel of 4 key plots (survival, biomarker,
 velocity, phase space)
-\item \code{"trajectories"}: Longitudinal biomarker trajectories.
+\item \code{"trajectory_biomarker"}: Longitudinal biomarker trajectories.
 Can show individual curves or group averages based on \code{by}
-\item \code{"phase"}: Phase space plots (biomarker vs velocity).
+\item \code{"trajectory_velocity"}: Longitudinal velocity trajectories.
 Can show individual curves or group averages based on \code{by}
+\item \code{"phase_biomarker_velocity"}: Phase space plots
+(biomarker vs velocity). Can show individual curves or group
+averages based on \code{by}
+\item \code{"phase_velocity_acceleration"}: Phase space plots
+(velocity vs acceleration). Can show individual curves or group
+averages based on \code{by}
 \item \code{"survival"}: Survival probability curves.
 Can be stratified by \code{by} variable
-\item \code{"residuals"}: Residuals vs fitted values
-\item \code{"residuals_time"}: Residuals vs time
-\item \code{"qq"}: Normal Q-Q plot of residuals
-\item \code{"random_effects"}: Random effects distribution
-\item \code{"association"}: Association between biomarker features
-and hazard
+\item \code{"diagnostic_residuals"}: Residuals vs fitted values
+\item \code{"diagnostic_residuals_time"}: Residuals vs time
+\item \code{"diagnostic_qq"}: Normal Q-Q plot of residuals
+\item \code{"diagnostic_random_effects"}: Random effects distribution
+\item \code{"diagnostic_association"}: Association between
+biomarker features and hazard
 }}
 
 \item{subject_ids}{Character or numeric vector of subject IDs to plot.
@@ -111,7 +119,6 @@ slope) relate to hazard ratios.
 \examples{
 \dontrun{
 library(JointODE)
-library(survival)
 
 # Load example dataset
 data(sim)
@@ -136,30 +143,36 @@ plot(fit)
 plot(fit, type = "overview")
 
 # Individual trajectory plots
-plot(fit, type = "biomarker")  # Shows all subjects
-plot(fit, type = "biomarker", subject_ids = c("1", "2", "3"))
+plot(fit, type = "trajectory_biomarker") # Shows all subjects
+plot(fit, type = "trajectory_biomarker", subject_ids = c("1", "2", "3"))
+plot(fit, type = "trajectory_velocity") # Velocity trajectories
+
+# Phase space plots
+plot(fit, type = "phase_biomarker_velocity")
+plot(fit, type = "phase_velocity_acceleration")
 
 # Group-stratified plots by survival covariates
-plot(fit, type = "survival", by = "w1")  # Continuous variable (auto-grouped)
-plot(fit, type = "biomarker", by = "w2")
-plot(fit, type = "velocity", by = "w2")
-plot(fit, type = "phase", by = "w1")
+plot(fit, type = "survival", by = "w1") # Continuous variable (auto-grouped)
+plot(fit, type = "trajectory_biomarker", by = "w2")
+plot(fit, type = "trajectory_velocity", by = "w2")
+plot(fit, type = "phase_biomarker_velocity", by = "w1")
 
 # Stratify survival by biomarker/velocity
 plot(fit, type = "survival", by = "biomarker")
 plot(fit, type = "survival", by = "velocity")
 
 # Diagnostic plots
-plot(fit, type = "residuals")
-plot(fit, type = "qq")
-plot(fit, type = "random_effects")
+plot(fit, type = "diagnostic_residuals")
+plot(fit, type = "diagnostic_residuals_time")
+plot(fit, type = "diagnostic_qq")
+plot(fit, type = "diagnostic_random_effects")
 
 # Customize colors
 plot(fit, type = "survival", cols = c("red", "blue", "green"))
 
 # Adjust smoothing
-plot(fit, type = "overview", span = 0.5)  # Less smooth
-plot(fit, type = "survival", span = 1.0)  # More smooth
+plot(fit, type = "overview", span = 0.5) # Less smooth
+plot(fit, type = "survival", span = 1.0) # More smooth
 }
 
 }

@@ -1,81 +1,39 @@
-.validate <- function(
+.validate_joint <- function(
   longitudinal_formula,
   survival_formula,
   longitudinal_data,
   survival_data,
-  state,
   gamma,
   spline_baseline,
-  init
+  init,
+  parsed_long = .parse_longitudinal_formula(longitudinal_formula),
+  parsed_surv = .parse_survival_formula(survival_formula),
+  spline_config = modifyList(.default_spline, spline_baseline)
 ) {
-  # Validate formulas (these also check that data has rows)
   .validate_longitudinal_formula(
     formula = longitudinal_formula,
-    data = longitudinal_data
+    data = longitudinal_data,
+    parsed = parsed_long
   )
 
   .validate_survival_formula(
     formula = survival_formula,
-    data = survival_data
+    data = survival_data,
+    parsed = parsed_surv
   )
 
-  .validate_data(
-    longitudinal_formula,
-    survival_formula,
-    longitudinal_data,
-    survival_data
-  )
-
-  .validate_state(state, survival_data)
-
+  .validate_data(longitudinal_data, survival_data, parsed_long, parsed_surv)
   .validate_gamma(gamma)
-
   .validate_spline(spline_baseline)
 
   .validate_initial(
     init = init,
-    longitudinal_formula = longitudinal_formula,
-    survival_formula = survival_formula,
-    spline_baseline = spline_baseline
+    parsed_long = parsed_long,
+    parsed_surv = parsed_surv,
+    spline_config = spline_config
   )
 
   invisible(NULL)
-}
-
-
-.validate_state <- function(state, survival_data) {
-  if (is.null(state)) {
-    return(invisible(TRUE))
-  }
-
-  if (!is.matrix(state)) {
-    stop("state: must be a matrix", call. = FALSE)
-  }
-
-  n_subjects <- nrow(survival_data)
-  if (nrow(state) != n_subjects) {
-    stop(
-      sprintf(
-        "state: wrong rows (expected %d, got %d)",
-        n_subjects,
-        nrow(state)
-      ),
-      call. = FALSE
-    )
-  }
-
-  if (ncol(state) != 2) {
-    stop(
-      sprintf("state: must have 2 columns, got %d", ncol(state)),
-      call. = FALSE
-    )
-  }
-
-  if (any(!is.finite(state))) {
-    stop("state: must contain finite values", call. = FALSE)
-  }
-
-  invisible(TRUE)
 }
 
 
@@ -94,14 +52,11 @@
 #' @importFrom stats setNames
 #' @noRd
 .validate_data <- function(
-  longitudinal_formula,
-  survival_formula,
   longitudinal_data,
-  survival_data
+  survival_data,
+  parsed_long,
+  parsed_surv
 ) {
-  parsed_long <- .parse_longitudinal_formula(longitudinal_formula)
-  parsed_surv <- .parse_survival_formula(survival_formula)
-
   id <- parsed_long$grouping
   time <- parsed_surv$time_var
 
@@ -199,7 +154,11 @@
   invisible(TRUE)
 }
 
-.validate_longitudinal_formula <- function(formula, data) {
+.validate_longitudinal_formula <- function(
+  formula,
+  data,
+  parsed = .parse_longitudinal_formula(formula)
+) {
   if (!inherits(formula, "formula")) {
     stop("Formula must be a formula object", call. = FALSE)
   }
@@ -215,7 +174,8 @@
 
   formula_str <- deparse(formula, width.cutoff = 500)
 
-  pipe_count <- length(gregexpr("\\|", formula_str)[[1]])
+  pipe_matches <- gregexpr("\\|", formula_str)[[1]]
+  pipe_count <- if (pipe_matches[1] == -1L) 0L else length(pipe_matches)
   if (pipe_count > 1) {
     stop(
       "Multiple random effects groupings are not supported. ",
@@ -232,7 +192,7 @@
     )
   }
 
-  parts <- .parse_longitudinal_formula(formula)
+  parts <- parsed
 
   if (is.null(parts$grouping)) {
     stop(
@@ -278,7 +238,11 @@
 }
 
 
-.validate_survival_formula <- function(formula, data) {
+.validate_survival_formula <- function(
+  formula,
+  data,
+  parsed = .parse_survival_formula(formula)
+) {
   if (!inherits(formula, "formula")) {
     stop("Formula must be a formula object", call. = FALSE)
   }
@@ -292,7 +256,7 @@
     stop("Formula must be two-sided: Surv(...) ~ x", call. = FALSE)
   }
 
-  parts <- .parse_survival_formula(formula)
+  parts <- parsed
 
   all_vars <- c(parts$time_var, parts$status_var, parts$covariate_terms)
   missing_vars <- setdiff(all_vars, names(data))
@@ -430,22 +394,21 @@
 
 .validate_initial <- function(
   init,
-  longitudinal_formula,
-  survival_formula,
-  spline_baseline
+  parsed_long,
+  parsed_surv,
+  spline_config
 ) {
-  if (is.null(init)) {
+  if (is.character(init)) {
+    if (!init %in% c("default", "marginal")) {
+      stop("init: must be 'default', 'marginal', or a list", call. = FALSE)
+    }
     return(invisible(TRUE))
   }
 
-  dims <- .compute_dimensions(
-    longitudinal_formula,
-    survival_formula,
-    spline_baseline
-  )
+  dims <- .compute_dimensions(parsed_long, parsed_surv, spline_config)
 
   if (!is.list(init)) {
-    stop("init: must be a list", call. = FALSE)
+    stop("init: must be 'default', 'marginal', or a list", call. = FALSE)
   }
 
   valid_components <- c("coefficients", "configurations")
@@ -469,6 +432,7 @@
       "baseline",
       "hazard",
       "longitudinal",
+      "initial_state",
       "measurement_error_sd",
       "random_effect_sigma"
     )
@@ -654,4 +618,27 @@
   }
 
   invisible(TRUE)
+}
+
+#' @noRd
+.validate_marginal <- function(formula, data, time, id, state) {
+  stopifnot(
+    "formula must be a formula" = inherits(formula, "formula"),
+    "data must be a data.frame or matrix" =
+      is.data.frame(data) || is.matrix(data),
+    "time must be a character string" = is.character(time),
+    "id must be a character string" = is.character(id)
+  )
+  if (is.data.frame(data) || is.matrix(data)) {
+    stopifnot(
+      "time column not found in data" = time %in% names(data),
+      "id column not found in data" = id %in% names(data)
+    )
+  }
+  if (!is.null(state)) {
+    stopifnot(
+      "state must be a matrix with 2 columns" =
+        is.matrix(state) && ncol(state) == 2
+    )
+  }
 }

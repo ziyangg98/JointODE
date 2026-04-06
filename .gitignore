@@ -11,4 +11,13 @@ inst/doc
 
 # Development environment
 .vscode/
-air.toml
+JointODE_*.tar.gz
+*.Rcheck/
+*.bak
+testthat-problems.rds
+tests/*.rds
+
+# renv
+renv/library/
+renv/staging/
+renv/sandbox/

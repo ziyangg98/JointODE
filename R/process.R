@@ -1,16 +1,22 @@
+# Data Processing ==============================================================
+
 #' @importFrom stats na.pass
 #' @noRd
-.process <- function(
-  longitudinal_formula,
-  survival_formula,
+.process_joint <- function(
   longitudinal_data,
   survival_data,
-  state
+  parsed_long = NULL,
+  parsed_surv = NULL,
+  survival_formula = NULL,
+  longitudinal_formula = NULL
 ) {
-  # Parse formulas once before the loop
-  parsed_long <- .parse_longitudinal_formula(longitudinal_formula)
-  parsed_surv <- .parse_survival_formula(survival_formula)
-
+  # Allow backward-compatible calls with formula arguments
+  if (is.null(parsed_long) && !is.null(longitudinal_formula)) {
+    parsed_long <- .parse_longitudinal_formula(longitudinal_formula)
+  }
+  if (is.null(parsed_surv) && !is.null(survival_formula)) {
+    parsed_surv <- .parse_survival_formula(survival_formula)
+  }
   id <- parsed_long$grouping
   time <- parsed_surv$time_var
 
@@ -85,18 +91,11 @@
     } else {
       data.frame()
     }
-    initial_state <- if (!is.null(state)) {
-      state[i, , drop = TRUE]
-    } else {
-      c(0, 0)
-    }
-
     data_process[[i]] <- list(
       id = unique_ids[i],
       time = event_time,
       status = event_status,
       covariates = covariates,
-      initial_state = initial_state,
       longitudinal = list(
         times = long_times,
         measurements = long_measurements,
@@ -110,66 +109,51 @@
   data_process
 }
 
+#' @importFrom stats model.frame model.matrix model.response
 #' @noRd
-.process_marginal <- function(
-  formula,
-  data,
-  id = "id",
-  time = "time"
-) {
-  # Extract response variable name
-  response_var <- all.vars(formula[[2]])
-  if (length(response_var) != 1) {
-    stop("Formula must have exactly one response variable", call. = FALSE)
-  }
+.process_marginal <- function(formula, data, time, id, state) {
+  if (is.matrix(data)) data <- as.data.frame(data)
+  stopifnot(
+    "Data cannot be empty" = nrow(data) > 0,
+    "Data must contain a time column" = time %in% names(data),
+    "Data must contain an id column" = id %in% names(data)
+  )
 
-  # Build model frame and matrix for covariates
-  mf <- model.frame(formula, data = data, na.action = na.pass)
-  mm <- model.matrix(formula, mf)
+  mf <- model.frame(formula, data = data, na.action = na.omit)
+  y <- model.response(mf)
+  X <- model.matrix(formula, data = mf) # nolint: object_name_linter
+  stopifnot("Formula must include a response" = !is.null(y))
 
-  # Extract covariates (excluding intercept if present)
-  if ("(Intercept)" %in% colnames(mm)) {
-    covariates <- mm[, -1, drop = FALSE]
-  } else {
-    covariates <- mm
-  }
+  row_idx <- as.numeric(rownames(mf))
+  times <- data[[time]][row_idx]
+  ids <- data[[id]][row_idx]
+  subjects <- unique(ids)
 
-  # Get unique IDs
-  unique_ids <- unique(data[[id]])
-  n_subjects <- length(unique_ids)
-
-  # Initialize result list
-  data_list <- vector("list", n_subjects)
-  names(data_list) <- as.character(unique_ids)
-
-  # Split data by ID
-  id_groups <- split(seq_len(nrow(data)), data[[id]])
-
-  for (i in seq_along(unique_ids)) {
-    sid <- as.character(unique_ids[i])
-    idx <- id_groups[[sid]]
-
-    if (length(idx) == 0) {
-      # Subject has no observations
-      data_list[[sid]] <- list(
-        time = numeric(0),
-        response = numeric(0),
-        covariates = matrix(0, nrow = 0, ncol = ncol(covariates)),
-        initial = c(0, 0)
+  subject_data <- lapply(seq_along(subjects), function(i) {
+    idx <- which(ids == subjects[i])
+    idx <- idx[order(times[idx])]
+    t_subj <- times[idx]
+    list(
+      time = max(t_subj),
+      initial_state = if (!is.null(state)) {
+        c(state[i, 1], state[i, 2])
+      } else {
+        c(0, 0)
+      },
+      longitudinal = list(
+        times = t_subj,
+        measurements = y[idx],
+        covariates = list(
+          fixed = X[idx, , drop = FALSE],
+          random = matrix(nrow = length(idx), ncol = 0)
+        )
       )
-    } else {
-      # Extract subject data and sort by time
-      subj_times <- data[[time]][idx]
-      time_order <- order(subj_times)
+    )
+  })
 
-      data_list[[sid]] <- list(
-        time = subj_times[time_order],
-        response = data[[response_var]][idx][time_order],
-        covariates = covariates[idx[time_order], , drop = FALSE],
-        initial = c(0, 0)
-      )
-    }
-  }
-
-  data_list
+  names(subject_data) <- as.character(subjects)
+  attr(subject_data, "n_covariates") <- ncol(X)
+  attr(subject_data, "covariate_names") <- colnames(X)
+  attr(subject_data, "biomarker_clamp") <- max(abs(y)) * 5
+  subject_data
 }

@@ -28,17 +28,13 @@
 #'   effect in the hazard function. When \code{gamma = 0}, velocity has no
 #'   effect; \code{gamma = 1} uses linear velocity; \code{gamma = 2} uses
 #'   squared velocity. Default is 1 (default: 1).
-#' @param state A matrix specifying initial conditions for the ODE system with
-#'   two columns: initial biomarker values and their first derivatives. Each row
-#'   corresponds to one subject. If \code{NULL}, defaults to a zero matrix with
-#'   appropriate dimensions (default: \code{NULL}).
 #' @param spline_baseline A list controlling the B-spline representation of the
 #'   baseline hazard function with the following components:
 #'   \describe{
 #'     \item{\code{degree}}{Polynomial degree of the B-spline basis functions
-#'       (default: 2, quadratic splines)}
+#'       (default: 3, cubic splines)}
 #'     \item{\code{n_knots}}{Number of interior knots for flexibility
-#'       (default: 0, providing moderate flexibility)}
+#'       (default: 2)}
 #'     \item{\code{knot_placement}}{Strategy for positioning knots:
 #'       \code{"quantile"} places knots at quantiles of observed event times,
 #'       \code{"equal"} uses equally-spaced knots (default: \code{"equal"})}
@@ -46,14 +42,13 @@
 #'       the boundary knot locations. If \code{NULL}, automatically set to the
 #'       range of observed event times (default: \code{NULL})}
 #'   }
-#' @param init Optional initial values for model parameters. Can be either:
+#' @param init Initial values for model parameters. Can be:
 #'   \itemize{
-#'     \item \code{NULL} (default): Automatically calls
-#'       \code{\link{MarginalODE}} to compute data-driven initial estimates
-#'       for longitudinal parameters and random effects. Recommended for
-#'       most applications.
+#'     \item \code{"default"} (default): Use zero/default initial values.
+#'     \item \code{"marginal"}: Use \code{\link{MarginalODE}} to compute
+#'       data-driven initial estimates.
 #'     \item A list with the same structure as the fitted model's
-#'       \code{parameters} component for full manual control
+#'       \code{parameters} component for full manual control.
 #'   }
 #'   When providing a list, it should have elements:
 #'   \describe{
@@ -77,10 +72,8 @@
 #'   \code{\link{JointODE.control}}. Key parameters include:
 #'   \describe{
 #'     \item{\code{maxit}}{Maximum number of EM iterations (default: 200)}
-#'     \item{\code{atol}}{Absolute tolerance for parameter convergence
-#'       (default: 5e-4)}
-#'     \item{\code{rtol}}{Relative tolerance for log-likelihood
-#'       convergence (default: 1e-5)}
+#'     \item{\code{tol}}{Convergence tolerance on max absolute
+#'       parameter change (default: 1e-3)}
 #'     \item{\code{verbose}}{Verbosity level: FALSE/0 for silent, TRUE/1 for
 #'       progress messages, 2 for detailed output (default: FALSE)}
 #'     \item{\code{parallel}}{Logical flag enabling parallel computation
@@ -88,7 +81,7 @@
 #'     \item{\code{n_cores}}{Number of CPU cores for parallel processing.
 #'       If 0, automatically detects available cores (default: 0)}
 #'     \item{\code{quad_level}}{Quadrature level for numerical integration
-#'       (default: 4)}
+#'       (default: 3)}
 #'   }
 #'   See \code{\link{JointODE.control}} for complete details and examples.
 #' @param ... Additional arguments passed to internal optimization routines.
@@ -117,7 +110,7 @@
 #'     \item{\code{convergence}}{List containing convergence diagnostics:
 #'       \itemize{
 #'         \item \code{converged}: Logical indicating convergence status
-#'         \item \code{em_iterations}: Number of EM iterations performed
+#'         \item \code{iterations}: Number of EM iterations performed
 #'         \item \code{message}: Descriptive convergence message
 #'       }}
 #'     \item{\code{random_effects}}{List containing random effects estimates:
@@ -157,7 +150,6 @@
 #'     closed-form updates for variance parameters
 #' }
 #'
-#' @importFrom stats optim
 #' @importFrom utils modifyList
 #' @importFrom survival Surv
 #' @importFrom cli cli_h2 cli_text cli_alert_success
@@ -168,7 +160,7 @@
 #' @examples
 #' \dontrun{
 #' # Generate example data
-#' sim <- simulate(n_subjects = 100, n_times = 10)
+#' sim <- simulate(n_subjects = 100, n_measurements = 10)
 #'
 #' # Fit with default control parameters
 #' fit1 <- JointODE(
@@ -180,7 +172,7 @@
 #'
 #' # Fit with custom control parameters using JointODE.control()
 #' control <- JointODE.control(
-#'   maxit = 200, atol = 1e-4, rtol = 1e-6, verbose = TRUE
+#'   maxit = 200, tol = 1e-4, verbose = TRUE
 #' )
 #' fit2 <- JointODE(
 #'   longitudinal_formula = observed ~ x1 + x2,
@@ -212,42 +204,22 @@ JointODE <- function(
   longitudinal_data,
   survival_data,
   gamma = 1,
-  state = NULL,
   spline_baseline = list(
-    degree = 2,
-    n_knots = 0,
+    degree = 3,
+    n_knots = 2,
     knot_placement = "equal",
     boundary_knots = NULL
   ),
-  init = NULL,
+  init = "default",
   control = list(),
   ...
 ) {
   cl <- match.call()
 
-  # Validate and process data
-  .validate(
-    longitudinal_formula = longitudinal_formula,
-    survival_formula = survival_formula,
-    longitudinal_data = longitudinal_data,
-    survival_data = survival_data,
-    state = state,
-    gamma = gamma,
-    spline_baseline = spline_baseline,
-    init = init
-  )
-
-  # Process data
-  data_list <- .process(
-    longitudinal_formula = longitudinal_formula,
-    survival_formula = survival_formula,
-    longitudinal_data = longitudinal_data,
-    survival_data = survival_data,
-    state = state
-  )
-
-  # Determine if we need to optimize initial states
-  has_state <- !is.null(state)
+  # Parse formulas and config once
+  parsed_long <- .parse_longitudinal_formula(longitudinal_formula)
+  parsed_surv <- .parse_survival_formula(survival_formula)
+  spline_config <- modifyList(.default_spline, spline_baseline)
 
   # Process control settings
   if (is.null(control)) {
@@ -258,31 +230,103 @@ JointODE <- function(
     stop("control must be a list or NULL")
   }
 
-  # Initialize parameters
-  init_state <- .initialize(
-    longitudinal_formula,
-    survival_formula,
-    longitudinal_data,
-    survival_data,
-    spline_baseline,
-    gamma,
-    state,
-    init,
-    control
+  # Validate
+  .validate_joint(
+    longitudinal_formula = longitudinal_formula,
+    survival_formula = survival_formula,
+    longitudinal_data = longitudinal_data,
+    survival_data = survival_data,
+    gamma = gamma,
+    spline_baseline = spline_baseline,
+    init = init,
+    parsed_long = parsed_long,
+    parsed_surv = parsed_surv,
+    spline_config = spline_config
   )
-  parameters <- init_state$parameters
-  random_effects <- init_state$random_effects
-  coef_names <- init_state$coef_names
+
+  # Process data
+  data_list <- .process_joint(
+    longitudinal_data = longitudinal_data,
+    survival_formula = survival_formula,
+    survival_data = survival_data,
+    parsed_long = parsed_long,
+    parsed_surv = parsed_surv
+  )
+
+  # Initialize parameters
+  model_config <- .setup_model(
+    longitudinal_data = longitudinal_data,
+    survival_data = survival_data,
+    survival_formula = survival_formula,
+    gamma = gamma,
+    parsed_long = parsed_long,
+    parsed_surv = parsed_surv,
+    spline_config = spline_config
+  )
+
+  if (is.character(init) && init == "marginal") {
+    parameters <- .initialize_from_marginal(
+      longitudinal_data, survival_data, gamma, control,
+      parsed_long, parsed_surv, model_config
+    )
+  } else if (is.list(init)) {
+    parameters <- init
+  } else {
+    parameters <- .default_parameters(
+      model_config$dims, gamma, parsed_long,
+      model_config$spline_baseline_config
+    )
+  }
+
+  parameters$configurations$baseline <- model_config$spline_baseline_config
+  response <- stats::model.response(stats::model.frame(
+    .build_formula(parsed_long$fixed_terms, response = parsed_long$response),
+    longitudinal_data
+  ))
+  parameters$configurations$biomarker_clamp <- max(abs(response)) * 5
+  parameters$configurations$hazard_quadrature <- control$hazard_quadrature
+
+  names(parameters$coefficients$baseline) <- model_config$coef_names$baseline
+  names(parameters$coefficients$hazard) <- model_config$coef_names$hazard
+  names(parameters$coefficients$longitudinal) <-
+    model_config$coef_names$longitudinal
+  names(parameters$coefficients$initial_state) <-
+    model_config$coef_names$initial_state
+
+  random_effects <- model_config$random_effects
+  coef_names <- model_config$coef_names
+
+  # Initialize state RE from first observations
+  for (i in seq_along(data_list)) {
+    obs <- data_list[[i]]$longitudinal
+    if (length(obs$measurements) >= 1) {
+      random_effects[i, 1] <- obs$measurements[1] -
+        parameters$coefficients$initial_state[1]
+    }
+    if (length(obs$measurements) >= 2) {
+      dt <- obs$times[2] - obs$times[1]
+      if (dt > 0) {
+        random_effects[i, 2] <- (obs$measurements[2] - obs$measurements[1]) /
+          dt - parameters$coefficients$initial_state[2]
+      }
+    }
+  }
 
   # EM Algorithm
   if (control$verbose > 0) {
     cli::cli_h2("Joint ODE Model Estimation")
-    cli::cli_text(paste0(
-      "Convergence: atol={sprintf('%.1e', control$atol)}, ",
-      "rtol={sprintf('%.1e', control$rtol)}, ",
-      "max_iter={control$maxit}"
+    cli::cli_text(sprintf(
+      "Convergence: tol=%.1e, max_iter=%d",
+      control$tol,
+      control$maxit
     ))
     cli::cli_text("")
+  }
+
+  # Set up parallel plan once before EM loop
+  if (control$parallel) {
+    parallel_cleanup <- .setup_parallel_plan(control$n_cores)
+    on.exit(parallel_cleanup(), add = TRUE)
   }
 
   # EM loop
@@ -295,26 +339,7 @@ JointODE <- function(
   converged <- FALSE
 
   for (em_iter in seq_len(control$maxit)) {
-    if (!has_state) {
-      opt_results <- .parallel_apply(
-        seq_along(data_list),
-        function(i) {
-          .estimate_state(
-            data_list[[i]]$initial_state,
-            data_list[[i]],
-            curr$random_effects[i, ],
-            curr$parameters
-          )
-        },
-        control$parallel,
-        control$n_cores
-      )
-      for (i in seq_along(data_list)) {
-        data_list[[i]]$initial_state <- opt_results[[i]]$state
-      }
-    }
-
-    # EM step
+    # EM step (initial states integrated as random effects)
     curr <- .em_step(
       data_list,
       curr$parameters,
@@ -331,38 +356,33 @@ JointODE <- function(
     }
 
     prev <- curr
-
-    # Periodic garbage collection every 10 iterations to free memory
-    if (em_iter %% 10 == 0) {
-      gc(verbose = FALSE, full = TRUE)
-    }
   }
 
   # Finalize model
-  final_results <- .finalize(
+  final_results <- .finalize_joint(
     data_list = data_list,
     parameters = curr$parameters,
-    random_effects = curr$random_effects,
     loglik = curr$loglik,
     control = control,
     coef_names = coef_names,
-    converged = converged
+    converged = converged,
+    random_effects = curr$random_effects
   )
 
   # Return fitted model
   structure(
     list(
-      parameters = curr$parameters,
+      parameters = final_results$parameters,
       logLik = final_results$loglik,
       AIC = final_results$aic,
       BIC = final_results$bic,
       cindex = final_results$cindex,
       convergence = list(
         converged = converged,
-        em_iterations = if (converged) em_iter else control$maxit,
+        iterations = if (converged) em_iter else control$maxit,
         message = sprintf(
-          "EM algorithm %s after %d iterations",
-          if (converged) "converged" else "did not converge within",
+          "%s after %d iterations",
+          if (converged) "Converged" else "Did not converge",
           if (converged) em_iter else control$maxit
         )
       ),
@@ -397,39 +417,29 @@ summary.JointODE <- function(object, ...) {
   n_baseline <- length(object$parameters$coefficients$baseline)
   n_hazard <- length(object$parameters$coefficients$hazard)
   n_longitudinal <- length(object$parameters$coefficients$longitudinal)
+  n_init <- length(object$parameters$coefficients$initial_state)
 
-  # Baseline hazard coefficients
   idx_baseline <- seq_len(n_baseline)
-  coef_baseline <- cbind(
-    Estimate = coefs[idx_baseline],
-    `Std. Error` = se[idx_baseline],
-    `z value` = coefs[idx_baseline] / se[idx_baseline],
-    `Pr(>|z|)` = 2 * pnorm(-abs(coefs[idx_baseline] / se[idx_baseline]))
-  )
+  idx_survival <- n_baseline + seq_len(n_hazard)
+  idx_longitudinal <- (n_baseline + n_hazard) + seq_len(n_longitudinal)
+  idx_initial <- (n_baseline + n_hazard + n_longitudinal) + seq_len(n_init)
+
+  coef_baseline <- .coef_table(coefs[idx_baseline], se[idx_baseline])
   rownames(coef_baseline) <- gsub("baseline:", "", rownames(coef_baseline))
 
-  # Survival process coefficients (hazard parameters)
-  idx_survival <- n_baseline + seq_len(n_hazard)
-  coef_survival <- cbind(
-    Estimate = coefs[idx_survival],
-    `Std. Error` = se[idx_survival],
-    `z value` = coefs[idx_survival] / se[idx_survival],
-    `Pr(>|z|)` = 2 * pnorm(-abs(coefs[idx_survival] / se[idx_survival]))
-  )
+  coef_survival <- .coef_table(coefs[idx_survival], se[idx_survival])
   rownames(coef_survival) <- gsub("hazard:", "", rownames(coef_survival))
 
-  # Longitudinal process coefficients (ODE parameters)
-  idx_longitudinal <- (n_baseline + n_hazard) + seq_len(n_longitudinal)
-  coef_longitudinal <- cbind(
-    Estimate = coefs[idx_longitudinal],
-    `Std. Error` = se[idx_longitudinal],
-    `z value` = coefs[idx_longitudinal] / se[idx_longitudinal],
-    `Pr(>|z|)` = 2 * pnorm(-abs(coefs[idx_longitudinal] / se[idx_longitudinal]))
+  coef_longitudinal <- .coef_table(
+    coefs[idx_longitudinal], se[idx_longitudinal]
   )
   rownames(coef_longitudinal) <- gsub(
-    "longitudinal:",
-    "",
-    rownames(coef_longitudinal)
+    "longitudinal:", "", rownames(coef_longitudinal)
+  )
+
+  coef_initial <- .coef_table(coefs[idx_initial], se[idx_initial])
+  rownames(coef_initial) <- gsub(
+    "initial state:", "", rownames(coef_initial)
   )
 
   # Delta method for derived parameters (period and xi)
@@ -495,12 +505,12 @@ summary.JointODE <- function(object, ...) {
 
   # Count longitudinal observations and events from data
   n_subjects <- length(object$data)
-  n_observations <- sum(sapply(object$data, function(subject) {
+  n_observations <- sum(vapply(object$data, function(subject) {
     length(subject$longitudinal$measurements)
-  }))
-  n_events <- sum(sapply(object$data, function(subject) {
+  }, integer(1)))
+  n_events <- sum(vapply(object$data, function(subject) {
     subject$status
-  }))
+  }, numeric(1)))
   event_rate <- n_events / n_subjects
 
   structure(
@@ -509,6 +519,7 @@ summary.JointODE <- function(object, ...) {
       coef_baseline = coef_baseline,
       coef_survival = coef_survival,
       coef_longitudinal = coef_longitudinal,
+      coef_initial = coef_initial,
       derived_params = derived_params,
       sigma = c(sigma_e = object$parameters$coefficients$measurement_error_sd),
       sigma_b_matrix = object$parameters$coefficients$random_effect_sigma,
@@ -558,7 +569,7 @@ print.summary.JointODE <- function(
   # Longitudinal Process (ODE model)
   cat("Longitudinal Process: Second-Order ODE Model\n")
   if (!is.null(x$coef_longitudinal)) {
-    printCoefmat(
+    .print_coefmat(
       x$coef_longitudinal,
       digits = digits,
       signif.stars = signif.stars,
@@ -569,7 +580,7 @@ print.summary.JointODE <- function(
   # Derived ODE characteristics
   if (!is.null(x$derived_params)) {
     cat("\nODE System Characteristics:\n")
-    printCoefmat(
+    .print_coefmat(
       x$derived_params,
       digits = digits,
       signif.stars = signif.stars,
@@ -580,7 +591,7 @@ print.summary.JointODE <- function(
   # Survival Process
   cat("\nSurvival Process: Proportional Hazards Model\n")
   if (!is.null(x$coef_survival)) {
-    printCoefmat(
+    .print_coefmat(
       x$coef_survival,
       digits = digits,
       signif.stars = signif.stars,
@@ -603,6 +614,15 @@ print.summary.JointODE <- function(
         max(x$coef_baseline[, "Estimate"])
       ),
       ")\n"
+    )
+  }
+
+  # Initial State
+  if (!is.null(x$coef_initial)) {
+    cat("\nInitial State: Population Mean\n")
+    .print_coefmat(
+      x$coef_initial,
+      digits = digits, signif.stars = signif.stars, ...
     )
   }
 
@@ -633,11 +653,12 @@ print.summary.JointODE <- function(
 #' @export
 coef.JointODE <- function(object, ...) {
   cf <- object$parameters$coefficients
-  coefs <- c(cf$baseline, cf$hazard, cf$longitudinal)
+  coefs <- c(cf$baseline, cf$hazard, cf$longitudinal, cf$initial_state)
   names(coefs) <- c(
     paste0("baseline:", names(cf$baseline)),
     paste0("hazard:", names(cf$hazard)),
-    paste0("longitudinal:", names(cf$longitudinal))
+    paste0("longitudinal:", names(cf$longitudinal)),
+    paste0("initial state:", names(cf$initial_state))
   )
   coefs
 }
@@ -662,14 +683,9 @@ vcov.JointODE <- function(object, ...) {
 #' @importFrom stats coef
 #' @export
 logLik.JointODE <- function(object, ...) {
-  # Count parameters: fixed effects + sigma_e + Sigma_b (symmetric matrix)
-  p_random <- nrow(object$parameters$coefficients$random_effect_sigma)
-  n_sigma_b_params <- p_random * (p_random + 1) / 2
-  n_params <- length(coef(object)) + 1 + n_sigma_b_params
-
   structure(
     object$logLik,
-    df = n_params,
+    df = .count_params(object$parameters),
     nobs = length(object$data),
     class = "logLik"
   )
@@ -689,11 +705,7 @@ print.JointODE <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
   cat("Call: ")
   print(x$call)
 
-  # Count parameters: fixed effects + sigma_e + Sigma_b (symmetric matrix)
-  p_random <- nrow(x$parameters$coefficients$random_effect_sigma)
-  n_sigma_b_params <- p_random * (p_random + 1) / 2
-  n_params <- length(coef(x)) + 1 + n_sigma_b_params
-
+  n_params <- .count_params(x$parameters)
   cat(
     "\nLog-likelihood:",
     format(x$logLik, digits = digits),
@@ -739,6 +751,7 @@ print.JointODE <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
 #'     \item{\code{cumhaz}}{Predicted cumulative hazard at each time point}
 #'     \item{\code{survival}}{Predicted survival probability, computed as
 #'       \eqn{S(t) = \exp(-\text{cumhaz})}}
+#'     \item{\code{log_hazard}}{Log instantaneous hazard at each time point}
 #'     \item{\code{biomarker}}{Predicted biomarker values}
 #'     \item{\code{velocity}}{Predicted velocity (first derivative)}
 #'     \item{\code{acceleration}}{Predicted acceleration (second derivative)}
@@ -799,46 +812,11 @@ predict.JointODE <- function(
     # Use last observation carried forward (LOCF) for times beyond observed data
     orig_times <- subj$longitudinal$times
 
-    extend_covariates_matrix <- function(cov_mat, orig_times, pred_times) {
-      if (is.null(cov_mat) || length(cov_mat) == 0) {
-        # Return empty matrix with correct dimensions
-        if (is.matrix(cov_mat)) {
-          return(matrix(numeric(0), nrow = length(pred_times), ncol = 0))
-        } else {
-          return(cov_mat) # Keep original structure if not a matrix
-        }
-      }
-
-      # For each pred_time, find the corresponding row in cov_mat using LOCF
-      indices <- sapply(pred_times, function(t) {
-        if (t <= max(orig_times)) {
-          # Find the closest time <= t
-          max(which(orig_times <= t))
-        } else {
-          # Use last observation
-          length(orig_times)
-        }
-      })
-
-      # Extract rows based on indices
-      if (is.matrix(cov_mat)) {
-        cov_mat[indices, , drop = FALSE]
-      } else {
-        # If it's a vector, return as vector
-        cov_mat[indices]
-      }
-    }
-
-    extended_fixed <- extend_covariates_matrix(
-      subj$longitudinal$covariates$fixed,
-      orig_times,
-      pred_times
+    extended_fixed <- .extend_covariates(
+      subj$longitudinal$covariates$fixed, orig_times, pred_times
     )
-
-    extended_random <- extend_covariates_matrix(
-      subj$longitudinal$covariates$random,
-      orig_times,
-      pred_times
+    extended_random <- .extend_covariates(
+      subj$longitudinal$covariates$random, orig_times, pred_times
     )
 
     extended_time <- if (!is.null(times)) {
@@ -852,7 +830,6 @@ predict.JointODE <- function(
       time = extended_time,
       status = subj$status,
       covariates = subj$covariates,
-      initial_state = subj$initial_state,
       longitudinal = list(
         times = pred_times,
         measurements = rep(0, length(pred_times)),
@@ -865,13 +842,13 @@ predict.JointODE <- function(
   })
 
   # Remove NULL entries
-  valid_idx <- !sapply(pred_data_list, is.null)
+  valid_idx <- !vapply(pred_data_list, is.null, logical(1))
   pred_data_list <- pred_data_list[valid_idx]
   valid_random_effects <- random_effects[valid_idx, , drop = FALSE]
   valid_ids <- names(data_list)[valid_idx]
 
   # Solve ODE for all subjects at once
-  ode_solutions <- .solve_batch_ode_cppad(
+  ode_solutions <- .solve_batch_joint(
     data_list = pred_data_list,
     random_effects = valid_random_effects,
     parameters = parameters
@@ -884,6 +861,7 @@ predict.JointODE <- function(
       time = ode_solutions[[i]]$times,
       cumhaz = ode_solutions[[i]]$cum_hazard,
       survival = exp(-ode_solutions[[i]]$cum_hazard),
+      log_hazard = ode_solutions[[i]]$log_hazard,
       biomarker = ode_solutions[[i]]$biomarker,
       velocity = ode_solutions[[i]]$velocity,
       acceleration = ode_solutions[[i]]$acceleration,

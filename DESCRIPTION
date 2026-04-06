@@ -14,7 +14,7 @@ Description: Implements joint modeling of longitudinal biomarker trajectories an
     capturing complex temporal patterns through ODE-based trajectory modeling while
     accounting for their association with event times through shared random effects.
 License: MIT + file LICENSE
-URL: https://github.com/ziyangg98/JointODE, http://gongziyang.com/JointODE/
+URL: https://github.com/ziyangg98/JointODE, https://gongziyang.com/JointODE/
 BugReports: https://github.com/ziyangg98/JointODE/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
@@ -37,7 +37,6 @@ Imports:
     patchwork,
     dplyr,
     tidyr,
-    magrittr,
     viridisLite
 LinkingTo:
     Rcpp,
@@ -46,14 +45,14 @@ Suggests:
     knitr,
     rmarkdown,
     testthat (>= 3.0.0),
-    JSM,
+    JMbayes2,
     nlme,
     purrr,
     gridExtra,
     latex2exp,
-    kableExtra
+    JMbayes2
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 Depends:
-    R (>= 3.5)
+    R (>= 4.1.0)
 LazyData: true

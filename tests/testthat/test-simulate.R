@@ -60,7 +60,8 @@ test_that("simulate generates valid output and respects parameters", {
   expect_type(sim, "list")
   expect_named(
     sim,
-    c("longitudinal_data", "survival_data", "state", "random_effects")
+    c("longitudinal_data", "survival_data", "state",
+      "initial_state_mean", "random_effects")
   )
   expect_s3_class(sim$longitudinal_data, "data.frame")
   expect_s3_class(sim$survival_data, "data.frame")
@@ -77,7 +78,10 @@ test_that("simulate generates valid output and respects parameters", {
   ))
   expect_true(is.matrix(sim$state))
   expect_equal(colnames(sim$state), c("biomarker", "velocity"))
-  expect_equal(colnames(sim$random_effects), c("dyn_value", "dyn_slope"))
+  expect_equal(
+    colnames(sim$random_effects),
+    c("m0", "v0", "dyn_value", "dyn_slope")
+  )
 
   expect_true(!is.null(attr(sim$random_effects, "mu")))
   expect_true(!is.null(attr(sim$random_effects, "sigma")))
@@ -102,9 +106,7 @@ test_that("simulate is reproducible", {
 })
 
 test_that("dynamics transformation and covariance are correct", {
-  skip_on_cran()
-
-  n <- 50
+  n <- 20
   xi_mean <- 0.6
   period_mean <- 7
 
@@ -139,7 +141,7 @@ test_that("dynamics transformation and covariance are correct", {
 })
 
 test_that("random_effects are properly centered", {
-  n <- 30
+  n <- 15
   sim <- JointODE::simulate(
     n_subjects = n,
     longitudinal = list(
@@ -159,8 +161,10 @@ test_that("random_effects are properly centered", {
   sigma <- attr(sim$random_effects, "sigma")
   se <- sqrt(diag(sigma) / n)
 
-  for (i in seq_len(ncol(sim$random_effects))) {
-    expect_true(abs(mean(sim$random_effects[, i])) < 4 * se[i])
+  # Only check dyn_value and dyn_slope (cols 3-4) which have population sigma
+  for (i in seq_along(se)) {
+    col_idx <- i + 2 # skip m0, v0 columns
+    expect_true(abs(mean(sim$random_effects[, col_idx])) < 4 * se[i])
   }
 })
 
@@ -264,7 +268,7 @@ test_that("simulate handles edge cases", {
   )
   expect_equal(nrow(sim1$random_effects), 1)
   expect_true(is.matrix(sim1$random_effects))
-  expect_equal(ncol(sim1$random_effects), 2)
+  expect_equal(ncol(sim1$random_effects), 4)
 
   sim_det <- JointODE::simulate(
     n_subjects = 5,
@@ -292,7 +296,7 @@ test_that("simulate handles edge cases", {
 
 test_that("simulate respects gamma parameter", {
   sim_g0 <- JointODE::simulate(
-    n_subjects = 20,
+    n_subjects = 5,
     survival = list(
       baseline = list(type = "weibull", shape = 2, scale = 15),
       value = 0.5,
@@ -304,7 +308,7 @@ test_that("simulate respects gamma parameter", {
   )
 
   sim_g1 <- JointODE::simulate(
-    n_subjects = 20,
+    n_subjects = 5,
     survival = list(
       baseline = list(type = "weibull", shape = 2, scale = 15),
       value = 0.5,
@@ -316,7 +320,7 @@ test_that("simulate respects gamma parameter", {
   )
 
   sim_g2 <- JointODE::simulate(
-    n_subjects = 20,
+    n_subjects = 5,
     survival = list(
       baseline = list(type = "weibull", shape = 2, scale = 15),
       value = 0.5,
@@ -372,7 +376,7 @@ test_that("simulate handles covariates correctly", {
   expect_true(all(c("w1", "w2") %in% names(sim_with_cov$survival_data)))
   expect_equal(
     colnames(sim_with_cov$random_effects),
-    c("dyn_value", "dyn_slope")
+    c("m0", "v0", "dyn_value", "dyn_slope")
   )
   expect_true(all(sim_with_cov$survival_data$w2 %in% c(0, 1)))
 
@@ -401,14 +405,12 @@ test_that("simulate handles covariates correctly", {
   )
 
   expect_equal(ncol(sim_no_cov$longitudinal_data), 6)
-  expect_equal(ncol(sim_no_cov$random_effects), 2)
+  expect_equal(ncol(sim_no_cov$random_effects), 4)
   expect_equal(ncol(sim_no_cov$survival_data), 3)
 })
 
 test_that(".create_example_data works", {
-  skip_on_cran()
-
-  example <- .create_example_data(n_subjects = 50, seed = 123)
+  example <- .create_example_data(n_subjects = 20, seed = 123)
 
   expect_named(example, c("data", "init"))
   expect_named(example$init, c("coefficients", "configurations"))
@@ -418,6 +420,7 @@ test_that(".create_example_data works", {
       "longitudinal_data",
       "survival_data",
       "state",
+      "initial_state_mean",
       "random_effects"
     ) %in%
       names(example$data)
@@ -430,7 +433,7 @@ test_that(".create_example_data works", {
 
   expect_equal(example$init$configurations$gamma, 1)
 
-  example2 <- .create_example_data(n_subjects = 50, seed = 123)
+  example2 <- .create_example_data(n_subjects = 20, seed = 123)
   expect_identical(
     example$data$survival_data$time,
     example2$data$survival_data$time

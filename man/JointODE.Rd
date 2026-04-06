@@ -10,10 +10,9 @@ JointODE(
   longitudinal_data,
   survival_data,
   gamma = 1,
-  state = NULL,
-  spline_baseline = list(degree = 2, n_knots = 0, knot_placement = "equal",
+  spline_baseline = list(degree = 3, n_knots = 2, knot_placement = "equal",
     boundary_knots = NULL),
-  init = NULL,
+  init = "default",
   control = list(),
   ...
 )
@@ -44,18 +43,13 @@ effect in the hazard function. When \code{gamma = 0}, velocity has no
 effect; \code{gamma = 1} uses linear velocity; \code{gamma = 2} uses
 squared velocity. Default is 1 (default: 1).}
 
-\item{state}{A matrix specifying initial conditions for the ODE system with
-two columns: initial biomarker values and their first derivatives. Each row
-corresponds to one subject. If \code{NULL}, defaults to a zero matrix with
-appropriate dimensions (default: \code{NULL}).}
-
 \item{spline_baseline}{A list controlling the B-spline representation of the
 baseline hazard function with the following components:
 \describe{
 \item{\code{degree}}{Polynomial degree of the B-spline basis functions
-(default: 2, quadratic splines)}
+(default: 3, cubic splines)}
 \item{\code{n_knots}}{Number of interior knots for flexibility
-(default: 0, providing moderate flexibility)}
+(default: 2)}
 \item{\code{knot_placement}}{Strategy for positioning knots:
 \code{"quantile"} places knots at quantiles of observed event times,
 \code{"equal"} uses equally-spaced knots (default: \code{"equal"})}
@@ -64,14 +58,13 @@ the boundary knot locations. If \code{NULL}, automatically set to the
 range of observed event times (default: \code{NULL})}
 }}
 
-\item{init}{Optional initial values for model parameters. Can be either:
+\item{init}{Initial values for model parameters. Can be:
 \itemize{
-\item \code{NULL} (default): Automatically calls
-\code{\link{MarginalODE}} to compute data-driven initial estimates
-for longitudinal parameters and random effects. Recommended for
-most applications.
+\item \code{"default"} (default): Use zero/default initial values.
+\item \code{"marginal"}: Use \code{\link{MarginalODE}} to compute
+data-driven initial estimates.
 \item A list with the same structure as the fitted model's
-\code{parameters} component for full manual control
+\code{parameters} component for full manual control.
 }
 When providing a list, it should have elements:
 \describe{
@@ -96,10 +89,8 @@ spline configuration from \code{spline_baseline}}
 \code{\link{JointODE.control}}. Key parameters include:
 \describe{
 \item{\code{maxit}}{Maximum number of EM iterations (default: 200)}
-\item{\code{atol}}{Absolute tolerance for parameter convergence
-(default: 5e-4)}
-\item{\code{rtol}}{Relative tolerance for log-likelihood
-convergence (default: 1e-5)}
+\item{\code{tol}}{Convergence tolerance on max absolute
+parameter change (default: 1e-3)}
 \item{\code{verbose}}{Verbosity level: FALSE/0 for silent, TRUE/1 for
 progress messages, 2 for detailed output (default: FALSE)}
 \item{\code{parallel}}{Logical flag enabling parallel computation
@@ -107,7 +98,7 @@ progress messages, 2 for detailed output (default: FALSE)}
 \item{\code{n_cores}}{Number of CPU cores for parallel processing.
 If 0, automatically detects available cores (default: 0)}
 \item{\code{quad_level}}{Quadrature level for numerical integration
-(default: 4)}
+(default: 3)}
 }
 See \code{\link{JointODE.control}} for complete details and examples.}
 
@@ -138,7 +129,7 @@ discrimination ability for survival prediction}
 \item{\code{convergence}}{List containing convergence diagnostics:
 \itemize{
 \item \code{converged}: Logical indicating convergence status
-\item \code{em_iterations}: Number of EM iterations performed
+\item \code{iterations}: Number of EM iterations performed
 \item \code{message}: Descriptive convergence message
 }}
 \item{\code{random_effects}}{List containing random effects estimates:
@@ -189,7 +180,7 @@ closed-form updates for variance parameters
 \examples{
 \dontrun{
 # Generate example data
-sim <- simulate(n_subjects = 100, n_times = 10)
+sim <- simulate(n_subjects = 100, n_measurements = 10)
 
 # Fit with default control parameters
 fit1 <- JointODE(
@@ -201,7 +192,7 @@ fit1 <- JointODE(
 
 # Fit with custom control parameters using JointODE.control()
 control <- JointODE.control(
-  maxit = 200, atol = 1e-4, rtol = 1e-6, verbose = TRUE
+  maxit = 200, tol = 1e-4, verbose = TRUE
 )
 fit2 <- JointODE(
   longitudinal_formula = observed ~ x1 + x2,

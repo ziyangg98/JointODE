@@ -7,45 +7,42 @@
 test_that(".validate checks formula types", {
   # Non-formula longitudinal_formula
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = "v ~ 1 + (1 | id)",
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Formula must be a formula object"
   )
 
   # Non-formula survival_formula
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = "Surv(time, status) ~ 1",
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Formula must be a formula object"
   )
 
   # Surv() with insufficient arguments
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Surv\\(\\) must have at least time and status arguments"
   )
@@ -54,30 +51,28 @@ test_that(".validate checks formula types", {
 test_that(".validate checks data frame types", {
   # Non-data.frame longitudinal_data
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = list(id = 1, time = 0, v = 1),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Data must be a data frame"
   )
 
   # Non-data.frame survival_data
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = list(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Data must be a data frame"
   )
@@ -86,7 +81,7 @@ test_that(".validate checks data frame types", {
 test_that(".validate checks for empty data", {
   # Empty longitudinal data
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(
@@ -95,17 +90,16 @@ test_that(".validate checks for empty data", {
         v = numeric(0)
       ),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Longitudinal data has no rows"
   )
 
   # Empty survival data
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
@@ -114,10 +108,9 @@ test_that(".validate checks for empty data", {
         time = numeric(0),
         status = numeric(0)
       ),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Survival data has no rows"
   )
@@ -130,45 +123,42 @@ test_that(".validate checks for empty data", {
 test_that(".validate checks required columns", {
   # Missing id column in longitudinal data
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(time = 0, v = 1),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Grouping variable 'id' not found"
   )
 
   # Missing time column in longitudinal data
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = 1, v = 1),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Time variable 'time' not in longitudinal data"
   )
 
   # Missing id column in survival data
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "ID variable 'id' not in survival data"
   )
@@ -181,45 +171,42 @@ test_that(".validate checks required columns", {
 test_that(".validate checks formula variables exist", {
   # Missing longitudinal response variable
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = missing_var ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Variables not found: missing_var"
   )
 
   # Missing longitudinal predictor variable
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ missing_pred + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Variables not found: missing_pred"
   )
 
   # Missing survival predictor variable
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ missing_surv,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Variables not found in data: missing_surv"
   )
@@ -232,15 +219,14 @@ test_that(".validate checks formula variables exist", {
 test_that(".validate checks Surv formula structure", {
   # Invalid Surv formula (no Surv on LHS)
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = time ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Survival formula must have Surv\\(\\) on the left-hand side"
   )
@@ -253,7 +239,7 @@ test_that(".validate checks Surv formula structure", {
 test_that(".validate checks for missing values", {
   # Missing values in longitudinal data
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(
@@ -262,25 +248,23 @@ test_that(".validate checks for missing values", {
         v = c(1, 2)
       ),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Missing values in Time in longitudinal data"
   )
 
   # Missing values in survival status
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = NA),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Missing values found in status variable 'status'"
   )
@@ -293,7 +277,7 @@ test_that(".validate checks for missing values", {
 test_that(".validate checks ID consistency", {
   # Duplicate IDs in survival data
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = rep(1, 2), time = 0:1, v = 1:2),
@@ -302,17 +286,16 @@ test_that(".validate checks ID consistency", {
         time = c(1, 2),
         status = c(1, 0)
       ),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Duplicate IDs in survival data"
   )
 
   # Subjects in longitudinal not in survival
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(
@@ -321,17 +304,16 @@ test_that(".validate checks ID consistency", {
         v = 1:6
       ),
       survival_data = data.frame(id = 1:2, time = c(1, 2), status = c(1, 0)),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Subjects in longitudinal but not survival data: 3"
   )
 
   # Subjects in survival without longitudinal data (error)
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(
@@ -344,10 +326,9 @@ test_that(".validate checks ID consistency", {
         time = c(1, 2, 3, 4),
         status = c(1, 0, 1, 1)
       ),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Subjects in survival but not longitudinal data: 3, 4"
   )
@@ -360,7 +341,7 @@ test_that(".validate checks ID consistency", {
 test_that(".validate checks time values", {
   # Negative time in longitudinal data
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(
@@ -369,32 +350,30 @@ test_that(".validate checks time values", {
         v = c(1, 2)
       ),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Negative time values in longitudinal data"
   )
 
   # Non-positive time in survival data
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 0, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Invalid observation times in 'time' \\(must be positive\\)"
   )
 
   # Warning: measurements after observation time
   expect_warning(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(
@@ -407,17 +386,16 @@ test_that(".validate checks time values", {
         time = c(1.5, 2.5),
         status = c(1, 1)
       ),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "1 subjects have measurements after observation time: 1"
   )
 
   # Warning: single longitudinal observation
   expect_warning(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(
@@ -426,10 +404,9 @@ test_that(".validate checks time values", {
         v = c(1, 2)
       ),
       survival_data = data.frame(id = 1:2, time = c(1, 2), status = c(1, 1)),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     "Each subject has only one longitudinal observation"
   )
@@ -442,90 +419,19 @@ test_that(".validate checks time values", {
 test_that(".validate checks status values", {
   # Invalid status values
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 2),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = NULL
+      init = "default"
     ),
     paste0(
       "Invalid status values in 'status': 2\\. ",
       "Must be 0 \\(censored\\) or 1 \\(event\\)"
     )
-  )
-})
-
-# ==============================================================================
-# State Matrix Validation
-# ==============================================================================
-
-test_that(".validate checks state matrix", {
-  # Non-matrix state
-  expect_error(
-    .validate(
-      longitudinal_formula = v ~ 1 + (1 | id),
-      survival_formula = Surv(time, status) ~ 1,
-      longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
-      survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = c(1, 2),
-      gamma = 1,
-      spline_baseline = list(),
-      init = NULL
-    ),
-    "state.*must be a matrix"
-  )
-
-  # Wrong number of rows in state
-  expect_error(
-    .validate(
-      longitudinal_formula = v ~ 1 + (1 | id),
-      survival_formula = Surv(time, status) ~ 1,
-      longitudinal_data = data.frame(
-        id = rep(1:2, each = 2),
-        time = rep(0:1, 2),
-        v = 1:4
-      ),
-      survival_data = data.frame(id = 1:2, time = c(1, 2), status = c(1, 0)),
-      state = matrix(c(1, 2), nrow = 1),
-      gamma = 1,
-      spline_baseline = list(),
-      init = NULL
-    ),
-    "state.*wrong rows"
-  )
-
-  # Wrong number of columns in state
-  expect_error(
-    .validate(
-      longitudinal_formula = v ~ 1 + (1 | id),
-      survival_formula = Surv(time, status) ~ 1,
-      longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
-      survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = matrix(c(1, 2, 3), nrow = 1),
-      gamma = 1,
-      spline_baseline = list(),
-      init = NULL
-    ),
-    "state.*must have 2 columns"
-  )
-
-  # Non-finite values in state
-  expect_error(
-    .validate(
-      longitudinal_formula = v ~ 1 + (1 | id),
-      survival_formula = Surv(time, status) ~ 1,
-      longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
-      survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = matrix(c(1, NA), nrow = 1),
-      gamma = 1,
-      spline_baseline = list(),
-      init = NULL
-    ),
-    "state.*must contain finite values"
   )
 })
 
@@ -536,29 +442,27 @@ test_that(".validate checks state matrix", {
 test_that(".validate checks spline_baseline parameters", {
   # Invalid parameter names
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(invalid_param = 1),
-      init = NULL
+      init = "default"
     ),
     "Invalid parameters in spline_baseline: invalid_param"
   )
 
   # Invalid degree
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
-      init = NULL,
+      init = "default",
       spline_baseline = list(degree = 10)
     ),
     "spline_baseline\\$degree must be a single integer between 1 and 5"
@@ -566,14 +470,13 @@ test_that(".validate checks spline_baseline parameters", {
 
   # Invalid n_knots
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
-      init = NULL,
+      init = "default",
       spline_baseline = list(n_knots = 50)
     ),
     "spline_baseline\\$n_knots must be a single integer between 0 and 20"
@@ -581,14 +484,13 @@ test_that(".validate checks spline_baseline parameters", {
 
   # Invalid boundary_knots
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
-      init = NULL,
+      init = "default",
       spline_baseline = list(boundary_knots = c(0, 1, 2))
     ),
     "spline_baseline\\$boundary_knots must be NULL or.*numeric vector"
@@ -596,14 +498,13 @@ test_that(".validate checks spline_baseline parameters", {
 
   # Invalid knot_placement
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
-      init = NULL,
+      init = "default",
       spline_baseline = list(knot_placement = "invalid")
     ),
     "spline_baseline\\$knot_placement must be one of: quantile, equal"
@@ -611,14 +512,13 @@ test_that(".validate checks spline_baseline parameters", {
 
   # Invalid boundary_knots
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
-      init = NULL,
+      init = "default",
       spline_baseline = list(boundary_knots = c(2, 1))
     ),
     "boundary_knots\\[1\\] must be less than"
@@ -632,27 +532,25 @@ test_that(".validate checks spline_baseline parameters", {
 test_that(".validate checks init parameter structure", {
   # Non-list init
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = "not a list"
     ),
-    "init.*must be a list"
+    "init.*must be 'default', 'marginal', or a list"
   )
 
   # Unknown init components
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = list(unknown_component = 1)
@@ -664,12 +562,11 @@ test_that(".validate checks init parameter structure", {
 test_that(".validate checks init$coefficients structure", {
   # Non-list coefficients
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = list(coefficients = "not a list")
@@ -679,12 +576,11 @@ test_that(".validate checks init$coefficients structure", {
 
   # Unknown coefficient types
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = list(coefficients = list(unknown_type = 1))
@@ -696,12 +592,11 @@ test_that(".validate checks init$coefficients structure", {
 test_that(".validate checks init$coefficients$baseline", {
   # Non-numeric baseline
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = list(coefficients = list(baseline = "not numeric"))
@@ -711,12 +606,11 @@ test_that(".validate checks init$coefficients$baseline", {
 
   # Non-finite baseline values
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = list(coefficients = list(baseline = c(1, NA, 3)))
@@ -726,7 +620,7 @@ test_that(".validate checks init$coefficients$baseline", {
 
   # Wrong baseline length (requires spline_baseline setup)
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(
@@ -735,7 +629,6 @@ test_that(".validate checks init$coefficients$baseline", {
         v = 1:4
       ),
       survival_data = data.frame(id = 1:2, time = c(2, 3), status = c(1, 0)),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(degree = 3, n_knots = 2),
       init = list(coefficients = list(baseline = c(1, 2))) # Wrong length
@@ -747,12 +640,11 @@ test_that(".validate checks init$coefficients$baseline", {
 test_that(".validate checks init$coefficients$hazard", {
   # Non-numeric hazard
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = list(coefficients = list(hazard = "not numeric"))
@@ -762,12 +654,11 @@ test_that(".validate checks init$coefficients$hazard", {
 
   # Non-finite hazard values
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = list(coefficients = list(hazard = c(1, Inf)))
@@ -777,7 +668,7 @@ test_that(".validate checks init$coefficients$hazard", {
 
   # Wrong hazard length (too short)
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ x1 + (1 | id),
       survival_formula = Surv(time, status) ~ w1,
       longitudinal_data = data.frame(
@@ -787,7 +678,6 @@ test_that(".validate checks init$coefficients$hazard", {
         x1 = c(1, 2)
       ),
       survival_data = data.frame(id = 1, time = 1, status = 1, w1 = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = list(coefficients = list(hazard = c(1)))
@@ -798,7 +688,7 @@ test_that(".validate checks init$coefficients$hazard", {
 
   # Wrong hazard length (exact check)
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ x1 + (1 | id),
       survival_formula = Surv(time, status) ~ w1,
       longitudinal_data = data.frame(
@@ -808,7 +698,6 @@ test_that(".validate checks init$coefficients$hazard", {
         x1 = c(1, 2)
       ),
       survival_data = data.frame(id = 1, time = 1, status = 1, w1 = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = list(coefficients = list(hazard = c(1, 2, 3, 4)))
@@ -821,12 +710,11 @@ test_that(".validate checks init$coefficients$hazard", {
 test_that(".validate checks init$coefficients$longitudinal", {
   # Non-numeric longitudinal
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = list(coefficients = list(longitudinal = "not numeric"))
@@ -836,12 +724,11 @@ test_that(".validate checks init$coefficients$longitudinal", {
 
   # Non-finite longitudinal values
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = list(coefficients = list(longitudinal = c(1, NA)))
@@ -851,7 +738,7 @@ test_that(".validate checks init$coefficients$longitudinal", {
 
   # Wrong longitudinal length
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ x1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(
@@ -861,7 +748,6 @@ test_that(".validate checks init$coefficients$longitudinal", {
         x1 = c(1, 2)
       ),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = list(coefficients = list(longitudinal = c(1)))
@@ -874,12 +760,11 @@ test_that(".validate checks init$coefficients$longitudinal", {
 test_that(".validate checks init$coefficients$measurement_error_sd", {
   # Non-numeric measurement_error_sd
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = list(coefficients = list(measurement_error_sd = "not numeric"))
@@ -889,12 +774,11 @@ test_that(".validate checks init$coefficients$measurement_error_sd", {
 
   # Non-finite measurement_error_sd
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = list(coefficients = list(measurement_error_sd = Inf))
@@ -904,12 +788,11 @@ test_that(".validate checks init$coefficients$measurement_error_sd", {
 
   # Non-positive measurement_error_sd
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = list(coefficients = list(measurement_error_sd = -1))
@@ -921,12 +804,11 @@ test_that(".validate checks init$coefficients$measurement_error_sd", {
 test_that(".validate checks init$coefficients$random_effect_sigma", {
   # Non-numeric random_effect_sigma
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = list(coefficients = list(random_effect_sigma = "not numeric"))
@@ -936,32 +818,30 @@ test_that(".validate checks init$coefficients$random_effect_sigma", {
 
   # Wrong dimension random_effect_sigma
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = list(coefficients = list(random_effect_sigma = diag(4)))
-      # Should be 1x1: only 1 random intercept (no ODE random effects specified)
+      init = list(coefficients = list(random_effect_sigma = diag(5)))
+      # Should be 3x3: 2 state RE + 1 random intercept
     ),
-    "random_effect_sigma.*wrong dim.*expected 1x1"
+    "random_effect_sigma.*wrong dim.*expected 3x3"
   )
 
   # Non-positive random_effect_sigma
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
-      init = list(coefficients = list(random_effect_sigma = matrix(0, 1, 1)))
-      # 1x1 for 1 random intercept only (no ODE random effects)
+      init = list(coefficients = list(random_effect_sigma = matrix(0, 3, 3)))
+      # 3x3 for 2 state RE + 1 random intercept
     ),
     "random_effect_sigma.*must be positive"
   )
@@ -970,12 +850,11 @@ test_that(".validate checks init$coefficients$random_effect_sigma", {
 test_that(".validate checks init$configurations", {
   # Non-list configurations
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = list(configurations = "not a list")
@@ -985,12 +864,11 @@ test_that(".validate checks init$configurations", {
 
   # Non-list baseline configuration
   expect_error(
-    .validate(
+    .validate_joint(
       longitudinal_formula = v ~ 1 + (1 | id),
       survival_formula = Surv(time, status) ~ 1,
       longitudinal_data = data.frame(id = c(1, 1), time = c(0, 1), v = c(1, 2)),
       survival_data = data.frame(id = 1, time = 1, status = 1),
-      state = NULL,
       gamma = 1,
       spline_baseline = list(),
       init = list(configurations = list(baseline = "not a list"))
@@ -1005,7 +883,7 @@ test_that(".validate checks init$configurations", {
 
 test_that(".validate accepts valid inputs", {
   # Test passes without error or warnings
-  result <- .validate(
+  result <- .validate_joint(
     longitudinal_formula = v ~ 1 + (1 | id),
     survival_formula = Surv(time, status) ~ 1,
     longitudinal_data = data.frame(
@@ -1018,10 +896,9 @@ test_that(".validate accepts valid inputs", {
       time = c(2, 3, 4),
       status = c(0, 1, 1)
     ),
-    state = NULL,
     gamma = 1,
     spline_baseline = list(),
-    init = NULL
+    init = "default"
   )
   expect_true(is.null(result))
 })

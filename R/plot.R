@@ -4,6 +4,7 @@ utils::globalVariables(c(
   "id",
   "biomarker",
   "velocity",
+  "acceleration",
   "time",
   "survival",
   "group",
@@ -25,18 +26,24 @@ utils::globalVariables(c(
 #'   \itemize{
 #'     \item \code{"overview"}: Panel of 4 key plots (survival, biomarker,
 #'       velocity, phase space)
-#'     \item \code{"trajectories"}: Longitudinal biomarker trajectories.
+#'     \item \code{"trajectory_biomarker"}: Longitudinal biomarker trajectories.
 #'       Can show individual curves or group averages based on \code{by}
-#'     \item \code{"phase"}: Phase space plots (biomarker vs velocity).
+#'     \item \code{"trajectory_velocity"}: Longitudinal velocity trajectories.
 #'       Can show individual curves or group averages based on \code{by}
+#'     \item \code{"phase_biomarker_velocity"}: Phase space plots
+#'       (biomarker vs velocity). Can show individual curves or group
+#'       averages based on \code{by}
+#'     \item \code{"phase_velocity_acceleration"}: Phase space plots
+#'       (velocity vs acceleration). Can show individual curves or group
+#'       averages based on \code{by}
 #'     \item \code{"survival"}: Survival probability curves.
 #'       Can be stratified by \code{by} variable
-#'     \item \code{"residuals"}: Residuals vs fitted values
-#'     \item \code{"residuals_time"}: Residuals vs time
-#'     \item \code{"qq"}: Normal Q-Q plot of residuals
-#'     \item \code{"random_effects"}: Random effects distribution
-#'     \item \code{"association"}: Association between biomarker features
-#'       and hazard
+#'     \item \code{"diagnostic_residuals"}: Residuals vs fitted values
+#'     \item \code{"diagnostic_residuals_time"}: Residuals vs time
+#'     \item \code{"diagnostic_qq"}: Normal Q-Q plot of residuals
+#'     \item \code{"diagnostic_random_effects"}: Random effects distribution
+#'     \item \code{"diagnostic_association"}: Association between
+#'       biomarker features and hazard
 #'   }
 #' @param subject_ids Character or numeric vector of subject IDs to plot.
 #'   If \code{NULL}, displays all subjects.
@@ -103,13 +110,11 @@ utils::globalVariables(c(
 #' @importFrom dplyr group_by summarise mutate filter ungroup .data left_join
 #' @importFrom tidyr pivot_longer
 #' @importFrom stats loess predict residuals
-#' @importFrom magrittr %>%
 #' @importFrom viridisLite viridis
 #'
 #' @examples
 #' \dontrun{
 #' library(JointODE)
-#' library(survival)
 #'
 #' # Load example dataset
 #' data(sim)
@@ -134,30 +139,36 @@ utils::globalVariables(c(
 #' plot(fit, type = "overview")
 #'
 #' # Individual trajectory plots
-#' plot(fit, type = "biomarker")  # Shows all subjects
-#' plot(fit, type = "biomarker", subject_ids = c("1", "2", "3"))
+#' plot(fit, type = "trajectory_biomarker") # Shows all subjects
+#' plot(fit, type = "trajectory_biomarker", subject_ids = c("1", "2", "3"))
+#' plot(fit, type = "trajectory_velocity") # Velocity trajectories
+#'
+#' # Phase space plots
+#' plot(fit, type = "phase_biomarker_velocity")
+#' plot(fit, type = "phase_velocity_acceleration")
 #'
 #' # Group-stratified plots by survival covariates
-#' plot(fit, type = "survival", by = "w1")  # Continuous variable (auto-grouped)
-#' plot(fit, type = "biomarker", by = "w2")
-#' plot(fit, type = "velocity", by = "w2")
-#' plot(fit, type = "phase", by = "w1")
+#' plot(fit, type = "survival", by = "w1") # Continuous variable (auto-grouped)
+#' plot(fit, type = "trajectory_biomarker", by = "w2")
+#' plot(fit, type = "trajectory_velocity", by = "w2")
+#' plot(fit, type = "phase_biomarker_velocity", by = "w1")
 #'
 #' # Stratify survival by biomarker/velocity
 #' plot(fit, type = "survival", by = "biomarker")
 #' plot(fit, type = "survival", by = "velocity")
 #'
 #' # Diagnostic plots
-#' plot(fit, type = "residuals")
-#' plot(fit, type = "qq")
-#' plot(fit, type = "random_effects")
+#' plot(fit, type = "diagnostic_residuals")
+#' plot(fit, type = "diagnostic_residuals_time")
+#' plot(fit, type = "diagnostic_qq")
+#' plot(fit, type = "diagnostic_random_effects")
 #'
 #' # Customize colors
 #' plot(fit, type = "survival", cols = c("red", "blue", "green"))
 #'
 #' # Adjust smoothing
-#' plot(fit, type = "overview", span = 0.5)  # Less smooth
-#' plot(fit, type = "survival", span = 1.0)  # More smooth
+#' plot(fit, type = "overview", span = 0.5) # Less smooth
+#' plot(fit, type = "survival", span = 1.0) # More smooth
 #' }
 #'
 #' @concept model-display
@@ -166,14 +177,16 @@ plot.JointODE <- function(
   x,
   type = c(
     "overview",
-    "biomarker",
-    "velocity",
-    "phase",
+    "trajectory_biomarker",
+    "trajectory_velocity",
+    "phase_biomarker_velocity",
+    "phase_velocity_acceleration",
     "survival",
-    "residuals",
-    "residuals_time",
-    "qq",
-    "random_effects"
+    "diagnostic_residuals",
+    "diagnostic_residuals_time",
+    "diagnostic_qq",
+    "diagnostic_random_effects",
+    "diagnostic_association"
   ),
   subject_ids = NULL,
   show_observed = TRUE,
@@ -187,8 +200,7 @@ plot.JointODE <- function(
   type <- match.arg(type)
 
   # Route to appropriate plot function
-  plot_obj <- switch(
-    type,
+  plot_obj <- switch(type,
     overview = .plot_overview(
       x,
       subject_ids = subject_ids,
@@ -197,7 +209,7 @@ plot.JointODE <- function(
       span = span,
       ...
     ),
-    biomarker = .plot_biomarker(
+    trajectory_biomarker = .plot_biomarker(
       x,
       subject_ids = subject_ids,
       show_observed = show_observed,
@@ -208,7 +220,7 @@ plot.JointODE <- function(
       span = span,
       ...
     ),
-    velocity = .plot_velocity(
+    trajectory_velocity = .plot_velocity(
       x,
       subject_ids = subject_ids,
       show_observed = FALSE,
@@ -219,7 +231,17 @@ plot.JointODE <- function(
       span = span,
       ...
     ),
-    phase = .plot_phase(
+    phase_biomarker_velocity = .plot_phase(
+      x,
+      subject_ids = subject_ids,
+      show_individual = show_individual,
+      by = by,
+      times = NULL,
+      cols = cols,
+      span = span,
+      ...
+    ),
+    phase_velocity_acceleration = .plot_vel_acc(
       x,
       subject_ids = subject_ids,
       show_individual = show_individual,
@@ -239,27 +261,31 @@ plot.JointODE <- function(
       span = span,
       ...
     ),
-    residuals = .plot_residuals_vs_fitted(
+    diagnostic_residuals = .plot_residuals_vs_fitted(
       x,
       cols = cols,
       span = span,
       ...
     ),
-    residuals_time = .plot_residuals_vs_time(
+    diagnostic_residuals_time = .plot_residuals_vs_time(
       x,
       cols = cols,
       span = span,
       ...
     ),
-    qq = .plot_qq(
+    diagnostic_qq = .plot_qq(
       x,
       cols = cols,
       ...
     ),
-    random_effects = .plot_random_effects(
+    diagnostic_random_effects = .plot_random_effects(
       x,
       cols = cols,
       ...
+    ),
+    diagnostic_association = stop(
+      "Association plot not yet implemented. ",
+      "This plot type is reserved for future functionality."
     )
   )
 
@@ -354,7 +380,7 @@ plot.JointODE <- function(
   combined_plot <- (p1 + p2 + p3 + p4) +
     patchwork::plot_layout(ncol = 2)
 
-  return(combined_plot)
+  combined_plot
 }
 
 
@@ -365,14 +391,13 @@ plot.JointODE <- function(
 # Create time grid for predictions
 .get_time_grid <- function(x, times = NULL, n_points = 100) {
   if (!is.null(times)) {
-    return(times)
+    times
+  } else {
+    all_times <- unlist(lapply(x$data, function(subj) {
+      subj$longitudinal$times
+    }))
+    seq(min(all_times), max(all_times), length.out = n_points)
   }
-
-  all_times <- unlist(lapply(x$data, function(subj) {
-    subj$longitudinal$times
-  }))
-
-  seq(min(all_times), max(all_times), length.out = n_points)
 }
 
 # Standard theme for individual subject faceted plots
@@ -448,9 +473,9 @@ plot.JointODE <- function(
         linewidth = 0.4
       ) +
       geom_smooth(
+        method = "loess", formula = y ~ x,
         data = data,
         aes(x = .data[[x_var]], y = .data[[y_var]], color = "Mean"),
-        method = "loess",
         span = span,
         se = FALSE,
         linewidth = 1.2
@@ -463,9 +488,9 @@ plot.JointODE <- function(
   } else {
     p <- p +
       geom_smooth(
+        method = "loess", formula = y ~ x,
         data = data,
         aes(x = .data[[x_var]], y = .data[[y_var]]),
-        method = "loess",
         span = span,
         se = FALSE,
         color = "#2E86AB",
@@ -509,9 +534,9 @@ plot.JointODE <- function(
 
   p <- p +
     geom_smooth(
+      method = "loess", formula = y ~ x,
       data = group_means,
       aes(x = .data[[x_var]], y = .data[[y_var]], color = group),
-      method = "loess",
       span = span,
       se = FALSE,
       linewidth = 1.5
@@ -520,7 +545,7 @@ plot.JointODE <- function(
     labs(x = x_label, y = y_label) +
     .theme_grouped()
 
-  return(p)
+  p
 }
 
 # Build grouped phase space plot (no smoothing, uses geom_path)
@@ -553,7 +578,40 @@ plot.JointODE <- function(
     labs(x = "Biomarker", y = "Velocity") +
     .theme_grouped()
 
-  return(p)
+  p
+}
+
+# Build grouped velocity-acceleration plot (no smoothing, uses geom_path)
+.build_grouped_vel_acc_plot <- function(
+  pred_data,
+  group_means,
+  group_colors,
+  group_name,
+  show_individual = TRUE
+) {
+  p <- ggplot()
+
+  if (show_individual) {
+    p <- p +
+      geom_path(
+        data = pred_data,
+        aes(x = velocity, y = acceleration, group = id, color = group),
+        alpha = 0.1,
+        linewidth = 0.3
+      )
+  }
+
+  p <- p +
+    geom_path(
+      data = group_means,
+      aes(x = velocity, y = acceleration, color = group),
+      linewidth = 1.5
+    ) +
+    scale_color_manual(values = group_colors, name = group_name) +
+    labs(x = "Velocity", y = "Acceleration") +
+    .theme_grouped()
+
+  p
 }
 
 # Build overlay phase space plot with individual curves and mean
@@ -573,8 +631,8 @@ plot.JointODE <- function(
       )
 
     # Calculate mean phase space trajectory
-    mean_data <- data %>%
-      group_by(time) %>%
+    mean_data <- data |>
+      group_by(time) |>
       summarise(
         biomarker = mean(biomarker, na.rm = TRUE),
         velocity = mean(velocity, na.rm = TRUE),
@@ -594,8 +652,8 @@ plot.JointODE <- function(
       )
   } else {
     # Only show mean phase space trajectory
-    mean_data <- data %>%
-      group_by(time) %>%
+    mean_data <- data |>
+      group_by(time) |>
       summarise(
         biomarker = mean(biomarker, na.rm = TRUE),
         velocity = mean(velocity, na.rm = TRUE),
@@ -612,6 +670,70 @@ plot.JointODE <- function(
   }
 
   p <- p + labs(x = "Biomarker", y = "Velocity") + .theme_simple()
+
+  if (show_individual) {
+    p <- p + theme(legend.position = "bottom")
+  }
+
+  p
+}
+
+# Build overlay velocity-acceleration plot with individual curves and mean
+.build_overlay_vel_acc_plot <- function(
+  data,
+  show_individual = TRUE
+) {
+  p <- ggplot()
+
+  if (show_individual) {
+    p <- p +
+      geom_path(
+        data = data,
+        aes(x = velocity, y = acceleration, group = id, color = "Individual"),
+        alpha = 0.15,
+        linewidth = 0.4
+      )
+
+    # Calculate mean velocity-acceleration trajectory
+    mean_data <- data |>
+      group_by(time) |>
+      summarise(
+        velocity = mean(velocity, na.rm = TRUE),
+        acceleration = mean(acceleration, na.rm = TRUE),
+        .groups = "drop"
+      )
+
+    p <- p +
+      geom_path(
+        data = mean_data,
+        aes(x = velocity, y = acceleration, color = "Mean"),
+        linewidth = 1.2
+      ) +
+      scale_color_manual(
+        name = NULL,
+        values = c("Individual" = "gray60", "Mean" = "#2E86AB"),
+        breaks = c("Mean", "Individual")
+      )
+  } else {
+    # Only show mean velocity-acceleration trajectory
+    mean_data <- data |>
+      group_by(time) |>
+      summarise(
+        velocity = mean(velocity, na.rm = TRUE),
+        acceleration = mean(acceleration, na.rm = TRUE),
+        .groups = "drop"
+      )
+
+    p <- p +
+      geom_path(
+        data = mean_data,
+        aes(x = velocity, y = acceleration),
+        color = "#2E86AB",
+        linewidth = 1.2
+      )
+  }
+
+  p <- p + labs(x = "Velocity", y = "Acceleration") + .theme_simple()
 
   if (show_individual) {
     p <- p + theme(legend.position = "bottom")
@@ -667,9 +789,9 @@ plot.JointODE <- function(
 
   p <- p +
     geom_smooth(
+      method = "loess", formula = y ~ x,
       data = pred_data,
       aes(x = time, y = survival, color = group, group = group),
-      method = "loess",
       span = span,
       se = FALSE,
       linewidth = 1.5
@@ -679,7 +801,7 @@ plot.JointODE <- function(
     .theme_grouped() +
     coord_cartesian(ylim = c(0, 1))
 
-  return(p)
+  p
 }
 
 # Build residual plot (shared by residuals vs fitted and residuals vs time)
@@ -688,7 +810,7 @@ plot.JointODE <- function(
     geom_point(color = "#2E86AB", alpha = 0.5, size = 2) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
     geom_smooth(
-      method = "loess",
+      method = "loess", formula = y ~ x,
       span = span,
       se = TRUE,
       color = "#A23B72",
@@ -708,44 +830,28 @@ plot.JointODE <- function(
   # Track if we're using individual means for time-varying covariates
   using_individual_means <- FALSE
 
-  group_var <- sapply(x$data, function(subj) {
+  group_var <- vapply(x$data, function(subj) {
     # Check if 'by' is in survival covariates
-    if (by %in% survival_cov_names) {
-      idx <- which(survival_cov_names == by)
-      if (idx <= length(subj$covariates)) {
-        return(subj$covariates[idx])
-      }
-    }
+    surv_idx <- which(survival_cov_names == by)
+    has_fixed <- !is.null(subj$longitudinal$covariates$fixed) &&
+      by %in% colnames(subj$longitudinal$covariates$fixed)
+    has_random <- !is.null(subj$longitudinal$covariates$random) &&
+      by %in% colnames(subj$longitudinal$covariates$random)
 
-    # Check if 'by' is in longitudinal covariates
-    if (!is.null(subj$longitudinal$covariates)) {
-      # Check fixed covariates
-      if (!is.null(subj$longitudinal$covariates$fixed)) {
-        fixed_cov_names <- colnames(subj$longitudinal$covariates$fixed)
-        if (by %in% fixed_cov_names) {
-          # Use mean value across all time points for time-varying covariates
-          using_individual_means <<- TRUE
-          return(mean(subj$longitudinal$covariates$fixed[, by], na.rm = TRUE))
-        }
-      }
-      # Check random covariates
-      if (!is.null(subj$longitudinal$covariates$random)) {
-        random_cov_names <- colnames(subj$longitudinal$covariates$random)
-        if (by %in% random_cov_names) {
-          # Use mean value across all time points for time-varying covariates
-          using_individual_means <<- TRUE
-          return(mean(subj$longitudinal$covariates$random[, by], na.rm = TRUE))
-        }
-      }
+    if (length(surv_idx) == 1 && surv_idx <= length(subj$covariates)) {
+      subj$covariates[surv_idx]
+    } else if (has_fixed) {
+      using_individual_means <<- TRUE
+      mean(subj$longitudinal$covariates$fixed[, by], na.rm = TRUE)
+    } else if (has_random) {
+      using_individual_means <<- TRUE
+      mean(subj$longitudinal$covariates$random[, by], na.rm = TRUE)
+    } else if (!is.null(subj[[by]])) {
+      subj[[by]]
+    } else {
+      NA
     }
-
-    # Check if 'by' is directly available in subject data
-    if (!is.null(subj[[by]])) {
-      return(subj[[by]])
-    }
-
-    NA
-  })
+  }, numeric(1))
 
   # Inform user if grouping by individual means
   if (using_individual_means) {
@@ -801,9 +907,9 @@ plot.JointODE <- function(
     quantile_breaks <- quantile(group_var, probs = probs, na.rm = TRUE)
 
     # Generate labels for groups
-    group_labels <- sapply(1:n_groups, function(i) {
+    group_labels <- vapply(seq_len(n_groups), function(i) {
       sprintf("G%d (%.0f-%.0f%%)", i, probs[i] * 100, probs[i + 1] * 100)
-    })
+    }, character(1))
 
     # Assign each observation to a quantile group
     group_var_discrete <- cut(
@@ -822,12 +928,12 @@ plot.JointODE <- function(
     )
 
     names(group_var_discrete) <- names(x$data)
-    return(group_var_discrete)
+    group_var_discrete
+  } else {
+    result <- as.character(group_var)
+    names(result) <- names(x$data)
+    result
   }
-
-  result <- as.character(group_var)
-  names(result) <- names(x$data)
-  return(result)
 }
 
 .setup_group_colors <- function(groups, cols = NULL) {
@@ -844,7 +950,7 @@ plot.JointODE <- function(
   }
 
   names(cols) <- unique_groups
-  return(cols)
+  cols
 }
 
 .calculate_residuals <- function(x) {
@@ -891,7 +997,7 @@ plot.JointODE <- function(
     subject_ids <- all_ids
   }
 
-  return(subject_ids)
+  subject_ids
 }
 
 .calculate_group_means <- function(pred_data, groups, type = "trajectory") {
@@ -900,37 +1006,45 @@ plot.JointODE <- function(
 
   # Calculate group means
   if (type == "trajectory") {
-    group_means <- pred_data %>%
-      group_by(group, time) %>%
+    group_means <- pred_data |>
+      group_by(group, time) |>
       summarise(
         biomarker = mean(biomarker, na.rm = TRUE),
         .groups = "drop"
       )
   } else if (type == "velocity") {
-    group_means <- pred_data %>%
-      group_by(group, time) %>%
+    group_means <- pred_data |>
+      group_by(group, time) |>
       summarise(
         velocity = mean(velocity, na.rm = TRUE),
         .groups = "drop"
       )
   } else if (type == "phase") {
-    group_means <- pred_data %>%
-      group_by(group, time) %>%
+    group_means <- pred_data |>
+      group_by(group, time) |>
       summarise(
         biomarker = mean(biomarker, na.rm = TRUE),
         velocity = mean(velocity, na.rm = TRUE),
         .groups = "drop"
       )
+  } else if (type == "velocity_acceleration") {
+    group_means <- pred_data |>
+      group_by(group, time) |>
+      summarise(
+        velocity = mean(velocity, na.rm = TRUE),
+        acceleration = mean(acceleration, na.rm = TRUE),
+        .groups = "drop"
+      )
   } else if (type == "survival") {
-    group_means <- pred_data %>%
-      group_by(group, time) %>%
+    group_means <- pred_data |>
+      group_by(group, time) |>
       summarise(
         survival = mean(survival, na.rm = TRUE),
         .groups = "drop"
       )
   }
 
-  return(group_means)
+  group_means
 }
 
 
@@ -950,7 +1064,7 @@ plot.JointODE <- function(
   ...
 ) {
   if (!is.null(by)) {
-    return(.plot_biomarker_grouped(
+    .plot_biomarker_grouped(
       x,
       by,
       show_individual,
@@ -958,70 +1072,68 @@ plot.JointODE <- function(
       cols,
       span,
       ...
-    ))
-  }
+    )
+  } else {
+    user_specified_subjects <- !is.null(subject_ids)
+    times <- .get_time_grid(x, times)
+    pred_data <- predict(x, times = times)
 
-  user_specified_subjects <- !is.null(subject_ids)
-  times <- .get_time_grid(x, times)
-  pred_data <- predict(x, times = times)
-
-  if (!is.data.frame(pred_data) || nrow(pred_data) == 0) {
-    stop("predict() returned invalid or empty data")
-  }
-
-  subject_ids <- .select_subjects(x, subject_ids)
-  pred_subset <- pred_data[pred_data$id %in% subject_ids, ]
-
-  if (user_specified_subjects) {
-    p <- ggplot() +
-      geom_line(
-        data = pred_subset,
-        aes(x = time, y = biomarker, group = id),
-        color = "#2E86AB",
-        linewidth = 0.8
-      )
-
-    if (show_observed) {
-      obs_data_list <- lapply(subject_ids, function(sid) {
-        subj <- x$data[[sid]]
-        data.frame(
-          id = sid,
-          time = subj$longitudinal$times,
-          biomarker = subj$longitudinal$measurements
-        )
-      })
-
-      if (length(obs_data_list) > 0) {
-        obs_data <- do.call(rbind, obs_data_list)
-        p <- p +
-          geom_point(
-            data = obs_data,
-            aes(x = time, y = biomarker, group = id),
-            color = "#A23B72",
-            size = 1.5,
-            alpha = 0.6
-          )
-      }
+    if (!is.data.frame(pred_data) || nrow(pred_data) == 0) {
+      stop("predict() returned invalid or empty data")
     }
 
-    p <- p +
-      facet_wrap(~id, scales = "free") +
-      labs(x = "Time", y = "Biomarker") +
-      .theme_faceted()
-  } else {
-    # Overlay view: show_observed is ignored (only for faceted view)
-    p <- .build_overlay_plot(
-      data = pred_subset,
-      x_var = "time",
-      y_var = "biomarker",
-      x_label = "Time",
-      y_label = "Biomarker",
-      show_individual = show_individual,
-      span = span
-    )
-  }
+    subject_ids <- .select_subjects(x, subject_ids)
+    pred_subset <- pred_data[pred_data$id %in% subject_ids, ]
 
-  return(p)
+    if (user_specified_subjects) {
+      p <- ggplot() +
+        geom_line(
+          data = pred_subset,
+          aes(x = time, y = biomarker, group = id),
+          color = "#2E86AB",
+          linewidth = 0.8
+        )
+
+      if (show_observed) {
+        obs_data_list <- lapply(subject_ids, function(sid) {
+          subj <- x$data[[sid]]
+          data.frame(
+            id = sid,
+            time = subj$longitudinal$times,
+            biomarker = subj$longitudinal$measurements
+          )
+        })
+
+        if (length(obs_data_list) > 0) {
+          obs_data <- do.call(rbind, obs_data_list)
+          p <- p +
+            geom_point(
+              data = obs_data,
+              aes(x = time, y = biomarker, group = id),
+              color = "#A23B72",
+              size = 1.5,
+              alpha = 0.6
+            )
+        }
+      }
+
+      p +
+        facet_wrap(~id, scales = "free") +
+        labs(x = "Time", y = "Biomarker") +
+        .theme_faceted()
+    } else {
+      # Overlay view: show_observed is ignored (only for faceted view)
+      .build_overlay_plot(
+        data = pred_subset,
+        x_var = "time",
+        y_var = "biomarker",
+        x_label = "Time",
+        y_label = "Biomarker",
+        show_individual = show_individual,
+        span = span
+      )
+    }
+  }
 }
 
 .plot_biomarker_grouped <- function(
@@ -1070,7 +1182,7 @@ plot.JointODE <- function(
   ...
 ) {
   if (!is.null(by)) {
-    return(.plot_velocity_grouped(
+    .plot_velocity_grouped(
       x,
       by,
       show_individual,
@@ -1078,38 +1190,38 @@ plot.JointODE <- function(
       cols,
       span,
       ...
-    ))
-  }
-
-  user_specified_subjects <- !is.null(subject_ids)
-  times <- .get_time_grid(x, times)
-  pred_data <- predict(x, times = times)
-
-  if (!is.data.frame(pred_data) || nrow(pred_data) == 0) {
-    stop("predict() returned invalid or empty data")
-  }
-
-  subject_ids <- .select_subjects(x, subject_ids)
-  pred_subset <- pred_data[pred_data$id %in% subject_ids, ]
-
-  if (user_specified_subjects) {
-    return(.build_faceted_trajectory_plot(
-      data = pred_subset,
-      x_var = "time",
-      y_var = "velocity",
-      x_label = "Time",
-      y_label = "Velocity"
-    ))
+    )
   } else {
-    return(.build_overlay_plot(
-      data = pred_subset,
-      x_var = "time",
-      y_var = "velocity",
-      x_label = "Time",
-      y_label = "Velocity",
-      show_individual = show_individual,
-      span = span
-    ))
+    user_specified_subjects <- !is.null(subject_ids)
+    times <- .get_time_grid(x, times)
+    pred_data <- predict(x, times = times)
+
+    if (!is.data.frame(pred_data) || nrow(pred_data) == 0) {
+      stop("predict() returned invalid or empty data")
+    }
+
+    subject_ids <- .select_subjects(x, subject_ids)
+    pred_subset <- pred_data[pred_data$id %in% subject_ids, ]
+
+    if (user_specified_subjects) {
+      .build_faceted_trajectory_plot(
+        data = pred_subset,
+        x_var = "time",
+        y_var = "velocity",
+        x_label = "Time",
+        y_label = "Velocity"
+      )
+    } else {
+      .build_overlay_plot(
+        data = pred_subset,
+        x_var = "time",
+        y_var = "velocity",
+        x_label = "Time",
+        y_label = "Velocity",
+        show_individual = show_individual,
+        span = span
+      )
+    }
   }
 }
 
@@ -1166,7 +1278,7 @@ plot.JointODE <- function(
   ...
 ) {
   if (!is.null(by)) {
-    return(.plot_phase_grouped(
+    .plot_phase_grouped(
       x,
       by = by,
       show_individual = show_individual,
@@ -1174,33 +1286,33 @@ plot.JointODE <- function(
       cols = cols,
       span = span,
       ...
-    ))
-  }
+    )
+  } else {
+    # Remember if user explicitly specified subject_ids
+    user_specified_subjects <- !is.null(subject_ids)
 
-  # Remember if user explicitly specified subject_ids
-  user_specified_subjects <- !is.null(subject_ids)
+    # Get predictions
+    times <- .get_time_grid(x, times)
+    pred_data <- predict(x, times = times)
 
-  # Get predictions
-  times <- .get_time_grid(x, times)
-  pred_data <- predict(x, times = times)
+    # Select subjects
+    subject_ids <- .select_subjects(x, subject_ids)
+    pred_data <- pred_data[pred_data$id %in% subject_ids, ]
 
-  # Select subjects
-  subject_ids <- .select_subjects(x, subject_ids)
-  pred_data <- pred_data[pred_data$id %in% subject_ids, ]
-
-  # If user specified subjects explicitly, use faceting for detailed view
-  if (user_specified_subjects) {
-    return(
+    # If user specified subjects explicitly, use faceting for detailed view
+    if (user_specified_subjects) {
       ggplot(pred_data, aes(x = biomarker, y = velocity, group = id)) +
         geom_path(color = "#2E86AB", linewidth = 0.8) +
         facet_wrap(~id, scales = "free") +
         labs(x = "Biomarker", y = "Velocity") +
         .theme_faceted()
-    )
+    } else {
+      # If showing all subjects, use overlay with mean trajectory
+      .build_overlay_phase_plot(
+        data = pred_data, show_individual = show_individual
+      )
+    }
   }
-
-  # If showing all subjects, use overlay with mean trajectory
-  .build_overlay_phase_plot(data = pred_data, show_individual = show_individual)
 }
 
 .plot_phase_grouped <- function(
@@ -1227,6 +1339,92 @@ plot.JointODE <- function(
 
   # Build plot
   .build_grouped_phase_plot(
+    pred_data = grouped$pred_data,
+    group_means = group_means,
+    group_colors = grouped$group_colors,
+    group_name = by,
+    show_individual = show_individual
+  )
+}
+
+
+# ==============================================================================
+# 6. VELOCITY-ACCELERATION PHASE SPACE PLOTS
+# ==============================================================================
+
+.plot_vel_acc <- function(
+  x,
+  subject_ids = NULL,
+  show_individual = TRUE,
+  by = NULL,
+  times = NULL,
+  cols = NULL,
+  span = 0.75,
+  ...
+) {
+  if (!is.null(by)) {
+    .plot_vel_acc_grouped(
+      x,
+      by = by,
+      show_individual = show_individual,
+      times = times,
+      cols = cols,
+      span = span,
+      ...
+    )
+  } else {
+    # Remember if user explicitly specified subject_ids
+    user_specified_subjects <- !is.null(subject_ids)
+
+    # Get predictions
+    times <- .get_time_grid(x, times)
+    pred_data <- predict(x, times = times)
+
+    # Select subjects
+    subject_ids <- .select_subjects(x, subject_ids)
+    pred_data <- pred_data[pred_data$id %in% subject_ids, ]
+
+    # If user specified subjects explicitly, use faceting for detailed view
+    if (user_specified_subjects) {
+      ggplot(pred_data, aes(x = velocity, y = acceleration, group = id)) +
+        geom_path(color = "#2E86AB", linewidth = 0.8) +
+        facet_wrap(~id, scales = "free") +
+        labs(x = "Velocity", y = "Acceleration") +
+        .theme_faceted()
+    } else {
+      # If showing all subjects, use overlay with mean trajectory
+      .build_overlay_vel_acc_plot(
+        data = pred_data,
+        show_individual = show_individual
+      )
+    }
+  }
+}
+
+.plot_vel_acc_grouped <- function(
+  x,
+  by,
+  show_individual = TRUE,
+  times = NULL,
+  cols = NULL,
+  span = 0.75,
+  ...
+) {
+  # Prepare grouped data
+  grouped <- .prepare_grouped_data(x, by, times)
+  if (!is.null(cols)) {
+    grouped$group_colors <- .setup_group_colors(grouped$groups, cols)
+  }
+
+  # Calculate group means
+  group_means <- .calculate_group_means(
+    grouped$pred_data,
+    grouped$groups,
+    type = "velocity_acceleration"
+  )
+
+  # Build plot
+  .build_grouped_vel_acc_plot(
     pred_data = grouped$pred_data,
     group_means = group_means,
     group_colors = grouped$group_colors,
@@ -1266,54 +1464,50 @@ plot.JointODE <- function(
   if (is.null(by)) {
     if (user_specified_subjects) {
       # Faceted view for specific subjects
-      return(
-        ggplot(pred_data, aes(x = time, y = survival, group = id)) +
-          geom_line(color = "black", linewidth = 0.8) +
-          facet_wrap(~id, scales = "free_y") +
-          labs(x = "Time", y = "Survival Probability") +
-          .theme_faceted() +
-          theme(panel.grid.minor = element_blank()) +
-          coord_cartesian(ylim = c(0, 1))
-      )
-    }
-
-    # Overall survival with individual curves and mean
-    p <- ggplot()
-    if (show_individual) {
-      p <- p +
-        geom_line(
-          data = pred_data,
-          aes(x = time, y = survival, group = id, color = "Individual"),
-          alpha = 0.15,
-          linewidth = 0.4
-        ) +
-        geom_smooth(
-          data = pred_data,
-          aes(x = time, y = survival, color = "Mean"),
-          method = "loess",
-          span = span,
-          se = FALSE,
-          linewidth = 1.2
-        ) +
-        scale_color_manual(
-          name = NULL,
-          values = c("Individual" = "gray60", "Mean" = "#2E86AB"),
-          breaks = c("Mean", "Individual")
-        )
+      ggplot(pred_data, aes(x = time, y = survival, group = id)) +
+        geom_line(color = "black", linewidth = 0.8) +
+        facet_wrap(~id, scales = "free_y") +
+        labs(x = "Time", y = "Survival Probability") +
+        .theme_faceted() +
+        theme(panel.grid.minor = element_blank()) +
+        coord_cartesian(ylim = c(0, 1))
     } else {
-      p <- p +
-        geom_smooth(
-          data = pred_data,
-          aes(x = time, y = survival),
-          method = "loess",
-          span = span,
-          se = FALSE,
-          color = "#2E86AB",
-          linewidth = 1.2
-        )
-    }
+      # Overall survival with individual curves and mean
+      p <- ggplot()
+      if (show_individual) {
+        p <- p +
+          geom_line(
+            data = pred_data,
+            aes(x = time, y = survival, group = id, color = "Individual"),
+            alpha = 0.15,
+            linewidth = 0.4
+          ) +
+          geom_smooth(
+            method = "loess", formula = y ~ x,
+            data = pred_data,
+            aes(x = time, y = survival, color = "Mean"),
+            span = span,
+            se = FALSE,
+            linewidth = 1.2
+          ) +
+          scale_color_manual(
+            name = NULL,
+            values = c("Individual" = "gray60", "Mean" = "#2E86AB"),
+            breaks = c("Mean", "Individual")
+          )
+      } else {
+        p <- p +
+          geom_smooth(
+            method = "loess", formula = y ~ x,
+            data = pred_data,
+            aes(x = time, y = survival),
+            span = span,
+            se = FALSE,
+            color = "#2E86AB",
+            linewidth = 1.2
+          )
+      }
 
-    return(
       p +
         labs(x = "Time", y = "Survival Probability") +
         .theme_simple() +
@@ -1322,17 +1516,15 @@ plot.JointODE <- function(
           panel.grid.minor = element_blank()
         ) +
         coord_cartesian(ylim = c(0, 1))
-    )
-  }
-
-  # Case 2: Grouping by biomarker or velocity (use individual means)
-  if (tolower(by) %in% c("biomarker", "velocity")) {
+    }
+  } else if (tolower(by) %in% c("biomarker", "velocity")) {
+    # Case 2: Grouping by biomarker or velocity (use individual means)
     var_name <- tolower(by)
     cli::cli_alert_info("Grouping by individual means of '{by}'.")
 
     # Calculate per-individual means and create temporary object
-    individual_means <- pred_data %>%
-      group_by(id) %>%
+    individual_means <- pred_data |>
+      group_by(id) |>
       summarise(
         individual_mean = mean(.data[[var_name]], na.rm = TRUE),
         .groups = "drop"
@@ -1349,27 +1541,27 @@ plot.JointODE <- function(
     group_colors <- .setup_group_colors(groups, cols)
     pred_data$group <- rep(groups, each = length(unique(pred_data$time)))
 
-    return(.build_grouped_survival_plot(
+    .build_grouped_survival_plot(
       pred_data,
       group_colors,
       by,
       show_individual,
       span
-    ))
+    )
+  } else {
+    # Case 3: Grouping by other covariates
+    groups <- .extract_groups(x, by, n_groups = n_groups)
+    group_colors <- .setup_group_colors(groups, cols)
+    pred_data$group <- rep(groups, each = length(unique(pred_data$time)))
+
+    .build_grouped_survival_plot(
+      pred_data,
+      group_colors,
+      by,
+      show_individual,
+      span
+    )
   }
-
-  # Case 3: Grouping by other covariates
-  groups <- .extract_groups(x, by, n_groups = n_groups)
-  group_colors <- .setup_group_colors(groups, cols)
-  pred_data$group <- rep(groups, each = length(unique(pred_data$time)))
-
-  .build_grouped_survival_plot(
-    pred_data,
-    group_colors,
-    by,
-    show_individual,
-    span
-  )
 }
 
 

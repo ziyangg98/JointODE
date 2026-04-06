@@ -1,3 +1,5 @@
+^renv$
+^renv\.lock$
 ^JointODE\.Rproj$
 ^\.Rproj\.user$
 ^LICENSE\.md$
@@ -16,6 +18,18 @@
 ^vignettes/\.gitignore$
 ^vignettes/.*\.html$
 ^\.pre-commit-config\.yaml$
-^[.]?air[.]toml$
 ^\.vscode$
 ^\.covrignore$
+^codecov\.yml$
+^\.editorconfig$
+^cran-comments\.md$
+^scripts$
+^src/symbols\.rds$
+^CLAUDE\.md$
+^\.Rprofile$
+^\.Rhistory$
+^\.covrignore$
+^\.editorconfig$
+^\.pre-commit-config\.yaml$
+\.DS_Store$
+\.Rcheck$
