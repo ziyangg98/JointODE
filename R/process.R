@@ -109,6 +109,29 @@
   data_process
 }
 
+#' Decompose Sigma_b into log(SD) and correlation theta parameters
+#' @noRd
+.pack_correlation_theta <- function(sigma_matrix, n_re) {
+  marginal_sds <- sqrt(diag(sigma_matrix))
+  scale_inv <- diag(1 / pmax(marginal_sds, 1e-10))
+  corr_matrix <- scale_inv %*% sigma_matrix %*% scale_inv
+
+  corr_theta <- numeric(n_re * (n_re - 1) / 2)
+  idx <- 1L
+  for (col in seq_len(n_re - 1)) {
+    for (row in (col + 1):n_re) {
+      rho <- max(-0.99, min(0.99, corr_matrix[row, col]))
+      corr_theta[idx] <- rho / sqrt(1 - rho^2)
+      idx <- idx + 1L
+    }
+  }
+
+  list(
+    log_sd_re = log(pmax(marginal_sds, 1e-10)),
+    corr_par = corr_theta
+  )
+}
+
 #' Pack per-subject data into flat TMB input
 #' @noRd
 .pack_joint_data <- function(data_list, parameters, control) {
@@ -189,24 +212,7 @@
 .pack_joint_params <- function(parameters) {
   coefs <- parameters$coefficients
   n_random_effects <- ncol(parameters$random_effects_init)
-  sigma_matrix <- coefs$random_effect_sigma
-
-  # Decompose Sigma_b -> log(SD) + correlation theta
-  marginal_sds <- sqrt(diag(sigma_matrix))
-  scale_inv <- diag(1 / pmax(marginal_sds, 1e-10))
-  corr_matrix <- scale_inv %*% sigma_matrix %*% scale_inv
-
-  # theta = rho / sqrt(1 - rho^2), lower-triangular off-diagonal
-  n_corr <- n_random_effects * (n_random_effects - 1) / 2
-  corr_theta <- numeric(n_corr)
-  idx <- 1L
-  for (col in seq_len(n_random_effects - 1)) {
-    for (row in (col + 1):n_random_effects) {
-      rho <- max(-0.99, min(0.99, corr_matrix[row, col]))
-      corr_theta[idx] <- rho / sqrt(1 - rho^2)
-      idx <- idx + 1L
-    }
-  }
+  corr <- .pack_correlation_theta(coefs$random_effect_sigma, n_random_effects)
 
   list(
     baseline = coefs$baseline,
@@ -214,8 +220,8 @@
     longitudinal = coefs$longitudinal,
     initial_state = coefs$initial_state,
     log_sigma_e = log(coefs$measurement_error_sd),
-    log_sd_re = log(pmax(marginal_sds, 1e-10)),
-    corr_par = corr_theta,
+    log_sd_re = corr$log_sd_re,
+    corr_par = corr$corr_par,
     random_effects = parameters$random_effects_init
   )
 }
@@ -356,28 +362,14 @@
 .pack_marginal_params <- function(parameters) {
   coefs <- parameters$coefficients
   n_re <- ncol(parameters$random_effects_init)
-  sigma_matrix <- coefs$random_effect_sigma
-
-  marginal_sds <- sqrt(diag(sigma_matrix))
-  scale_inv <- diag(1 / pmax(marginal_sds, 1e-10))
-  corr_matrix <- scale_inv %*% sigma_matrix %*% scale_inv
-
-  corr_theta <- numeric(n_re * (n_re - 1) / 2)
-  idx <- 1L
-  for (col in seq_len(n_re - 1)) {
-    for (row in (col + 1):n_re) {
-      rho <- max(-0.99, min(0.99, corr_matrix[row, col]))
-      corr_theta[idx] <- rho / sqrt(1 - rho^2)
-      idx <- idx + 1L
-    }
-  }
+  corr <- .pack_correlation_theta(coefs$random_effect_sigma, n_re)
 
   list(
     longitudinal = coefs$longitudinal,
     initial_state = coefs$initial_state,
     log_sigma_e = log(coefs$measurement_error_sd),
-    log_sd_re = log(pmax(marginal_sds, 1e-10)),
-    corr_par = corr_theta,
+    log_sd_re = corr$log_sd_re,
+    corr_par = corr$corr_par,
     random_effects = parameters$random_effects_init
   )
 }

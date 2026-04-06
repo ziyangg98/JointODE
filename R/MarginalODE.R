@@ -172,7 +172,13 @@ print.MarginalODE <- function(
 #' @return Named numeric vector of parameter estimates
 #' @concept model-inspection
 #' @export
-coef.MarginalODE <- function(object, ...) object$parameters
+coef.MarginalODE <- function(object, ...) {
+  p <- object$parameters
+  is_init <- names(p) %in% .init_state_names
+  names(p)[!is_init] <- paste0("longitudinal:", names(p)[!is_init])
+  names(p)[is_init] <- paste0("initial:", names(p)[is_init])
+  p
+}
 
 #' Extract Variance-Covariance Matrix
 #' @param object A MarginalODE object
@@ -210,10 +216,52 @@ summary.MarginalODE <- function(object, ...) {
     rep(NA_real_, length(object$parameters))
   }
 
+  # Derived ODE physical parameters (period and damping ratio)
+  derived_params <- NULL
+  nms <- names(object$parameters)
+  has_bv <- "biomarker" %in% nms && "velocity" %in% nms
+  if (!is.null(object$vcov) && !all(is.na(object$vcov)) && has_bv) {
+    idx_b <- which(nms == "biomarker")
+    idx_v <- which(nms == "velocity")
+    value_coef <- object$parameters[idx_b]
+    slope_coef <- object$parameters[idx_v]
+    var_value <- object$vcov[idx_b, idx_b]
+    var_slope <- object$vcov[idx_v, idx_v]
+    cov_value_slope <- object$vcov[idx_b, idx_v]
+
+    if (value_coef < 0) {
+      omega_est <- sqrt(-value_coef)
+      period_est <- 2 * pi / omega_est
+      xi_est <- -slope_coef / (2 * omega_est)
+
+      grad_period_value <- pi / ((-value_coef)^(3 / 2))
+      var_period <- grad_period_value^2 * var_value
+      se_period <- sqrt(var_period)
+
+      grad_xi_value <- -slope_coef / (4 * (-value_coef)^(3 / 2))
+      grad_xi_slope <- -1 / (2 * sqrt(-value_coef))
+      var_xi <- grad_xi_value^2 * var_value +
+        grad_xi_slope^2 * var_slope +
+        2 * grad_xi_value * grad_xi_slope * cov_value_slope
+      se_xi <- sqrt(var_xi)
+
+      derived_params <- cbind(
+        Estimate = c(period_est, xi_est),
+        `Std. Error` = c(se_period, se_xi),
+        `z value` = c(period_est / se_period, xi_est / se_xi),
+        `Pr(>|z|)` = 2 * pnorm(-abs(c(
+          period_est / se_period, xi_est / se_xi
+        )))
+      )
+      rownames(derived_params) <- c("T (period)", "xi (damping ratio)")
+    }
+  }
+
   structure(
     list(
       call = object$call,
       coefficients = .coef_table(object$parameters, se),
+      derived_params = derived_params,
       sigma = c(sigma_e = object$measurement_error_sd),
       nobs = length(object$data),
       n_observations = .n_obs(object$data),
@@ -252,6 +300,12 @@ print.summary.MarginalODE <- function(
     x$coefficients,
     digits = digits, signif.stars = signif.stars, ...
   )
+
+  if (!is.null(x$derived_params)) {
+    cat("\nODE System Characteristics:\n")
+    .print_coefmat(x$derived_params, digits = digits,
+                   signif.stars = signif.stars, ...)
+  }
   cat(sprintf(
     "\nMeasurement Error SD: %.6f\n", x$sigma["sigma_e"]
   ))

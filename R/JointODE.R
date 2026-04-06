@@ -168,10 +168,10 @@ JointODE <- function(
   # Data-driven defaults for initial state and sigma_e
   # (prevents inner Newton divergence when init = "default")
   cf <- parameters$coefficients
-  if (all(cf$initial_state == 0)) {
+  if (is.null(cf$initial_state)) {
     cf$initial_state <- c(mean(all_y), 0)
   }
-  if (cf$measurement_error_sd == 1) {
+  if (is.null(cf$measurement_error_sd)) {
     cf$measurement_error_sd <- sd(all_y)
   }
   parameters$coefficients <- cf

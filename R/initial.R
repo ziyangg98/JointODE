@@ -9,8 +9,8 @@
       baseline = rep(0, dims$n_spline_basis),
       hazard = rep(0, dims$n_survival_covariates + 2),
       longitudinal = rep(0, dims$n_longitudinal_coef),
-      initial_state = c(0, 0),
-      measurement_error_sd = 1,
+      initial_state = NULL,
+      measurement_error_sd = NULL,
       random_effect_sigma = diag(1, dims$n_random_effects)
     ),
     configurations = list(
@@ -80,9 +80,6 @@
   params$coefficients$random_effect_sigma <- sigma
   params$random_effects_init <- marginal_re
 
-  if (verbose > 0)
-    cli::cli_alert_success("Longitudinal initialized from MarginalODE")
-
   # --- Survival: time-dependent Cox with predicted trajectories ---
   surv_cov_names <- parsed_surv$covariate_terms %||% character(0)
 
@@ -107,9 +104,6 @@
     stop("Cox model produced NA coefficients.", call. = FALSE)
   }
   params$coefficients$hazard <- hazard
-  if (verbose > 0)
-    cli::cli_alert_success("Hazard initialized from time-dependent Cox")
-
   # Baseline hazard via Weibull → B-spline projection
   weibull_fit <- survival::survreg(
     reformulate("1", response = call(
@@ -119,12 +113,6 @@
   )
   wb_scale <- exp(coef(weibull_fit)[1])
   wb_shape <- 1 / weibull_fit$scale
-  if (verbose > 0) {
-    cli::cli_alert_info(sprintf(
-      "Weibull baseline: shape=%.3f, scale=%.3f",
-      wb_shape, wb_scale
-    ))
-  }
 
   evt <- survival_data[[surv_vars[1]]][
     survival_data[[surv_vars[2]]] == 1
@@ -147,18 +135,25 @@
     degree = sbc$degree, intercept = TRUE
   )
   params$coefficients$baseline <- qr.coef(qr(basis), log_h)
-  if (verbose > 0)
-    cli::cli_alert_success("Baseline initialized via Weibull")
-
   if (verbose > 0) {
+    cli::cli_alert_success("Initialization complete")
     cf <- params$coefficients
-    fmt <- function(x) paste(names(x), round(x, 4), sep = "=", collapse = ", ")
+    vfmt <- function(x) {
+      paste0("[", paste(round(x, 3), collapse = ", "), "]")
+    }
     cli::cli_h3("Initialized parameters")
-    cli::cli_text("Longitudinal: {fmt(cf$longitudinal)}")
-    cli::cli_text("Initial state: {fmt(cf$initial_state)}")
-    cli::cli_text("Hazard: {fmt(cf$hazard)}")
-    cli::cli_text("sigma_e = {round(cf$measurement_error_sd, 4)}")
-    cli::cli_text("RE SD: {paste(round(sqrt(diag(cf$random_effect_sigma)), 4), collapse = ', ')}")
+    cat("Longitudinal:\n")
+    cat("  Coefficients:", vfmt(cf$longitudinal), "\n")
+    cat("  Initial state:",
+        vfmt(cf$initial_state), "\n")
+    cat("Survival:\n")
+    cat("  Hazard:      ", vfmt(cf$hazard), "\n")
+    cat("  Baseline:    ", vfmt(cf$baseline), "\n")
+    cat("Variance:\n")
+    cat("  sigma_e:     ",
+        format(cf$measurement_error_sd, digits = 4), "\n")
+    cat("  Random SD:   ",
+        vfmt(sqrt(diag(cf$random_effect_sigma))), "\n")
   }
 
   params

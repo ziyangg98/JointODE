@@ -348,26 +348,6 @@ test_that(".coef_table structure and computation", {
   expect_true(is.infinite(tbl2[1, "z value"]))
 })
 
-# --- .coef_to_vector / .vector_to_coef ---
-
-test_that(".coef_to_vector roundtrips correctly", {
-  params <- sim$init
-  theta <- .coef_to_vector(params)
-  recovered <- .vector_to_coef(params, theta)
-
-  expect_equal(
-    unname(recovered$coefficients$baseline),
-    unname(params$coefficients$baseline)
-  )
-  expect_equal(
-    unname(recovered$coefficients$hazard),
-    unname(params$coefficients$hazard)
-  )
-  expect_equal(
-    unname(recovered$coefficients$longitudinal),
-    unname(params$coefficients$longitudinal)
-  )
-})
 
 # --- .compute_dimensions ---
 
@@ -414,16 +394,4 @@ test_that(".get_spline_config variants", {
     .get_spline_config(1:10, knot_placement = "invalid"),
     "knot_placement"
   )
-})
-
-# --- .update_random_effect_sigma ---
-
-test_that(".update_random_effect_sigma computes Laplace-corrected estimate", {
-  re <- matrix(c(1, 0, 0, 2), nrow = 2, byrow = TRUE)
-  posteriors <- list(
-    list(cov = diag(2) * 0.1),
-    list(cov = diag(2) * 0.3)
-  )
-  expected <- (crossprod(re) + diag(2) * 0.1 + diag(2) * 0.3) / 2
-  expect_equal(.update_random_effect_sigma(re, posteriors), expected)
 })

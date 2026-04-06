@@ -72,7 +72,9 @@ Type joint_ode_nll(objective_function<Type>* obj) {
   Type BC = Type(clamp_val);
 
   // Output vectors for REPORT (filled per-subject, safe for parallel)
+  int n_total_obs = obs_times.size();
   vector<Type> cumulative_hazard(n_subjects), log_hazard_at_event(n_subjects);
+  vector<Type> fitted_biomarker(n_total_obs), fitted_velocity(n_total_obs);
 
   // Parallel accumulator for negative log-likelihood
   parallel_accumulator<Type> nll(obj);
@@ -169,6 +171,8 @@ Type joint_ode_nll(objective_function<Type>* obj) {
       int time_idx = find_time_index(time_pts, obs_t(j));
       if (time_idx >= 0) {
         nll -= dnorm(Type(obs_y(j)), sol_m(time_idx), sigma_e, true);
+        fitted_biomarker(oi + j) = sol_m(time_idx);
+        fitted_velocity(oi + j) = sol_v(time_idx);
       }
     }
 
@@ -192,6 +196,8 @@ Type joint_ode_nll(objective_function<Type>* obj) {
     for (int j = 0; j < n_random_effects; j++)
       Sigma_b(i, j) *= exp(log_sd_re(i)) * exp(log_sd_re(j));
 
+  REPORT(fitted_biomarker);
+  REPORT(fitted_velocity);
   REPORT(cumulative_hazard);
   REPORT(log_hazard_at_event);
   REPORT(Sigma_b);
