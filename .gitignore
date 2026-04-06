@@ -29,3 +29,4 @@ src/*.so
 src/*.dll
 src/*.o.tmp
 Rplots.pdf
+.claude/
