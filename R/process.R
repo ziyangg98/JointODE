@@ -151,15 +151,6 @@
     numeric(0)
   }
 
-  # ODE branch (same for all subjects at initialization)
-  b1_init <- if (configs$biomarker$fixed) coefs$longitudinal[1] else 0
-  b2_init <- if (configs$velocity$fixed) {
-    coefs$longitudinal[1 + configs$biomarker$fixed]
-  } else {
-    0
-  }
-  ode_branch <- .classify_disc(b1_init, b2_init)
-
   baseline_config <- configs$baseline
   list(
     model_type = 0L,
@@ -176,7 +167,6 @@
     long_random_covariates = flatten_design("random"),
     surv_covariates = surv_covariates,
     n_surv_covariates = as.integer(n_surv_covariates),
-    ode_branch = as.integer(ode_branch),
     clamp_value = configs$biomarker_clamp,
     hazard_quadrature = as.integer(control$hazard_quadrature),
     velocity_power = configs$gamma,
@@ -230,22 +220,6 @@
   )
 }
 
-#' Classify ODE branch from discriminant (R version)
-#' @noRd
-.classify_disc <- function(b1, b2) {
-  eps <- 1e-8
-  disc_tol <- 1e-12
-  if (abs(b1) < eps) {
-    return(if (abs(b2) > eps) 1L else 4L) # FIRST_ORD or ZERO
-  }
-  D <- b2^2 + 4 * b1
-  if (D > disc_tol) return(0L)   # REAL
-  if (D < -disc_tol) return(2L)  # COMPLEX
-  return(3L)                       # REPEATED
-}
-
-#' @importFrom stats model.frame model.matrix model.response
-#' @noRd
 #' @importFrom stats model.frame model.matrix model.response
 #' @noRd
 .process_marginal <- function(formula, data, time, id, parsed_long) {
@@ -346,47 +320,11 @@
     n_random_covariates = as.integer(n_random_covariates),
     long_fixed_covariates = flatten_design("fixed"),
     long_random_covariates = flatten_design("random"),
-    ode_branch = 4L,  # BR_ZERO (b1=b2=0 at initialization)
     clamp_value = clamp_value,
     biomarker_fixed = as.integer(parsed_long$biomarker$fixed),
     biomarker_random = as.integer(parsed_long$biomarker$random),
     velocity_fixed = as.integer(parsed_long$velocity$fixed),
     velocity_random = as.integer(parsed_long$velocity$random)
-  )
-}
-
-#' Setup marginal model dimensions and coefficient names
-#' @noRd
-.setup_marginal_model <- function(data, parsed_long) {
-  fixed_formula <- .build_formula(parsed_long$fixed_terms,
-                                  response = parsed_long$response)
-  fixed_names <- colnames(model.matrix(
-    fixed_formula, model.frame(fixed_formula, data)
-  ))
-
-  long_names <- character(0)
-  if (parsed_long$biomarker$fixed) long_names <- c(long_names, "biomarker")
-  if (parsed_long$velocity$fixed) long_names <- c(long_names, "velocity")
-  long_names <- c(long_names, fixed_names)
-
-  # RE dimension
-  has_re_covs <- !is.null(parsed_long$random_terms)
-  random_terms <- if (has_re_covs) parsed_long$random_terms else character(0)
-  n_long_random <- if (length(random_terms) > 0) {
-    ncol(model.matrix(.build_formula(random_terms, is_random = TRUE), data))
-  } else {
-    0L
-  }
-  n_re <- 2L + n_long_random +
-    sum(parsed_long$biomarker$random, parsed_long$velocity$random)
-
-  list(
-    n_longitudinal_coef = length(long_names),
-    n_re = n_re,
-    coef_names = list(
-      longitudinal = long_names,
-      initial_state = c("init_biomarker", "init_velocity")
-    )
   )
 }
 
@@ -441,140 +379,5 @@
     log_sd_re = log(pmax(marginal_sds, 1e-10)),
     corr_par = corr_theta,
     random_effects = parameters$random_effects_init
-  )
-}
-
-#' Extract results from fitted MarginalODE TMB object
-#' @noRd
-.finalize_marginal <- function(obj, opt, coef_names, n_re, n_subjects) {
-  sdr <- TMB::sdreport(obj)
-  reported <- obj$report()
-  par <- obj$env$last.par.best
-  pn <- names(par)
-
-  longitudinal <- as.numeric(par[pn == "longitudinal"])
-  names(longitudinal) <- coef_names$longitudinal
-  initial_state <- as.numeric(par[pn == "initial_state"])
-  names(initial_state) <- coef_names$initial_state
-  sigma_e <- unname(exp(par[pn == "log_sigma_e"]))
-
-  parameters <- c(longitudinal, initial_state)
-
-  # Vcov of fixed effects
-  n_fixed <- length(parameters)
-  vcov_matrix <- if (!is.null(sdr$cov.fixed) && nrow(sdr$cov.fixed) >= n_fixed) {
-    sdr$cov.fixed[seq_len(n_fixed), seq_len(n_fixed), drop = FALSE]
-  } else {
-    matrix(NA, n_fixed, n_fixed)
-  }
-  dimnames(vcov_matrix) <- list(names(parameters), names(parameters))
-
-  # Variance component SEs
-  sdr_report <- summary(sdr, "report")
-  sdr_names <- rownames(sdr_report)
-  sigma_e_se <- as.numeric(sdr_report[sdr_names == "sigma_e", "Std. Error"])
-  sigma_b <- as.matrix(reported$Sigma_b)
-  sigma_b_se <- matrix(
-    sdr_report[sdr_names == "Sigma_b", "Std. Error"], n_re, n_re)
-
-  # Random effects posterior modes
-  random_effects <- matrix(par[pn == "random_effects"],
-                           nrow = n_subjects, ncol = n_re)
-
-  loglik <- -opt$objective
-  n_total_params <- n_fixed + 1  # +1 for sigma_e
-  converged <- opt$convergence == 0
-
-  list(
-    parameters = parameters,
-    measurement_error_sd = sigma_e,
-    measurement_error_sd_se = sigma_e_se,
-    random_effect_sigma = sigma_b,
-    random_effect_sigma_se = sigma_b_se,
-    logLik = loglik,
-    AIC = -2 * loglik + 2 * n_total_params,
-    BIC = -2 * loglik + n_total_params * log(n_subjects),
-    vcov = vcov_matrix,
-    random_effects = random_effects,
-    convergence = list(
-      converged = converged,
-      iterations = opt$iterations,
-      message = sprintf("%s (%s)",
-        if (converged) "Converged" else "Did not converge", opt$message))
-  )
-}
-
-# TMB Result Extraction ========================================================
-
-#' @noRd
-.finalize_joint <- function(obj, opt, parameters, coef_names,
-                          data_list, n_re, control) {
-  sdr <- TMB::sdreport(obj)
-  reported <- obj$report()
-  par <- obj$env$last.par.best
-  pn <- names(par)
-
-  # Fixed effects
-  cf <- parameters$coefficients
-  for (nm in c("baseline", "hazard", "longitudinal", "initial_state"))
-    cf[[nm]] <- setNames(as.numeric(par[pn == nm]), coef_names[[nm]])
-  cf$measurement_error_sd <- exp(par[pn == "log_sigma_e"])
-  cf$random_effect_sigma <- as.matrix(reported$Sigma_b)
-
-  # Variance component SEs (delta method via ADREPORT)
-  sdr_report <- summary(sdr, "report")
-  sdr_names <- rownames(sdr_report)
-  cf$measurement_error_sd_se <- as.numeric(
-    sdr_report[sdr_names == "sigma_e", "Std. Error"])
-  cf$random_effect_sigma_se <- matrix(
-    sdr_report[sdr_names == "Sigma_b", "Std. Error"], n_re, n_re)
-
-  parameters$coefficients <- cf
-  parameters$random_effects_init <- NULL
-
-  # Vcov of fixed effects
-  coef_names_exp <- .prefixed_coef_names(coef_names)
-  n_fixed <- length(coef_names_exp)
-  vcov_matrix <- if (!is.null(sdr$cov.fixed) && nrow(sdr$cov.fixed) >= n_fixed) {
-    sdr$cov.fixed[seq_len(n_fixed), seq_len(n_fixed), drop = FALSE]
-  } else {
-    matrix(NA, n_fixed, n_fixed)
-  }
-  dimnames(vcov_matrix) <- list(coef_names_exp, coef_names_exp)
-
-  # C-index
-  n_subjects <- length(data_list)
-  event_t <- vapply(data_list, `[[`, numeric(1), "time")
-  event_s <- vapply(data_list, `[[`, numeric(1), "status")
-  cindex <- survival::concordance(
-    Surv(event_t, event_s) ~ as.numeric(reported$log_hazard_at_event),
-    reverse = TRUE
-  )$concordance
-
-  # Convergence reporting
-  loglik <- -opt$objective
-  converged <- opt$convergence == 0
-  if (control$verbose > 0) {
-    if (converged) cli::cli_alert_success(sprintf("Converged (%s)", opt$message))
-    else cli::cli_alert_warning(sprintf("Did not converge: %s", opt$message))
-    cli::cli_alert_info(sprintf("Log-likelihood: %.2f", loglik))
-    cli::cli_alert_info(sprintf("C-index: %.3f", cindex))
-  }
-
-  n_params <- .count_params(parameters)
-  list(
-    parameters = parameters,
-    logLik = loglik,
-    AIC = -2 * loglik + 2 * n_params,
-    BIC = -2 * loglik + n_params * log(n_subjects),
-    cindex = cindex,
-    convergence = list(
-      converged = converged,
-      iterations = opt$iterations,
-      message = sprintf("%s (%s)",
-        if (converged) "Converged" else "Did not converge", opt$message)),
-    random_effects = matrix(par[pn == "random_effects"], nrow = n_subjects, ncol = n_re),
-    vcov = vcov_matrix,
-    tmb_report = reported
   )
 }

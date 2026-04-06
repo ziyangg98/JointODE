@@ -61,17 +61,34 @@ MarginalODE <- function(
   # Build parameters (default or user-provided)
   parameters <- .default_marginal_parameters(model_config, parsed_long)
 
-  # Initialize RE from observations
   all_y <- unlist(lapply(data_list, function(d) d$longitudinal$measurements))
   mean_y <- mean(all_y)
-  parameters$coefficients$initial_state <- c(mean_y, 0)
+  has_dynamics_re <- parsed_long$biomarker$random ||
+    parsed_long$velocity$random
 
-  random_effects_init <- .init_re_from_observations(data_list, mean_y, 0, n_re)
-  re_sds <- pmax(apply(random_effects_init, 2, sd), 1e-4)
-  parameters$coefficients$measurement_error_sd <- sd(all_y)
+  if (has_dynamics_re) {
+    # Phase 1: fit reduced model to warm-start dynamics RE
+    ws <- .warm_start_marginal(
+      formula, data, time, id, parsed_long, control
+    )
+    parameters$coefficients$longitudinal <- ws$longitudinal
+    parameters$coefficients$initial_state <- ws$initial_state
+    parameters$coefficients$measurement_error_sd <- ws$measurement_error_sd
+
+    # Expand RE matrix: cols 1-2 from warm start, rest = 0
+    random_effects_init <- matrix(0, n_subjects, n_re)
+    random_effects_init[, 1:2] <- ws$random_effects
+  } else {
+    parameters$coefficients$initial_state <- c(mean_y, 0)
+    parameters$coefficients$measurement_error_sd <- sd(all_y)
+    random_effects_init <- .init_re_from_observations(
+      data_list, mean_y, 0, n_re
+    )
+  }
+
+  re_sds <- pmax(apply(random_effects_init, 2, sd), sd(all_y) * 0.1)
   parameters$coefficients$random_effect_sigma <- diag(re_sds^2, n_re)
   parameters$random_effects_init <- random_effects_init
-
   parameters$configurations$biomarker_clamp <- max(abs(all_y)) * 5
 
   # Pack TMB inputs
@@ -80,22 +97,30 @@ MarginalODE <- function(
 
   .setup_openmp(control)
 
-  if (control$verbose > 0) cli::cli_h2("Marginal ODE Model Estimation (TMB)")
+  if (control$verbose > 0) {
+    phase_label <- if (has_dynamics_re) "Phase 2: " else ""
+    cli::cli_h2(paste0(phase_label, "Marginal ODE Model Estimation (TMB)"))
+  }
 
   obj <- TMB::MakeADFun(
     data = tmb_data,
     parameters = tmb_params,
     random = "random_effects",
     DLL = "JointODE",
-    silent = control$verbose < 2
+    silent = control$verbose < 3,
+    normalize = TRUE,
+    inner.control = list(ustep = 1)
   )
 
   opt <- stats::nlminb(
     start = obj$par,
     objective = obj$fn,
     gradient = obj$gr,
-    control = list(iter.max = control$maxit, eval.max = control$maxit * 2,
-                   rel.tol = control$tol)
+    control = list(
+      iter.max = control$maxit, eval.max = control$maxit * 2,
+      rel.tol = control$tol,
+      trace = as.integer(control$verbose >= 2)
+    )
   )
 
   results <- .finalize_marginal(obj, opt, coef_names, n_re, n_subjects)

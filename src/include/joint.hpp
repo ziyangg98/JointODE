@@ -23,7 +23,6 @@ Type joint_ode_nll(objective_function<Type>* obj) {
   DATA_VECTOR(long_random_covariates);
   DATA_VECTOR(surv_covariates);
   DATA_INTEGER(n_surv_covariates);
-  DATA_INTEGER(ode_branch);
   DATA_SCALAR(clamp_value);
   DATA_INTEGER(hazard_quadrature);
   DATA_SCALAR(velocity_power);
@@ -146,14 +145,14 @@ Type joint_ode_nll(objective_function<Type>* obj) {
         double t_start = t0 + q * sub_dt;
         // Midpoint
         Type m_mid = m, v_mid = v;
-        ode_step(m_mid, v_mid, b1, b2, forcing, Type(sub_dt * 0.5), ode_branch);
+        ode_step(m_mid, v_mid, b1, b2, forcing, Type(sub_dt * 0.5));
         m_mid = clamp(m_mid, -BC, BC);
         v_mid = clamp(v_mid, -BC, BC);
         Type h_mid = eval_hazard(m_mid, v_mid, t_start + sub_dt * 0.5,
                                  baseline_degree, full_knots,
                                  baseline, hazard, surv_cov_i, velocity_power_val);
         // Right endpoint
-        ode_step(m_mid, v_mid, b1, b2, forcing, Type(sub_dt * 0.5), ode_branch);
+        ode_step(m_mid, v_mid, b1, b2, forcing, Type(sub_dt * 0.5));
         m_mid = clamp(m_mid, -BC, BC);
         v_mid = clamp(v_mid, -BC, BC);
         Type h_right = eval_hazard(m_mid, v_mid, t_start + sub_dt,

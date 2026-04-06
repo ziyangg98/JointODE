@@ -144,8 +144,8 @@ JointODE <- function(
 
   if (is.character(init) && init == "marginal") {
     parameters <- .initialize_from_marginal(
-      longitudinal_data, survival_data, gamma, control,
-      parsed_long, parsed_surv, model_config
+      longitudinal_formula, longitudinal_data, survival_data,
+      gamma, control, parsed_long, parsed_surv, model_config
     )
   } else if (is.list(init)) {
     parameters <- init
@@ -156,12 +156,25 @@ JointODE <- function(
     )
   }
 
+  all_y <- unlist(lapply(
+    data_list, function(d) d$longitudinal$measurements
+  ))
+
   parameters$configurations$baseline <- model_config$spline_baseline_config
-  parameters$configurations$biomarker_clamp <- max(abs(unlist(
-    lapply(data_list, function(d) d$longitudinal$measurements)
-  ))) * 5
+  parameters$configurations$biomarker_clamp <- max(abs(all_y)) * 5
   parameters$configurations$hazard_quadrature <- control$hazard_quadrature
   parameters$configurations$gamma <- gamma
+
+  # Data-driven defaults for initial state and sigma_e
+  # (prevents inner Newton divergence when init = "default")
+  cf <- parameters$coefficients
+  if (all(cf$initial_state == 0)) {
+    cf$initial_state <- c(mean(all_y), 0)
+  }
+  if (cf$measurement_error_sd == 1) {
+    cf$measurement_error_sd <- sd(all_y)
+  }
+  parameters$coefficients <- cf
 
   names(parameters$coefficients$baseline) <- model_config$coef_names$baseline
   names(parameters$coefficients$hazard) <- model_config$coef_names$hazard
@@ -172,14 +185,11 @@ JointODE <- function(
 
   coef_names <- model_config$coef_names
 
-  # Initialize random effects (skip if already set by marginal init)
+  # Initialize random effects (zero if not set by marginal init)
+  n_re <- ncol(model_config$random_effects)
   if (is.null(parameters$random_effects_init)) {
-    n_re <- ncol(model_config$random_effects)
-    parameters$random_effects_init <- .init_re_from_observations(
-      data_list,
-      parameters$coefficients$initial_state[1],
-      parameters$coefficients$initial_state[2],
-      n_re
+    parameters$random_effects_init <- matrix(
+      0, nrow = length(data_list), ncol = n_re
     )
   }
 
@@ -198,7 +208,9 @@ JointODE <- function(
     parameters = tmb_params,
     random = "random_effects",
     DLL = "JointODE",
-    silent = control$verbose < 2
+    silent = control$verbose < 3,
+    normalize = TRUE,
+    inner.control = list(ustep = 1)
   )
 
   opt <- stats::nlminb(
@@ -208,7 +220,8 @@ JointODE <- function(
     control = list(
       iter.max = control$maxit,
       eval.max = control$maxit * 10,
-      rel.tol = control$tol
+      rel.tol = control$tol,
+      trace = as.integer(control$verbose >= 2)
     )
   )
 

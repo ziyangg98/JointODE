@@ -3,15 +3,6 @@
 #ifndef JOINTODE_UTILS_HPP
 #define JOINTODE_UTILS_HPP
 
-// ODE branch classification (BR_ prefix avoids R macro REAL/COMPLEX clash)
-enum {
-  BR_REAL      = 0,  // D > 0, |b1| > eps: two distinct real roots
-  BR_FIRST_ORD = 1,  // |b1| ~ 0: degenerates to first-order ODE
-  BR_COMPLEX   = 2,  // D < 0: conjugate complex roots
-  BR_REPEATED  = 3,  // D ~ 0, |b2| > eps: double root
-  BR_ZERO      = 4   // D ~ 0, |b2| ~ 0: trivial case
-};
-
 // ============================================================================
 // Core math utilities
 // ============================================================================
@@ -32,62 +23,62 @@ Type clamp(Type x, Type lower, Type upper) {
            CppAD::CondExpGt(x, upper, upper, x));
 }
 
+// AD-safe sqrt: returns sqrt(max(x, eps)) to avoid NaN on negative input
+template <class Type>
+Type safe_sqrt(Type x) {
+  Type eps(1e-20);
+  return sqrt(CppAD::CondExpGt(x, eps, x, eps));
+}
+
 // ============================================================================
 // Matrix exponential ODE solver
 // Solves d²m/dt² = b1·m + b2·dm/dt + forcing exactly via Cayley-Hamilton
-// Branch pre-classified from doubles → no CondExp overhead in AD tape
+// Uses CondExp to select between REAL (D>0) and COMPLEX (D<0) branches,
+// adapting to current parameter values during optimization.
 // ============================================================================
 
 template <class Type>
 void ode_step(Type& biomarker, Type& velocity,
-              Type b1, Type b2, Type forcing, Type dt, int branch) {
+              Type b1, Type b2, Type forcing, Type dt) {
   Type half_b2 = b2 * Type(0.5);
-  Type a0, a1, J0, J1;
+  Type D = b2 * b2 + Type(4) * b1;  // discriminant
 
-  if (branch == BR_REAL) {
-    Type discriminant = sqrt(b2 * b2 + Type(4) * b1);
-    Type root1 = half_b2 + discriminant * Type(0.5);
-    Type root2 = half_b2 - discriminant * Type(0.5);
-    Type exp1 = safe_exp(root1 * dt), exp2 = safe_exp(root2 * dt);
-    a0 = (root1 * exp2 - root2 * exp1) / discriminant;
-    a1 = (exp1 - exp2) / discriminant;
-    Type int1 = (exp1 - Type(1)) / root1;
-    Type int2 = (exp2 - Type(1)) / root2;
-    J1 = (int1 - int2) / discriminant;
-    J0 = (root1 * int2 - root2 * int1) / discriminant;
+  // --- REAL branch (D > 0): two distinct real roots ---
+  Type D_real = safe_sqrt(D);  // safe when D <= 0
+  Type root1 = half_b2 + D_real * Type(0.5);
+  Type root2 = half_b2 - D_real * Type(0.5);
+  // Guard roots near zero to avoid division by zero
+  Type root1_safe = CppAD::CondExpGt(root1 * root1, Type(1e-20), root1, Type(1e-10));
+  Type root2_safe = CppAD::CondExpGt(root2 * root2, Type(1e-20), root2, Type(-1e-10));
+  Type D_real_safe = CppAD::CondExpGt(D_real * D_real, Type(1e-20), D_real, Type(1e-10));
+  Type exp1 = safe_exp(root1 * dt), exp2 = safe_exp(root2 * dt);
+  Type a0_r = (root1 * exp2 - root2 * exp1) / D_real_safe;
+  Type a1_r = (exp1 - exp2) / D_real_safe;
+  Type int1 = (exp1 - Type(1)) / root1_safe;
+  Type int2 = (exp2 - Type(1)) / root2_safe;
+  Type J1_r = (int1 - int2) / D_real_safe;
+  Type J0_r = (root1 * int2 - root2 * int1) / D_real_safe;
 
-  } else if (branch == BR_FIRST_ORD) {
-    Type exp_b2 = safe_exp(b2 * dt);
-    Type int_b2 = (exp_b2 - Type(1)) / b2;
-    Type shifted_vel = velocity + forcing / b2;
-    biomarker += shifted_vel * int_b2 - forcing * dt / b2;
-    velocity = shifted_vel * exp_b2 - forcing / b2;
-    return;
+  // --- COMPLEX branch (D < 0): conjugate complex roots ---
+  Type omega = safe_sqrt(-D) * Type(0.5);  // safe when D >= 0
+  Type omega_safe = CppAD::CondExpGt(omega * omega, Type(1e-20), omega, Type(1e-10));
+  Type mod_sq = half_b2 * half_b2 + omega * omega;
+  Type mod_sq_safe = CppAD::CondExpGt(mod_sq, Type(1e-20), mod_sq, Type(1e-10));
+  Type exp_real = safe_exp(half_b2 * dt);
+  Type cos_w = cos(omega * dt), sin_w = sin(omega * dt);
+  Type a0_c = exp_real * (cos_w - half_b2 * sin_w / omega_safe);
+  Type a1_c = exp_real * sin_w / omega_safe;
+  Type int_cos = (exp_real * (half_b2 * cos_w + omega * sin_w) - half_b2) / mod_sq_safe;
+  Type int_sin = (exp_real * (half_b2 * sin_w - omega * cos_w) + omega) / mod_sq_safe;
+  Type J1_c = int_sin / omega_safe;
+  Type J0_c = int_cos - (half_b2 / omega_safe) * int_sin;
 
-  } else if (branch == BR_COMPLEX) {
-    Type omega = sqrt(-(b2 * b2 + Type(4) * b1)) * Type(0.5);
-    Type mod_sq = half_b2 * half_b2 + omega * omega;
-    Type exp_real = safe_exp(half_b2 * dt);
-    Type cos_w = cos(omega * dt), sin_w = sin(omega * dt);
-    a0 = exp_real * (cos_w - half_b2 * sin_w / omega);
-    a1 = exp_real * sin_w / omega;
-    Type int_cos = (exp_real * (half_b2 * cos_w + omega * sin_w) - half_b2) / mod_sq;
-    Type int_sin = (exp_real * (half_b2 * sin_w - omega * cos_w) + omega) / mod_sq;
-    J1 = int_sin / omega;
-    J0 = int_cos - (half_b2 / omega) * int_sin;
-
-  } else if (branch == BR_REPEATED) {
-    Type exp_h = safe_exp(half_b2 * dt);
-    Type int_h = (exp_h - Type(1)) / half_b2;
-    a0 = exp_h * (Type(1) - half_b2 * dt);
-    a1 = dt * exp_h;
-    J1 = (dt * exp_h - int_h) / half_b2;
-    J0 = Type(2) * int_h - dt * exp_h;
-
-  } else { // BR_ZERO
-    a0 = Type(1);  a1 = dt;
-    J1 = dt * dt * Type(0.5);  J0 = dt;
-  }
+  // --- Select branch via CondExp based on discriminant sign ---
+  Type zero(0);
+  Type a0 = CppAD::CondExpGt(D, zero, a0_r, a0_c);
+  Type a1 = CppAD::CondExpGt(D, zero, a1_r, a1_c);
+  Type J0 = CppAD::CondExpGt(D, zero, J0_r, J0_c);
+  Type J1 = CppAD::CondExpGt(D, zero, J1_r, J1_c);
 
   Type new_m = a0 * biomarker + a1 * velocity + forcing * J1;
   Type new_v = b1 * a1 * biomarker + (a0 + b2 * a1) * velocity +

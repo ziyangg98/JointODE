@@ -52,6 +52,35 @@
   re
 }
 
+#' Build counting process (start, stop, event) from predictions + survival
+#' @noRd
+.build_counting_process <- function(pred, survival_data, id, surv_vars) {
+  names(pred)[names(pred) == "time"] <- "obstime"
+  merged <- merge(pred, survival_data, by = id, all.x = TRUE)
+  merged <- merged[order(merged[[id]], merged$obstime), ]
+
+  merged$start <- merged$obstime
+  subj_ids <- as.vector(merged[[id]])
+  subj_idx <- c(which(!duplicated(subj_ids)), nrow(merged) + 1)
+  ni <- diff(subj_idx)
+
+  stop_vec <- event_vec <- numeric(nrow(merged))
+  for (i in seq_along(ni)) {
+    s <- subj_idx[i]
+    e <- subj_idx[i + 1] - 1
+    if (ni[i] == 1) {
+      stop_vec[s] <- merged[[surv_vars[1]]][s]
+      event_vec[s] <- merged[[surv_vars[2]]][s]
+    } else {
+      stop_vec[s:e] <- c(merged$obstime[(s + 1):e], merged[[surv_vars[1]]][e])
+      event_vec[s:e] <- c(rep(0, ni[i] - 1), merged[[surv_vars[2]]][e])
+    }
+  }
+  merged$stop <- stop_vec
+  merged$event <- event_vec
+  merged
+}
+
 # Constants ====================================================================
 
 .default_spline <- list(
@@ -62,6 +91,8 @@
 )
 
 .reserved_words <- c("biomarker", "velocity")
+
+.init_state_names <- c("init_biomarker", "init_velocity")
 
 # Formula Parsing ==============================================================
 

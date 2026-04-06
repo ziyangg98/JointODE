@@ -20,7 +20,6 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
   DATA_INTEGER(n_random_covariates);
   DATA_VECTOR(long_fixed_covariates);
   DATA_VECTOR(long_random_covariates);
-  DATA_INTEGER(ode_branch);
   DATA_SCALAR(clamp_value);
   DATA_INTEGER(biomarker_fixed);
   DATA_INTEGER(biomarker_random);
@@ -112,7 +111,7 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
       for (int k = 0; k < n_random_covariates; k++)
         forcing += bi(forcing_re_start + k) * Type(long_random_covariates_i(cov_idx, k));
 
-      ode_step(m, v, b1, b2, forcing, dt, ode_branch);
+      ode_step(m, v, b1, b2, forcing, dt);
       m = clamp(m, -BC, BC);
       v = clamp(v, -BC, BC);
       sol_m(ti) = m;  sol_v(ti) = v;

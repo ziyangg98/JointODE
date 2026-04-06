@@ -8,8 +8,8 @@
 #' @param maxit Maximum number of EM iterations (default: 200)
 #' @param tol Convergence tolerance on maximum absolute parameter
 #'   change: max|delta_theta| < tol (default: 1e-4)
-#' @param verbose Logical or numeric; controls verbosity level. FALSE/0 for
-#'   silent, TRUE/1 for basic progress, 2 for detailed output (default: FALSE)
+#' @param verbose Numeric verbosity level: 0 = silent, 1 = progress,
+#'   2 = outer iterations, 3 = inner Newton detail (default: 0)
 #' @param parallel Logical; whether to use parallel computation (default: FALSE)
 #' @param n_cores Integer; number of cores to use for parallel computation.
 #'   If 0, uses all available cores (default: 0)
