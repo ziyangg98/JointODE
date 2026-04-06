@@ -77,9 +77,6 @@ test_that("logLik.JointODE returns logLik class", {
 
 # predict requires tmb_obj (not available in mock); tested in test-fit.R
 
-test_that("predict.JointODE errors on newdata", {
-  expect_error(predict(mock, newdata = data.frame()), "not yet supported")
-})
 
 
 # Plot and predict tests require TMB fit object — covered in test-fit.R

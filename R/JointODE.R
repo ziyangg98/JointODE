@@ -513,30 +513,18 @@ print.JointODE <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
 #' @concept model-prediction
 #' @export
 predict.JointODE <- function(object, newdata = NULL, times = NULL, ...) {
-  if (!is.null(newdata)) stop("newdata not yet supported")
-
-  reported <- object$tmb_obj$report()
   data_list <- object$data
+  cf <- object$parameters$coefficients
+  configs <- object$parameters$configurations
+  re <- object$random_effects
 
-  cum_haz <- as.numeric(reported$cumulative_hazard)
-
-  obs_offset <- 0L
-  results <- vector("list", length(data_list))
-  for (i in seq_along(data_list)) {
-    ni <- length(data_list[[i]]$longitudinal$measurements)
-    idx <- obs_offset + seq_len(ni)
-
-    results[[i]] <- data.frame(
-      id = names(data_list)[i],
-      time = data_list[[i]]$longitudinal$times,
-      biomarker = as.numeric(reported$fitted_biomarker[idx]),
-      velocity = as.numeric(reported$fitted_velocity[idx]),
-      cumhaz = cum_haz[i],
-      survival = exp(-cum_haz[i]),
-      stringsAsFactors = FALSE
-    )
-    obs_offset <- obs_offset + ni
+  if (is.null(times)) {
+    all_t <- unlist(lapply(data_list, function(d) d$longitudinal$times))
+    times <- sort(unique(c(0, all_t)))
   }
 
-  do.call(rbind, results)
+  .predict_trajectories(
+    data_list, times, cf, configs, re,
+    object$control$hazard_quadrature
+  )
 }
