@@ -507,7 +507,8 @@ print.JointODE <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
 #' @param object An object of class \code{JointODE}
 #' @param newdata Optional data frame with new subjects. If NULL, uses the
 #'   training data from the model fit.
-#' @param times Optional time points for prediction (currently unused).
+#' @param times Optional time points for prediction. If NULL, uses observed
+#'   time points for each subject.
 #' @param ... Additional arguments (currently unused)
 #'
 #' @return A data.frame with columns id, time, biomarker, velocity.

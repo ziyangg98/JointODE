@@ -119,7 +119,6 @@ vector<double> bspline_basis(double t, int degree,
     if (t < knots(i + 1)) { span = i; break; }
 
   // De Boor recursion — only iterate over [span-degree, span] range
-  int lo = std::max(0, span - degree), hi = std::min(n_basis - 1, span);
   vector<double> current(n_basis), previous(n_basis);
   current.setZero();
   if (span < n_basis) current(span) = 1.0;
@@ -158,12 +157,12 @@ Type eval_hazard(Type biomarker, Type velocity, double t,
                  double gamma_power) {
   vector<double> basis = bspline_basis(t, spline_degree, knot_vector);
   Type log_h(0);
-  for (int k = 0; k < baseline_coefs.size(); k++)
+  for (size_t k = 0; k < (size_t)baseline_coefs.size(); k++)
     log_h += Type(basis(k)) * baseline_coefs(k);
   log_h += hazard_coefs(0) * biomarker;
   if (gamma_power == 1)      log_h += hazard_coefs(1) * velocity;
   else if (gamma_power == 2) log_h += hazard_coefs(1) * velocity * velocity;
-  for (int k = 0; k < survival_covariates.size(); k++)
+  for (size_t k = 0; k < (size_t)survival_covariates.size(); k++)
     log_h += hazard_coefs(k + 2) * Type(survival_covariates(k));
   return safe_exp(clamp(log_h, Type(-20.0), Type(20.0)));
 }
@@ -178,7 +177,7 @@ vector<double> build_time_grid(const vector<double>& obs_times,
   std::vector<double> grid;
   grid.reserve(obs_times.size() + 2);
   grid.push_back(0.0);
-  for (int i = 0; i < obs_times.size(); i++)
+  for (size_t i = 0; i < (size_t)obs_times.size(); i++)
     grid.push_back(std::max(0.0, std::min(event_time, obs_times(i))));
   grid.push_back(event_time);
   std::sort(grid.begin(), grid.end());

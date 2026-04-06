@@ -14,10 +14,6 @@
 \item{times}{Prediction times (NULL = observed)}
 
 \item{...}{Additional arguments}
-
-\item{parallel}{Logical for parallel computation}
-
-\item{n_cores}{Number of cores (0 = auto)}
 }
 \value{
 A data.frame with id, time, biomarker, velocity, acceleration

@@ -344,8 +344,6 @@ print.summary.MarginalODE <- function(
 #' @param object A MarginalODE object
 #' @param newdata Not yet supported
 #' @param times Prediction times (NULL = observed)
-#' @param parallel Logical for parallel computation
-#' @param n_cores Number of cores (0 = auto)
 #' @param ... Additional arguments
 #' @return A data.frame with id, time, biomarker, velocity, acceleration
 #' @concept model-prediction

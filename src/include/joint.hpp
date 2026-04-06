@@ -39,8 +39,8 @@ Type joint_ode_nll(objective_function<Type>* obj) {
   double clamp_val = asDouble(clamp_value);
   int n_quadrature = std::max(hazard_quadrature, 1);
   vector<double> knots_d(baseline_knots.size()), boundary_d(baseline_boundary.size());
-  for (int i = 0; i < knots_d.size(); i++) knots_d(i) = asDouble(baseline_knots(i));
-  for (int i = 0; i < boundary_d.size(); i++) boundary_d(i) = asDouble(baseline_boundary(i));
+  for (size_t i = 0; i < (size_t)knots_d.size(); i++) knots_d(i) = asDouble(baseline_knots(i));
+  for (size_t i = 0; i < (size_t)boundary_d.size(); i++) boundary_d(i) = asDouble(baseline_boundary(i));
   vector<double> full_knots = build_knot_vector(baseline_degree, knots_d, boundary_d);
 
   // Pre-compute per-subject observation offsets for parallel access

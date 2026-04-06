@@ -1,4 +1,5 @@
 #' @useDynLib JointODE, .registration = TRUE
+#' @importFrom stats sd
 NULL
 
 #' Re-exported from survival

@@ -12,7 +12,8 @@
 \item{newdata}{Optional data frame with new subjects. If NULL, uses the
 training data from the model fit.}
 
-\item{times}{Optional time points for prediction (currently unused).}
+\item{times}{Optional time points for prediction. If NULL, uses observed
+time points for each subject.}
 
 \item{...}{Additional arguments (currently unused)}
 }
