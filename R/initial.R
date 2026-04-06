@@ -52,8 +52,8 @@
       parallel = control$parallel, n_cores = control$n_cores
     )
   )
-  if (!marginal_fit$convergence$converged) {
-    stop("MarginalODE failed to converge", call. = FALSE)
+  if (!marginal_fit$convergence$converged && verbose > 0) {
+    cli::cli_alert_warning("MarginalODE did not fully converge; using current estimates")
   }
 
   # Transfer longitudinal coefficients
@@ -83,7 +83,7 @@
   # --- Survival: time-dependent Cox with predicted trajectories ---
   surv_cov_names <- parsed_surv$covariate_terms %||% character(0)
 
-  # Get time-varying biomarker/velocity from marginal fit
+  # Get per-subject fitted values at observation times
   pred <- predict(marginal_fit)
 
   # Build counting process dataset

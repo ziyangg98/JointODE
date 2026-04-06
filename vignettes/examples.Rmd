@@ -10,7 +10,7 @@ vignette: >
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   echo = TRUE, message = FALSE, warning = FALSE,
-  eval = FALSE,
+  eval = requireNamespace("JMbayes2", quietly = TRUE),
   fig.width = 8, fig.height = 5
 )
 ```
@@ -42,7 +42,7 @@ survival_data <- pbc2.id |>
 longitudinal_data <- pbc2 |>
   transmute(
     id = as.integer(id), time = year,
-    observed = log(albumin)
+    observed = log(serBilir)
   ) |>
   left_join(
     survival_data |> select(id, drug, age, sex),
@@ -83,9 +83,9 @@ longitudinal_data |>
     labels = c("Censored", "Event"), name = "Status"
   ) +
   labs(
-    title = "Log Bilirubin Trajectories (20 Patients)",
+    title = "Log Serum Bilirubin Trajectories (20 Patients)",
     x = "Time (years)",
-    y = "Log Bilirubin (standardized)"
+    y = "Log Serum Bilirubin (standardized)"
   ) +
   theme_minimal(base_size = 12)
 ```
@@ -103,7 +103,7 @@ fit_ode <- JointODE(
   longitudinal_data = longitudinal_data,
   survival_data = survival_data,
   init = "marginal",
-  control = list(parallel = !nzchar(Sys.getenv("CI")))
+  control = list(maxit = 300, tol = 1e-3, parallel = TRUE)
 )
 summary(fit_ode)
 ```

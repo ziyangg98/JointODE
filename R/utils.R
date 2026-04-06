@@ -78,7 +78,7 @@
   }
   merged$stop <- stop_vec
   merged$event <- event_vec
-  merged
+  merged[merged$stop > merged$start, , drop = FALSE]
 }
 
 # Constants ====================================================================

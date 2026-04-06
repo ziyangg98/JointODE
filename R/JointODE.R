@@ -544,13 +544,18 @@ predict.JointODE <- function(object, newdata = NULL, times = NULL, ...) {
     data_list <- object$data
   }
 
-  if (is.null(times)) {
-    all_t <- unlist(lapply(data_list, function(d) d$longitudinal$times))
-    times <- sort(unique(c(0, all_t)))
-  }
+  n_quad <- object$control$hazard_quadrature
 
-  .predict_trajectories(
-    data_list, times, cf, configs, re,
-    object$control$hazard_quadrature
-  )
+  if (!is.null(times)) {
+    .predict_trajectories(data_list, times, cf, configs, re, n_quad)
+  } else {
+    # Per-subject at own observation times
+    do.call(rbind, lapply(seq_along(data_list), function(i) {
+      obs_t <- data_list[[i]]$longitudinal$times
+      .predict_trajectories(
+        data_list[i], obs_t, cf, configs,
+        re[i, , drop = FALSE], n_quad
+      )
+    }))
+  }
 }

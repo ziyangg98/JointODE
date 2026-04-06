@@ -355,12 +355,19 @@ predict.MarginalODE <- function(object, newdata = NULL, times = NULL, ...) {
 
   data_list <- object$data
 
-  if (is.null(times)) {
-    all_t <- unlist(lapply(data_list, function(d) d$longitudinal$times))
-    times <- sort(unique(c(0, all_t)))
+  if (!is.null(times)) {
+    .predict_marginal_trajectories(
+      data_list, times, object$coefs, object$configs,
+      object$random_effects
+    )
+  } else {
+    # Per-subject at own observation times
+    do.call(rbind, lapply(seq_along(data_list), function(i) {
+      obs_t <- data_list[[i]]$longitudinal$times
+      .predict_marginal_trajectories(
+        data_list[i], obs_t, object$coefs, object$configs,
+        object$random_effects[i, , drop = FALSE]
+      )
+    }))
   }
-
-  .predict_marginal_trajectories(
-    data_list, times, object$coefs, object$configs, object$random_effects
-  )
 }
