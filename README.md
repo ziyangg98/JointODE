@@ -93,13 +93,12 @@ fit <- JointODE(
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = longitudinal_data,
   survival_data = sim$data$survival_data,
-  init = "marginal",
-  control = list(parallel = TRUE)
+  init = "marginal"
 )
 #> Warning in stats::nlminb(start = obj$par, objective = obj$fn, gradient =
 #> obj$gr, : NA/NaN function evaluation
 cat(sprintf("Elapsed: %.1f s\n", (proc.time() - t0)["elapsed"]))
-#> Elapsed: 149.9 s
+#> Elapsed: 110.8 s
 ```
 
 ``` r
@@ -110,8 +109,7 @@ summary(fit)
 #> JointODE(longitudinal_formula = observed ~ biomarker + velocity +
 #>     x1 + x2 + (biomarker + velocity | id), survival_formula = Surv(time,
 #>     status) ~ w1 + w2, longitudinal_data = longitudinal_data,
-#>     survival_data = sim$data$survival_data, init = "marginal",
-#>     control = list(parallel = TRUE))
+#>     survival_data = sim$data$survival_data, init = "marginal")
 #>
 #> Data Descriptives:
 #> Longitudinal Process            Survival Process
@@ -119,56 +117,56 @@ summary(fit)
 #> Number of Subjects: 200
 #>
 #>        AIC        BIC     logLik
-#> -28960.071 -28874.315  14506.036
+#> -28960.371 -28874.614  14506.185
 #>
 #> Coefficients:
 #> Longitudinal Process: Second-Order ODE Model
 #>             Estimate Std. Error  z value Pr(>|z|)
-#> biomarker    -1.0897     0.0078 -139.693   <2e-16 ***
-#> velocity     -0.8504     0.0179  -47.471   <2e-16 ***
-#> (Intercept)   0.0006     0.0014    0.391    0.695
-#> x1            0.5441     0.0040  137.491   <2e-16 ***
-#> x2           -0.4897     0.0036 -134.731   <2e-16 ***
+#> biomarker    -1.0897     0.0078 -140.137   <2e-16 ***
+#> velocity     -0.8449     0.0179  -47.094   <2e-16 ***
+#> (Intercept)   0.0006     0.0014    0.392    0.695
+#> x1            0.5437     0.0039  137.755   <2e-16 ***
+#> x2           -0.4896     0.0036 -134.951   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> ODE System Characteristics:
 #>                    Estimate Std. Error z value Pr(>|z|)
-#> T (period)           6.0189     0.0215  279.39   <2e-16 ***
-#> xi (damping ratio)   0.4073     0.0083   48.99   <2e-16 ***
+#> T (period)           6.0191     0.0215  280.27   <2e-16 ***
+#> xi (damping ratio)   0.4047     0.0083   48.54   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Survival Process: Proportional Hazards Model
 #>         Estimate Std. Error z value Pr(>|z|)
-#> alpha_1   0.8972     0.2172   4.132 3.60e-05 ***
-#> alpha_2   2.2963     0.6365   3.608 0.000309 ***
-#> w1        0.6550     0.1336   4.903 9.44e-07 ***
-#> w2       -0.8889     0.2762  -3.218 0.001290 **
+#> alpha_1   0.8963     0.2166   4.138 3.50e-05 ***
+#> alpha_2   2.3209     0.6466   3.590 0.000331 ***
+#> w1        0.6563     0.1336   4.912 9.02e-07 ***
+#> w2       -0.8894     0.2761  -3.222 0.001275 **
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Baseline Hazard: B-spline with 4 basis functions
-#> (Coefficients range: [-4.606, -2.496] )
+#> (Coefficients range: [-4.705, -2.450] )
 #>
 #> Initial State: Population Mean
 #>           Estimate Std. Error z value Pr(>|z|)
-#> biomarker  -0.4888     0.0073  -67.13   <2e-16 ***
-#> velocity   -0.1149     0.0087  -13.14   <2e-16 ***
+#> biomarker  -0.4887     0.0073  -67.05   <2e-16 ***
+#> velocity   -0.1146     0.0087  -13.15   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Variance Components:
-#> Measurement Error SD: 0.099596 (SE: 0.000546)
+#> Measurement Error SD: 0.099619 (SE: 0.000547)
 #> Random Effect Covariance Matrix:
 #>            [,1]       [,2]       [,3]       [,4]
-#> [1,]  0.0082656  2.136e-03  5.452e-04 -0.0002021
-#> [2,]  0.0021358  7.127e-03 -6.173e-05  0.0002697
-#> [3,]  0.0005452 -6.173e-05  1.361e-03  0.0003975
-#> [4,] -0.0002021  2.697e-04  3.975e-04  0.0412607
+#> [1,]  8.300e-03  2.218e-03  5.519e-04 -4.028e-05
+#> [2,]  2.218e-03  7.116e-03 -5.438e-05  3.002e-04
+#> [3,]  5.519e-04 -5.438e-05  1.338e-03  3.531e-04
+#> [4,] -4.028e-05  3.002e-04  3.531e-04  4.206e-02
 #>
 #> Model Diagnostics:
-#> C-index (Concordance): 0.623
+#> C-index (Concordance): 0.613
 #> Convergence: Converged (relative convergence (4))
 
 # Plot results
