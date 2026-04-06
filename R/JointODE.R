@@ -518,6 +518,8 @@ predict.JointODE <- function(object, newdata = NULL, times = NULL, ...) {
   reported <- object$tmb_obj$report()
   data_list <- object$data
 
+  cum_haz <- as.numeric(reported$cumulative_hazard)
+
   obs_offset <- 0L
   results <- vector("list", length(data_list))
   for (i in seq_along(data_list)) {
@@ -529,6 +531,8 @@ predict.JointODE <- function(object, newdata = NULL, times = NULL, ...) {
       time = data_list[[i]]$longitudinal$times,
       biomarker = as.numeric(reported$fitted_biomarker[idx]),
       velocity = as.numeric(reported$fitted_velocity[idx]),
+      cumhaz = cum_haz[i],
+      survival = exp(-cum_haz[i]),
       stringsAsFactors = FALSE
     )
     obs_offset <- obs_offset + ni
