@@ -27,102 +27,72 @@
 }
 
 #' @noRd
-.extend_covariates <- function(cov_mat, orig_times, pred_times) {
-  if (is.null(cov_mat)) {
-    return(NULL)
+.setup_openmp <- function(control) {
+  if (control$parallel) {
+    n_cores <- if (control$n_cores > 0) control$n_cores else parallel::detectCores()
+    TMB::openmp(n_cores)
   }
-  if (is.matrix(cov_mat) && length(cov_mat) == 0) {
-    return(matrix(numeric(0), nrow = length(pred_times), ncol = 0))
+}
+
+#' Initialize RE columns 1-2 from first observations
+#' @noRd
+.init_re_from_observations <- function(data_list, m0, v0 = 0, n_re = 2L) {
+  n_subjects <- length(data_list)
+  re <- matrix(0, nrow = n_subjects, ncol = max(n_re, 2L))
+  for (i in seq_along(data_list)) {
+    obs <- data_list[[i]]$longitudinal
+    if (length(obs$measurements) >= 1)
+      re[i, 1] <- obs$measurements[1] - m0
+    if (length(obs$measurements) >= 2) {
+      dt <- obs$times[2] - obs$times[1]
+      if (dt > 0)
+        re[i, 2] <- (obs$measurements[2] - obs$measurements[1]) / dt - v0
+    }
   }
-  indices <- findInterval(pred_times, orig_times)
-  indices[indices == 0L] <- 1L
-  if (is.matrix(cov_mat)) cov_mat[indices, , drop = FALSE] else cov_mat[indices]
+  re
+}
+
+#' Build counting process (start, stop, event) from predictions + survival
+#' @noRd
+.build_counting_process <- function(pred, survival_data, id, surv_vars) {
+  names(pred)[names(pred) == "time"] <- "obstime"
+  merged <- merge(pred, survival_data, by = id, all.x = TRUE)
+  merged <- merged[order(merged[[id]], merged$obstime), ]
+
+  merged$start <- merged$obstime
+  subj_ids <- as.vector(merged[[id]])
+  subj_idx <- c(which(!duplicated(subj_ids)), nrow(merged) + 1)
+  ni <- diff(subj_idx)
+
+  stop_vec <- event_vec <- numeric(nrow(merged))
+  for (i in seq_along(ni)) {
+    s <- subj_idx[i]
+    e <- subj_idx[i + 1] - 1
+    if (ni[i] == 1) {
+      stop_vec[s] <- merged[[surv_vars[1]]][s]
+      event_vec[s] <- merged[[surv_vars[2]]][s]
+    } else {
+      stop_vec[s:e] <- c(merged$obstime[(s + 1):e], merged[[surv_vars[1]]][e])
+      event_vec[s:e] <- c(rep(0, ni[i] - 1), merged[[surv_vars[2]]][e])
+    }
+  }
+  merged$stop <- stop_vec
+  merged$event <- event_vec
+  merged[merged$stop > merged$start, , drop = FALSE]
 }
 
 # Constants ====================================================================
 
 .default_spline <- list(
-  degree = 3,
-  n_knots = 2,
+  degree = 2,
+  n_knots = 1,
   knot_placement = "equal",
   boundary_knots = NULL
 )
 
 .reserved_words <- c("biomarker", "velocity")
 
-# Formatting ===================================================================
-
-#' @importFrom utils head
-#' @noRd
-.format_vector <- function(x, n = 4) {
-  if (!length(x)) {
-    return("[]")
-  }
-  shown <- head(x, n)
-  rest <- length(x) - n
-  paste0(
-    "[",
-    paste(sprintf("%.3f", shown), collapse = ", "),
-    if (rest > 0) paste0(", ...+", rest) else "",
-    "]"
-  )
-}
-
-#' @noRd
-.format_matrix <- function(mat) {
-  if (!is.matrix(mat) || !length(mat)) {
-    return("[]")
-  }
-  rows <- apply(mat, 1, function(row) {
-    paste(sprintf("%.3f", row), collapse = ", ")
-  })
-  paste0("[", paste(paste0("[", rows, "]"), collapse = ", "), "]")
-}
-
-# Parallel Computing ===========================================================
-
-#' @importFrom parallel detectCores
-#' @importFrom future plan multicore multisession sequential supportsMulticore
-#' @noRd
-.resolve_cores <- function(n_cores) {
-  if (n_cores == 0L) {
-    detected <- parallel::detectCores()
-    if (is.na(detected)) 1L else max(1L, detected - 1L)
-  } else {
-    n_cores
-  }
-}
-
-#' @noRd
-.setup_parallel_plan <- function(n_cores = 0) {
-  n_cores <- .resolve_cores(n_cores)
-  strategy <- if (future::supportsMulticore()) {
-    future::multicore
-  } else {
-    future::multisession
-  }
-  future::plan(strategy, workers = n_cores)
-  function() future::plan(future::sequential)
-}
-
-#' @importFrom future.apply future_lapply
-#' @noRd
-.parallel_apply <- function(
-  indices, fn, parallel = TRUE, n_cores = 0, setup = TRUE
-) {
-  if (!parallel) return(lapply(indices, fn))
-
-  if (setup) {
-    cleanup <- .setup_parallel_plan(n_cores)
-    on.exit(cleanup(), add = TRUE)
-  }
-
-  future.apply::future_lapply(
-    indices, fn,
-    future.seed = TRUE,
-    future.packages = "JointODE"
-  )
-}
+.init_state_names <- c("init_biomarker", "init_velocity")
 
 # Formula Parsing ==============================================================
 
@@ -133,9 +103,7 @@
   has_intercept <- "(Intercept)" %in% terms
 
   terms_str <- if (length(covars) > 0) {
-    if (is_random) {
-      covars <- gsub("^\\(Intercept\\)$", "1", covars)
-    }
+    if (is_random) covars <- gsub("^\\(Intercept\\)$", "1", covars)
     paste(covars, collapse = " + ")
   } else if (has_intercept) {
     "1"
@@ -284,8 +252,8 @@
 #' @noRd
 .get_spline_config <- function(
   x,
-  degree = 3,
-  n_knots = 5,
+  degree = 2,
+  n_knots = 1,
   knot_placement = "quantile",
   boundary_knots = NULL
 ) {
@@ -298,8 +266,7 @@
     knots <- quantile(x, probs = probs, na.rm = TRUE, names = FALSE)
   } else if (knot_placement == "equal") {
     knots <- seq(
-      boundary_knots[1],
-      boundary_knots[2],
+      boundary_knots[1], boundary_knots[2],
       length.out = n_knots + 2
     )[-c(1, n_knots + 2)]
   } else {
@@ -314,22 +281,17 @@
   )
 }
 
+# Parameter Helpers =============================================================
+
 #' @noRd
-.safe_chol <- function(H) {
-  R <- try(chol(H), silent = TRUE)
-  if (!inherits(R, "try-error")) return(R)
-  tau <- 1e-4 * max(abs(diag(H)), 1)
-  for (k in seq_len(10)) {
-    R <- try(chol(H + diag(tau, nrow(H))), silent = TRUE)
-    if (!inherits(R, "try-error")) return(R)
-    tau <- tau * 10
-  }
-  stop("Hessian is not positive definite")
+.prefixed_coef_names <- function(coef_names) {
+  c(
+    paste0("baseline:", coef_names$baseline),
+    paste0("hazard:", coef_names$hazard),
+    paste0("longitudinal:", coef_names$longitudinal),
+    paste0("initial state:", coef_names$initial_state)
+  )
 }
-
-
-
-# Parameter Counting & Conversion =============================================
 
 #' @noRd
 .count_params <- function(parameters) {
@@ -339,138 +301,207 @@
     length(cf$initial_state) + 1 + p * (p + 1) / 2
 }
 
+# Prediction Utilities =========================================================
+
+#' ODE step (double, 5-branch)
 #' @noRd
-.coef_to_vector <- function(parameters) {
-  with(parameters$coefficients,
-       c(baseline, hazard, longitudinal, initial_state))
-}
+.ode_step_r <- function(m, v, b1, b2, f, dt) {
+  h <- b2 / 2
+  D <- b2^2 + 4 * b1
+  eps <- 1e-10
 
-#' @noRd
-.vector_to_coef <- function(parameters, theta) {
-  cf <- parameters$coefficients
-  n <- c(length(cf$baseline), length(cf$hazard),
-         length(cf$longitudinal), length(cf$initial_state))
-  idx <- cumsum(n)
-
-  parameters$coefficients$baseline <- theta[1:idx[1]]
-  parameters$coefficients$hazard <- theta[(idx[1] + 1):idx[2]]
-  parameters$coefficients$longitudinal <- theta[(idx[2] + 1):idx[3]]
-  parameters$coefficients$initial_state <- theta[(idx[3] + 1):idx[4]]
-  parameters
-}
-
-# EM Progress Tracking =========================================================
-
-#' @noRd
-.compute_metrics <- function(curr, prev, iter) {
-  if (iter > 1) {
-    delta_l <- curr$loglik - prev$loglik
-    rel_l <- abs(delta_l) / (abs(curr$loglik) + 1)
-
-    # Parameter change: max relative change across fixed effects + variance
-    theta_curr <- c(
-      .coef_to_vector(curr$parameters),
-      curr$parameters$coefficients$measurement_error_sd,
-      as.vector(curr$parameters$coefficients$random_effect_sigma)
-    )
-    theta_prev <- c(
-      .coef_to_vector(prev$parameters),
-      prev$parameters$coefficients$measurement_error_sd,
-      as.vector(prev$parameters$coefficients$random_effect_sigma)
-    )
-    delta_theta <- max(abs(theta_curr - theta_prev))
+  if (abs(b1) < 1e-12 && abs(b2) < 1e-12) {
+    a0 <- 1; a1 <- dt; J0 <- dt; J1 <- dt^2 / 2
+  } else if (abs(b1) < 1e-12) {
+    eb <- exp(b2 * dt); a0 <- 1
+    a1 <- if (abs(b2) > eps) (eb - 1) / b2 else dt
+    J1 <- if (abs(b2) > eps) (eb - 1) / b2^2 - dt / b2 else dt^2 / 2
+    J0 <- if (abs(b2) > eps) (eb - 1) / b2 else dt
+  } else if (abs(D) < 1e-10) {
+    ert <- exp(h * dt)
+    a0 <- ert * (1 - h * dt); a1 <- ert * dt
+    if (abs(h) > eps) {
+      ir <- (ert - 1) / h
+      isr <- (ert * (h * dt - 1) + 1) / h^2
+      J1 <- isr; J0 <- ir - h * isr
+    } else { J0 <- dt; J1 <- dt^2 / 2 }
+  } else if (D > 0) {
+    sD <- sqrt(D)
+    r1 <- h + sD / 2; r2 <- h - sD / 2
+    r1s <- if (r1^2 > 1e-20) r1 else eps
+    r2s <- if (r2^2 > 1e-20) r2 else -eps
+    sDs <- max(sD, eps)
+    e1 <- exp(r1 * dt); e2 <- exp(r2 * dt)
+    a0 <- (r1 * e2 - r2 * e1) / sDs
+    a1 <- (e1 - e2) / sDs
+    i1 <- (e1 - 1) / r1s; i2 <- (e2 - 1) / r2s
+    J1 <- (i1 - i2) / sDs; J0 <- (r1 * i2 - r2 * i1) / sDs
   } else {
-    delta_l <- curr$loglik
-    rel_l <- 1
-    delta_theta <- 1
+    w <- sqrt(-D) / 2; ws <- max(w, eps)
+    ms <- max(h^2 + w^2, 1e-20)
+    er <- exp(h * dt)
+    cw <- cos(w * dt); sw <- sin(w * dt)
+    a0 <- er * (cw - h * sw / ws)
+    a1 <- er * sw / ws
+    ic <- (er * (h * cw + w * sw) - h) / ms
+    is_ <- (er * (h * sw - w * cw) + w) / ms
+    J1 <- is_ / ws; J0 <- ic - (h / ws) * is_
   }
-  list(delta_l = delta_l, rel_l = rel_l, delta_theta = delta_theta)
+  c(a0 * m + a1 * v + f * J1,
+    b1 * a1 * m + (a0 + b2 * a1) * v + f * (J0 + b2 * J1))
 }
 
+#' Predict marginal trajectories for all subjects at given times
 #' @noRd
-.print_iteration <- function(iter, curr, metrics, control) {
-  cf <- curr$parameters$coefficients
+.predict_marginal_trajectories <- function(data_list, times, cf, configs, re) {
+  clamp_val <- configs$biomarker_clamp
+  lc <- unname(cf$longitudinal)
 
-  cli::cli_text(sprintf(
-    "[%3d/%3d] L=%10.2f | dL=%+.2e  dTheta=%.2e",
-    iter, control$maxit, curr$loglik,
-    metrics$delta_l, metrics$delta_theta
-  ))
+  ids <- names(data_list)
+  n_times <- length(times)
+  out <- vector("list", length(ids))
 
-  if (control$verbose >= 2) {
-    cli::cli_text(sprintf("    sigma_e: %.5f", cf$measurement_error_sd))
-    cli::cli_text(sprintf(
-      "    Sigma_b diag: %s",
-      paste(sprintf("%.4f", diag(cf$random_effect_sigma)), collapse = ", ")
-    ))
-    cli::cli_text(sprintf("    baseline: %s", .format_vector(cf$baseline)))
-    cli::cli_text(sprintf("    hazard: %s", .format_vector(cf$hazard)))
-    cli::cli_text(sprintf(
-      "    longitudinal: %s", .format_vector(cf$longitudinal, 6)
-    ))
-    if (!is.null(cf$initial_state)) {
-      cli::cli_text(sprintf(
-        "    initial_state: %s",
-        paste(sprintf("%.4f", cf$initial_state), collapse = ", ")
-      ))
-    }
-  }
-  if (control$verbose >= 3) {
-    re <- curr$random_effects
-    if (!is.null(re)) {
-      for (k in seq_len(ncol(re))) {
-        cli::cli_text(sprintf(
-          "    RE[,%d] range: [%.3f, %.3f]",
-          k, min(re[, k]), max(re[, k])
-        ))
+  for (i in seq_along(data_list)) {
+    subj <- data_list[[i]]
+    obs_t <- subj$longitudinal$times
+    fcov <- subj$longitudinal$covariates$fixed
+    rcov <- subj$longitudinal$covariates$random
+
+    bi <- re[i, ]
+    m <- cf$initial_state[1] + bi[1]
+    v <- cf$initial_state[2] + bi[2]
+
+    # b1, b2 from longitudinal + RE
+    b1 <- 0; b2 <- 0; fi <- 1; ri <- 3
+    if (configs$biomarker$fixed)  { b1 <- lc[fi]; fi <- fi + 1 }
+    if (configs$biomarker$random) { b1 <- b1 + bi[ri]; ri <- ri + 1 }
+    if (configs$velocity$fixed)   { b2 <- lc[fi]; fi <- fi + 1 }
+    if (configs$velocity$random)  { b2 <- b2 + bi[ri]; ri <- ri + 1 }
+    ffs <- fi; rfs <- ri
+
+    bio <- vel <- numeric(n_times)
+    prev_t <- 0
+
+    for (ti in seq_len(n_times)) {
+      tgt <- times[ti]; dt <- tgt - prev_t
+      if (dt > 0 && length(obs_t) > 0) {
+        ci <- findInterval(prev_t, obs_t)
+        ci <- max(1, min(ci, nrow(fcov)))
+        forcing <- sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci, ])
+        if (ncol(rcov) > 0)
+          forcing <- forcing + sum(bi[rfs:(rfs + ncol(rcov) - 1)] * rcov[ci, ])
+
+        mv <- .ode_step_r(m, v, b1, b2, forcing, dt)
+        m <- max(-clamp_val, min(clamp_val, mv[1]))
+        v <- max(-clamp_val, min(clamp_val, mv[2]))
       }
+      bio[ti] <- m; vel[ti] <- v; prev_t <- tgt
     }
+    out[[i]] <- data.frame(
+      id = ids[i], time = times,
+      biomarker = bio, velocity = vel,
+      stringsAsFactors = FALSE
+    )
   }
+  do.call(rbind, out)
 }
 
+#' Hazard at time t (double)
 #' @noRd
-.track <- function(iter, curr, prev, control) {
-  metrics <- .compute_metrics(curr, prev, iter)
+.eval_hazard_r <- function(m, v, t, baseline, hazard, surv_cov,
+                           spline_config, gamma) {
+  basis <- splines2::bSpline(
+    t, knots = spline_config$knots,
+    Boundary.knots = spline_config$boundary_knots,
+    degree = spline_config$degree, intercept = TRUE
+  )
+  log_h <- sum(basis * baseline) + hazard[1] * m
+  if (gamma == 1) log_h <- log_h + hazard[2] * v
+  else if (gamma == 2) log_h <- log_h + hazard[2] * v^2
+  if (length(surv_cov) > 0)
+    log_h <- log_h + sum(hazard[-(1:2)] * surv_cov)
+  exp(max(-20, min(20, log_h)))
+}
 
-  if (is.na(metrics$delta_l) || is.na(metrics$rel_l)) {
-    if (control$verbose > 0) {
-      cli::cli_alert_warning("Log-likelihood is NA at iteration {iter}")
+#' Predict trajectories for all subjects at given times
+#' @noRd
+.predict_trajectories <- function(
+  data_list, times, cf, configs, re, n_quad
+) {
+  n_quad <- max(n_quad %||% 1L, 1L)
+  clamp_val <- configs$biomarker_clamp
+  bl <- unname(cf$baseline)
+  hz <- unname(cf$hazard)
+  lc <- unname(cf$longitudinal)
+  sbc <- configs$baseline
+
+  ids <- names(data_list)
+  n_subj <- length(ids)
+  n_times <- length(times)
+
+  out <- vector("list", n_subj)
+  for (i in seq_along(data_list)) {
+    subj <- data_list[[i]]
+    obs_t <- subj$longitudinal$times
+    fcov <- subj$longitudinal$covariates$fixed
+    rcov <- subj$longitudinal$covariates$random
+    surv_cov <- if (!is.null(subj$survival$covariates)) {
+      as.numeric(subj$survival$covariates)
+    } else {
+      numeric(0)
     }
-    return(list(converged = FALSE))
-  }
 
-  if (iter > 1 && metrics$delta_l < -1e-6 && control$verbose > 0) {
-    cli::cli_alert_warning(sprintf(
-      "Log-likelihood decreased by %.4e at iteration %d",
-      abs(metrics$delta_l), iter
-    ))
-  }
+    bi <- re[i, ]
+    m <- cf$initial_state[1] + bi[1]
+    v <- cf$initial_state[2] + bi[2]
 
-  converged <- iter > 1 && metrics$delta_theta < control$tol
-  is_final <- iter == control$maxit
+    # b1, b2 from longitudinal + RE
+    b1 <- 0; b2 <- 0; fi <- 1; ri <- 3
+    if (configs$biomarker$fixed)  { b1 <- lc[fi]; fi <- fi + 1 }
+    if (configs$biomarker$random) { b1 <- b1 + bi[ri]; ri <- ri + 1 }
+    if (configs$velocity$fixed)   { b2 <- lc[fi]; fi <- fi + 1 }
+    if (configs$velocity$random)  { b2 <- b2 + bi[ri]; ri <- ri + 1 }
+    ffs <- fi; rfs <- ri
 
-  if (control$verbose > 0 && !(is_final && !converged)) {
-    .print_iteration(iter, curr, metrics, control)
-  }
+    bio <- vel <- cumhaz <- numeric(n_times)
+    ch <- 0; prev_t <- 0
 
-  if (control$verbose > 0) {
-    if (converged) {
-      cli::cli_text("")
-      cli::cli_alert_success(sprintf(
-        "Converged in %d iterations (dTheta=%.2e)",
-        iter, metrics$delta_theta
-      ))
-    } else if (is_final) {
-      cli::cli_text("")
-      cli::cli_alert_warning(sprintf(
-        "Not converged after %d iterations (dTheta=%.2e > %.2e)",
-        control$maxit, metrics$delta_theta, control$tol
-      ))
-      cli::cli_alert_info(
-        "Try increasing maxit, relaxing tolerances, or adjusting initial values"
-      )
+    for (ti in seq_len(n_times)) {
+      tgt <- times[ti]; dt <- tgt - prev_t
+      if (dt > 0 && length(obs_t) > 0) {
+        ci <- findInterval(prev_t, obs_t)
+        ci <- max(1, min(ci, nrow(fcov)))
+        forcing <- sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci, ])
+        if (ncol(rcov) > 0)
+          forcing <- forcing + sum(bi[rfs:(rfs + ncol(rcov) - 1)] * rcov[ci, ])
+
+        sub_dt <- dt / n_quad
+        hl <- .eval_hazard_r(m, v, prev_t, bl, hz, surv_cov, sbc, configs$gamma)
+        for (q in seq_len(n_quad)) {
+          ts <- prev_t + (q - 1) * sub_dt
+          # Midpoint
+          mv <- .ode_step_r(m, v, b1, b2, forcing, sub_dt / 2)
+          mm <- max(-clamp_val, min(clamp_val, mv[1]))
+          vv <- max(-clamp_val, min(clamp_val, mv[2]))
+          hm <- .eval_hazard_r(mm, vv, ts + sub_dt / 2, bl, hz, surv_cov, sbc, configs$gamma)
+          # Right
+          mv <- .ode_step_r(mm, vv, b1, b2, forcing, sub_dt / 2)
+          mm <- max(-clamp_val, min(clamp_val, mv[1]))
+          vv <- max(-clamp_val, min(clamp_val, mv[2]))
+          hr <- .eval_hazard_r(mm, vv, ts + sub_dt, bl, hz, surv_cov, sbc, configs$gamma)
+          ch <- ch + (sub_dt / 6) * (hl + 4 * hm + hr)
+          m <- mm; v <- vv; hl <- hr
+        }
+      }
+      bio[ti] <- m; vel[ti] <- v
+      cumhaz[ti] <- ch; prev_t <- tgt
     }
+    out[[i]] <- data.frame(
+      id = ids[i], time = times,
+      biomarker = bio, velocity = vel,
+      cumhaz = cumhaz, survival = exp(-cumhaz),
+      stringsAsFactors = FALSE
+    )
   }
-
-  list(converged = converged)
+  do.call(rbind, out)
 }

@@ -1,18 +1,18 @@
 Package: JointODE
 Title: Joint Modeling of Longitudinal and Survival Data Using ODEs
-Version: 0.1.2
+Version: 0.2.0
 Author: Ziyang Gong
 Maintainer: Ziyang Gong <meetziyang@gmail.com>
 Authors@R: c(
-    person("Ziyang", "Gong", , "meetziyang@gmail.com", role = c("aut", "cre")),
-    person("Bradley M.", "Bell", role = "cph",
-           comment = "CppAD library author")
+    person("Ziyang", "Gong", , "meetziyang@gmail.com", role = c("aut", "cre"))
     )
 Description: Implements joint modeling of longitudinal biomarker trajectories and
     time-to-event outcomes using ordinary differential equations (ODEs). The package
     provides tools for simultaneous analysis of biomarker dynamics and survival data,
     capturing complex temporal patterns through ODE-based trajectory modeling while
     accounting for their association with event times through shared random effects.
+    Estimation uses TMB (Template Model Builder) for automatic Laplace approximation
+    of random effects and efficient gradient computation.
 License: MIT + file LICENSE
 URL: https://github.com/ziyangg98/JointODE, https://gongziyang.com/JointODE/
 BugReports: https://github.com/ziyangg98/JointODE/issues
@@ -21,26 +21,21 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Imports:
     stats,
-    parallel,
-    deSolve,
     survival,
-    simsurv,
-    future,
-    future.apply,
     cli,
-    numDeriv,
-    MASS,
     splines2,
-    mvQuad,
-    Rcpp,
+    TMB,
+    MASS,
+    deSolve,
+    simsurv,
     ggplot2,
     patchwork,
     dplyr,
     tidyr,
     viridisLite
 LinkingTo:
-    Rcpp,
-    RcppArmadillo
+    TMB,
+    RcppEigen
 Suggests:
     knitr,
     rmarkdown,
@@ -49,8 +44,7 @@ Suggests:
     nlme,
     purrr,
     gridExtra,
-    latex2exp,
-    JMbayes2
+    latex2exp
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 Depends:

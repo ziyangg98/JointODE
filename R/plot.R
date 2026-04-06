@@ -43,7 +43,7 @@ utils::globalVariables(c(
 #'     \item \code{"diagnostic_qq"}: Normal Q-Q plot of residuals
 #'     \item \code{"diagnostic_random_effects"}: Random effects distribution
 #'     \item \code{"diagnostic_association"}: Association between
-#'       biomarker features and hazard
+#'       biomarker features and hazard (not yet implemented)
 #'   }
 #' @param subject_ids Character or numeric vector of subject IDs to plot.
 #'   If \code{NULL}, displays all subjects.
@@ -119,19 +119,14 @@ utils::globalVariables(c(
 #' # Load example dataset
 #' data(sim)
 #'
-#' # Prepare data
-#' longitudinal_data <- sim$data$longitudinal_data[
-#'   , c("id", "time", "observed", "x1", "x2")
-#' ]
-#'
 #' # Fit joint ODE model
 #' fit <- JointODE(
-#'   longitudinal_formula = observed ~ biomarker + velocity + x1 + x2 +
+#'   longitudinal_formula = observed ~ x1 + x2 +
 #'     (biomarker + velocity | id),
 #'   survival_formula = Surv(time, status) ~ w1 + w2,
-#'   longitudinal_data = longitudinal_data,
+#'   longitudinal_data = sim$data$longitudinal_data,
 #'   survival_data = sim$data$survival_data,
-#'   state = as.matrix(sim$data$state)
+#'   control = list(maxit = 5)
 #' )
 #'
 #' # Overview plot
@@ -1622,7 +1617,9 @@ plot.JointODE <- function(
 
   # Ensure column names
   if (is.null(colnames(random_effects))) {
-    colnames(random_effects) <- paste0("RE", seq_len(ncol(random_effects)))
+    colnames(random_effects) <- paste0(
+      "Random Effects", seq_len(ncol(random_effects))
+    )
   }
 
   # Prepare data and plot

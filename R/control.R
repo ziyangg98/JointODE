@@ -6,15 +6,13 @@
 #' process a list to fill in missing values with defaults.
 #'
 #' @param maxit Maximum number of EM iterations (default: 200)
-#' @param tol Convergence tolerance. The EM algorithm converges
-#'   when max|theta_new - theta_old| < tol (default: 1e-3)
-#' @param verbose Logical or numeric; controls verbosity level. FALSE/0 for
-#'   silent, TRUE/1 for basic progress, 2 for detailed output (default: FALSE)
+#' @param tol Convergence tolerance on maximum absolute parameter
+#'   change: max|delta_theta| < tol (default: 1e-4)
+#' @param verbose Numeric verbosity level: 0 = silent, 1 = progress,
+#'   2 = outer iterations, 3 = inner Newton detail (default: 0)
 #' @param parallel Logical; whether to use parallel computation (default: FALSE)
 #' @param n_cores Integer; number of cores to use for parallel computation.
 #'   If 0, uses all available cores (default: 0)
-#' @param quad_level Integer; quadrature level for numerical integration
-#'   (default: 3)
 #' @param hazard_quadrature Integer; number of Simpson sub-intervals per
 #'   observation interval for hazard integration (default: 1)
 #' @param .list Optional list of control parameters to process
@@ -31,7 +29,7 @@
 #' control <- JointODE.control()
 #'
 #' # Custom settings for faster exploration
-#' control <- JointODE.control(maxit = 30, tol = 1e-3)
+#' control <- JointODE.control(maxit = 30, tol = 1e-4)
 #'
 #' # Verbose output for debugging
 #' control <- JointODE.control(verbose = TRUE)
@@ -47,18 +45,17 @@
 # nolint next: object_name_linter
 JointODE.control <- function(
   maxit = 200,
-  tol = 1e-3,
+  tol = 1e-4,
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,
-  quad_level = 3,
   hazard_quadrature = 1,
   .list = NULL,
   ...
 ) {
   defaults <- list(
     maxit = maxit, tol = tol, verbose = verbose,
-    parallel = parallel, n_cores = n_cores, quad_level = quad_level,
+    parallel = parallel, n_cores = n_cores,
     hazard_quadrature = hazard_quadrature
   )
 
@@ -81,11 +78,9 @@ JointODE.control <- function(
   if (!is.numeric(control$n_cores) || control$n_cores < 0) {
     stop("n_cores must be a non-negative integer")
   }
-  if (!is.numeric(control$quad_level) || control$quad_level < 1) {
-    stop("quad_level must be a positive integer")
-  }
-  if (!is.numeric(control$hazard_quadrature) || control$hazard_quadrature < 1 ||
-      control$hazard_quadrature != as.integer(control$hazard_quadrature)) {
+  if (!is.numeric(control$hazard_quadrature) ||
+        control$hazard_quadrature < 1 ||
+        control$hazard_quadrature != as.integer(control$hazard_quadrature)) {
     stop("hazard_quadrature must be a positive integer")
   }
 
@@ -100,7 +95,7 @@ JointODE.control <- function(
 #' @param maxit Maximum number of alternating optimization iterations
 #'   (default: 200)
 #' @param tol Convergence tolerance on max absolute parameter
-#'   change (default: 1e-3)
+#'   change (default: 1e-4)
 #' @param verbose Logical or numeric; FALSE/0 for silent, TRUE/1 for basic
 #'   progress, 2 for detailed output (default: FALSE)
 #' @param parallel Logical; whether to use parallel computation (default: FALSE)
@@ -116,13 +111,13 @@ JointODE.control <- function(
 #'
 #' @examples
 #' control <- MarginalODE.control()
-#' control <- MarginalODE.control(maxit = 50, tol = 1e-3)
+#' control <- MarginalODE.control(maxit = 50, tol = 1e-4)
 #'
 #' @seealso \code{\link{MarginalODE}}
 # nolint next: object_name_linter
 MarginalODE.control <- function(
   maxit = 200,
-  tol = 1e-3,
+  tol = 1e-4,
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,

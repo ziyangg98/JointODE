@@ -14,9 +14,9 @@
 #      - Value ranges and reproducibility with seed
 #
 #   2. Mathematical Correctness
-#      - Parameter transformation: xi/period → dyn_value/dyn_slope
-#        * dyn_value = -omega^2, omega = 2*pi/period
-#        * dyn_slope = -2*xi*omega
+#      - Parameter transformation: xi/period → dyn_biomarker/dyn_velocity
+#        * dyn_biomarker = -omega^2, omega = 2*pi/period
+#        * dyn_velocity = -2*xi*omega
 #      - Covariance matrix: positive semi-definite and symmetric
 #      - Random effects: centered at zero (within 4 SE)
 #
@@ -39,7 +39,7 @@
 #      - .create_example_data(): generates example with true parameters
 #
 # Random Effects Structure:
-#   - Only dyn_value and dyn_slope have random effects (2×2 covariance)
+#   - Only dyn_biomarker and dyn_velocity have random effects (2×2 covariance)
 #   - Rationale: subject-specific frequency and damping
 #
 # Model Equations:
@@ -60,12 +60,10 @@ test_that("simulate generates valid output and respects parameters", {
   expect_type(sim, "list")
   expect_named(
     sim,
-    c("longitudinal_data", "survival_data", "state",
-      "initial_state_mean", "random_effects")
+    c("longitudinal_data", "survival_data", "random_effects")
   )
   expect_s3_class(sim$longitudinal_data, "data.frame")
   expect_s3_class(sim$survival_data, "data.frame")
-  expect_true(is.matrix(sim$state))
   expect_true(is.matrix(sim$random_effects))
 
   expect_true(all(
@@ -76,18 +74,14 @@ test_that("simulate generates valid output and respects parameters", {
     c("id", "time", "status") %in%
       names(sim$survival_data)
   ))
-  expect_true(is.matrix(sim$state))
-  expect_equal(colnames(sim$state), c("biomarker", "velocity"))
   expect_equal(
     colnames(sim$random_effects),
-    c("m0", "v0", "dyn_value", "dyn_slope")
+    c("init_biomarker", "init_velocity", "dyn_biomarker", "dyn_velocity")
   )
 
-  expect_true(!is.null(attr(sim$random_effects, "mu")))
-  expect_true(!is.null(attr(sim$random_effects, "sigma")))
+  expect_equal(ncol(sim$random_effects), 4)
 
   expect_equal(nrow(sim$survival_data), n)
-  expect_equal(nrow(sim$state), n)
   expect_equal(nrow(sim$random_effects), n)
   expect_equal(length(unique(sim$longitudinal_data$id)), n)
 
@@ -117,8 +111,8 @@ test_that("dynamics transformation and covariance are correct", {
       period = c(mean = period_mean, sd = 1.0),
       excitation = list(offset = 2.0, covariates = numeric(0)),
       initial = list(
-        offset = c(biomarker = 3.0, velocity = -0.1),
-        covariates = list(biomarker = numeric(0), velocity = numeric(0))
+        biomarker = c(mean = 3.0, sd = 0.1),
+        velocity = c(mean = -0.1, sd = 0.1)
       ),
       error_sd = 0.2,
       n_measurements = 3
@@ -126,18 +120,15 @@ test_that("dynamics transformation and covariance are correct", {
     seed = 999
   )
 
-  mu <- attr(sim$random_effects, "mu")
-  omega_mean <- sqrt(-mu["dyn_value"])
-  period_recovered <- 2 * pi / omega_mean
-  xi_recovered <- -mu["dyn_slope"] / (2 * omega_mean)
+  # Recover physical params from population mean coefficients
+  omega_mean <- 2 * pi / period_mean
+  expected_dyn_biomarker <- -omega_mean^2
+  expected_dyn_velocity <- -2 * xi_mean * omega_mean
 
-  expect_equal(as.numeric(period_recovered), period_mean, tolerance = 1e-10)
-  expect_equal(as.numeric(xi_recovered), xi_mean, tolerance = 1e-10)
-
-  sigma <- attr(sim$random_effects, "sigma")
-  eigenvalues <- eigen(sigma, symmetric = TRUE, only.values = TRUE)$values
-  expect_true(all(eigenvalues >= -1e-10))
-  expect_true(all(abs(sigma - t(sigma)) < 1e-10))
+  re_means <- colMeans(sim$random_effects)
+  # dyn_biomarker/dyn_velocity RE should be centered near zero
+  expect_equal(as.numeric(re_means["dyn_biomarker"]), 0, tolerance = 0.1)
+  expect_equal(as.numeric(re_means["dyn_velocity"]), 0, tolerance = 0.2)
 })
 
 test_that("random_effects are properly centered", {
@@ -149,8 +140,8 @@ test_that("random_effects are properly centered", {
       period = c(mean = 5, sd = 0.5),
       excitation = list(offset = 2, covariates = numeric(0)),
       initial = list(
-        offset = c(biomarker = 1, velocity = 0),
-        covariates = list(biomarker = numeric(0), velocity = numeric(0))
+        biomarker = c(mean = 1, sd = 0.1),
+        velocity = c(mean = 0, sd = 0.1)
       ),
       error_sd = 0.1,
       n_measurements = 3
@@ -158,13 +149,11 @@ test_that("random_effects are properly centered", {
     seed = 777
   )
 
-  sigma <- attr(sim$random_effects, "sigma")
-  se <- sqrt(diag(sigma) / n)
-
-  # Only check dyn_value and dyn_slope (cols 3-4) which have population sigma
-  for (i in seq_along(se)) {
-    col_idx <- i + 2 # skip m0, v0 columns
-    expect_true(abs(mean(sim$random_effects[, col_idx])) < 4 * se[i])
+  # dyn_biomarker and dyn_velocity RE should be approximately centered
+  for (col_idx in 3:4) {
+    col_sd <- sd(sim$random_effects[, col_idx])
+    se <- col_sd / sqrt(n)
+    expect_true(abs(mean(sim$random_effects[, col_idx])) < 4 * se)
   }
 })
 
@@ -180,8 +169,8 @@ test_that("simulate validates parameters correctly", {
         period = c(mean = 5, sd = 0.5),
         excitation = list(offset = 0, covariates = numeric(0)),
         initial = list(
-          offset = c(biomarker = 0, velocity = 0),
-          covariates = list(biomarker = numeric(0), velocity = numeric(0))
+          biomarker = c(mean = 0, sd = 0.1),
+          velocity = c(mean = 0, sd = 0.1)
         ),
         error_sd = 0.1,
         n_measurements = 5
@@ -198,8 +187,8 @@ test_that("simulate validates parameters correctly", {
         period = c(mean = 5, sd = 0.5),
         excitation = list(offset = 0, covariates = numeric(0)),
         initial = list(
-          offset = c(biomarker = 0, velocity = 0),
-          covariates = list(biomarker = numeric(0), velocity = numeric(0))
+          biomarker = c(mean = 0, sd = 0.1),
+          velocity = c(mean = 0, sd = 0.1)
         ),
         error_sd = 0.1,
         n_measurements = 5
@@ -216,8 +205,8 @@ test_that("simulate validates parameters correctly", {
         period = c(mean = 5, sd = 0.5),
         excitation = list(offset = 0, covariates = c(x1 = 1, x2 = 2)),
         initial = list(
-          offset = c(biomarker = 0, velocity = 0),
-          covariates = list(biomarker = numeric(0), velocity = numeric(0))
+          biomarker = c(mean = 0, sd = 0.1),
+          velocity = c(mean = 0, sd = 0.1)
         ),
         error_sd = 0.1,
         n_measurements = 5
@@ -250,8 +239,8 @@ test_that("simulate handles edge cases", {
       period = c(mean = 5, sd = 0.2),
       excitation = list(offset = 2, covariates = numeric(0)),
       initial = list(
-        offset = c(biomarker = 1, velocity = 0),
-        covariates = list(biomarker = numeric(0), velocity = numeric(0))
+        biomarker = c(mean = 1, sd = 0.1),
+        velocity = c(mean = 0, sd = 0.1)
       ),
       error_sd = 0.1,
       n_measurements = 5
@@ -277,8 +266,8 @@ test_that("simulate handles edge cases", {
       period = c(mean = 5, sd = 0),
       excitation = list(offset = 2, covariates = numeric(0)),
       initial = list(
-        offset = c(biomarker = 1, velocity = 0),
-        covariates = list(biomarker = numeric(0), velocity = numeric(0))
+        biomarker = c(mean = 1, sd = 0),
+        velocity = c(mean = 0, sd = 0)
       ),
       error_sd = 0.1,
       n_measurements = 3
@@ -347,11 +336,8 @@ test_that("simulate handles covariates correctly", {
       period = c(mean = 5, sd = 0.5),
       excitation = list(offset = 0.2, covariates = c(x1 = -0.2, x2 = 0.1)),
       initial = list(
-        offset = c(biomarker = 1.2, velocity = -0.1),
-        covariates = list(
-          biomarker = c(x1 = -0.4, x2 = 0.2),
-          velocity = c(x1 = 0.1, x2 = -0.05)
-        )
+        biomarker = c(mean = 1.2, sd = 0.1),
+        velocity = c(mean = -0.1, sd = 0.1)
       ),
       error_sd = 0.5,
       n_measurements = 3
@@ -376,7 +362,7 @@ test_that("simulate handles covariates correctly", {
   expect_true(all(c("w1", "w2") %in% names(sim_with_cov$survival_data)))
   expect_equal(
     colnames(sim_with_cov$random_effects),
-    c("m0", "v0", "dyn_value", "dyn_slope")
+    c("init_biomarker", "init_velocity", "dyn_biomarker", "dyn_velocity")
   )
   expect_true(all(sim_with_cov$survival_data$w2 %in% c(0, 1)))
 
@@ -387,8 +373,8 @@ test_that("simulate handles covariates correctly", {
       period = c(mean = 5, sd = 0.5),
       excitation = list(offset = 0, covariates = numeric(0)),
       initial = list(
-        offset = c(biomarker = 1.5, velocity = 0),
-        covariates = list(biomarker = numeric(0), velocity = numeric(0))
+        biomarker = c(mean = 1.5, sd = 0.1),
+        velocity = c(mean = 0, sd = 0.1)
       ),
       error_sd = 0.4,
       n_measurements = 3
@@ -416,13 +402,7 @@ test_that(".create_example_data works", {
   expect_named(example$init, c("coefficients", "configurations"))
 
   expect_true(all(
-    c(
-      "longitudinal_data",
-      "survival_data",
-      "state",
-      "initial_state_mean",
-      "random_effects"
-    ) %in%
+    c("longitudinal_data", "survival_data", "random_effects") %in%
       names(example$data)
   ))
 

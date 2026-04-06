@@ -13,9 +13,6 @@ NULL
 #' @param data Data frame with longitudinal measurements
 #' @param time Time variable name (default: \code{"time"})
 #' @param id Subject identifier name (default: \code{"id"})
-#' @param state Optional \eqn{n \times 2} matrix of initial
-#'   conditions \eqn{[m(0), \dot{m}(0)]}. If \code{NULL},
-#'   estimated from data.
 #' @param control List of control parameters.
 #'   See \code{\link{MarginalODE.control}}.
 #'
@@ -25,8 +22,7 @@ NULL
 #' \dontrun{
 #' fit <- MarginalODE(
 #'   formula = observed ~ x1 + x2,
-#'   data = sim$data$longitudinal_data,
-#'   state = as.matrix(sim$data$state)
+#'   data = sim$data$longitudinal_data
 #' )
 #' }
 #'
@@ -36,10 +32,10 @@ NULL
 MarginalODE <- function(
   formula, data,
   time = "time", id = "id",
-  state = NULL, control = list()
+  control = list()
 ) {
   cl <- match.call()
-  .validate_marginal(formula, data, time, id, state)
+  .validate_marginal(formula, data, time, id)
 
   if (is.null(control)) {
     control <- MarginalODE.control()
@@ -49,93 +45,126 @@ MarginalODE <- function(
     stop("control must be a list or NULL")
   }
 
-  data_list <- .process_marginal(formula, data, time, id, state)
-  n_covariates <- attr(data_list, "n_covariates")
-  covariate_names <- attr(data_list, "covariate_names")
-  biomarker_clamp <- attr(data_list, "biomarker_clamp")
-  n_params <- 2 + n_covariates
-  param_names <- c("value", "slope", covariate_names)
-  has_state <- !is.null(state)
+  # Parse formula (same as JointODE, supports (... | id) RE syntax)
+  parsed_long <- .parse_longitudinal_formula(formula)
+  if (is.null(parsed_long$grouping)) parsed_long$grouping <- id
 
-  if (control$verbose > 0) {
-    cli::cli_h2("Marginal ODE Model Estimation")
-    cli::cli_text(sprintf(
-      "Data: %d subjects, %d obs, %d params",
-      length(data_list), .n_obs(data_list), n_params
-    ))
-  }
+  # Process data
+  data_list <- .process_marginal(formula, data, time, id, parsed_long)
+  n_subjects <- length(data_list)
 
-  if (control$parallel) {
-    cleanup <- .setup_parallel_plan(control$n_cores)
-    on.exit(cleanup(), add = TRUE)
-  }
+  # Model setup
+  model_config <- .setup_marginal_model(data, parsed_long)
+  coef_names <- model_config$coef_names
+  n_re <- model_config$n_re
 
-  # Optimization loop (1 iteration when state provided)
-  theta <- rep(0, n_params)
-  sse <- Inf
+  # Build parameters (default or user-provided)
+  parameters <- .default_marginal_parameters(model_config, parsed_long)
 
-  for (iter in seq_len(if (has_state) 1L else control$maxit)) {
-    if (!has_state) {
-      opt <- .parallel_apply(
-        seq_along(data_list),
-        function(i) {
-          .estimate_marginal_state(
-            data_list[[i]]$initial_state, data_list[[i]],
-            theta, biomarker_clamp
-          )
-        },
-        control$parallel, control$n_cores,
-        setup = FALSE
-      )
-      for (i in seq_along(data_list)) {
-        data_list[[i]]$initial_state <- opt[[i]]
-      }
-    }
+  all_y <- unlist(lapply(data_list, function(d) d$longitudinal$measurements))
+  mean_y <- mean(all_y)
+  has_dynamics_re <- parsed_long$biomarker$random ||
+    parsed_long$velocity$random
 
-    fit <- nlm(
-      function(th) {
-        .compute_marginal_objective(
-          th, data_list, biomarker_clamp, TRUE, TRUE
-        )
-      },
-      theta,
-      print.level = 0,
-      hessian = FALSE, check.analyticals = FALSE
+  if (has_dynamics_re) {
+    # Phase 1: fit reduced model to warm-start dynamics RE
+    ws <- .warm_start_marginal(
+      formula, data, time, id, parsed_long, control
     )
-    theta <- fit$estimate
-    prev_sse <- sse
-    sse <- fit$minimum
+    parameters$coefficients$longitudinal <- ws$longitudinal
+    parameters$coefficients$initial_state <- ws$initial_state
+    parameters$coefficients$measurement_error_sd <- ws$measurement_error_sd
 
-    if (control$verbose > 1) {
-      cli::cli_alert_info(sprintf(
-        "Iter %d: SSE=%.4f", iter, sse
-      ))
-    }
-
-    rel <- abs(sse - prev_sse) / (abs(sse) + 1)
-    if (iter > 1 && rel < control$tol) break
-  }
-
-  converged <- if (has_state) {
-    fit$code <= 2
+    # Expand RE matrix: cols 1-2 from warm start, rest = 0
+    random_effects_init <- matrix(0, n_subjects, n_re)
+    random_effects_init[, 1:2] <- ws$random_effects
   } else {
-    iter > 1 && rel < control$tol
+    parameters$coefficients$initial_state <- c(mean_y, 0)
+    parameters$coefficients$measurement_error_sd <- sd(all_y)
+    random_effects_init <- .init_re_from_observations(
+      data_list, mean_y, 0, n_re
+    )
   }
-  n_iter <- if (has_state) fit$iterations else iter
+
+  re_sds <- pmax(apply(random_effects_init, 2, sd), sd(all_y) * 0.1)
+  parameters$coefficients$random_effect_sigma <- diag(re_sds^2, n_re)
+  parameters$random_effects_init <- random_effects_init
+  parameters$configurations$biomarker_clamp <- max(abs(all_y)) * 5
+
+  # Pack TMB inputs
+  tmb_data <- .pack_marginal_data(data_list, parsed_long, n_re)
+  tmb_params <- .pack_marginal_params(parameters)
+
+  .setup_openmp(control)
 
   if (control$verbose > 0) {
-    cli::cli_alert_info(sprintf(
-      "%s after %d iterations",
-      if (converged) "Converged" else "Did not converge",
-      n_iter
-    ))
+    phase_label <- if (has_dynamics_re) "Phase 2: " else ""
+    cli::cli_h2(paste0(phase_label, "Marginal ODE Model Estimation (TMB)"))
   }
 
-  .finalize_marginal(
-    theta, sse, data_list, biomarker_clamp,
-    param_names, converged, n_iter, has_state,
-    control, cl
+  obj <- TMB::MakeADFun(
+    data = tmb_data,
+    parameters = tmb_params,
+    random = "random_effects",
+    DLL = "JointODE",
+    silent = control$verbose < 3,
+    normalize = TRUE,
+    inner.control = list(ustep = 1)
   )
+
+  opt <- stats::nlminb(
+    start = obj$par,
+    objective = obj$fn,
+    gradient = obj$gr,
+    control = list(
+      iter.max = control$maxit, eval.max = control$maxit * 2,
+      rel.tol = control$tol,
+      trace = as.integer(control$verbose >= 2)
+    )
+  )
+
+  results <- .finalize_marginal(obj, opt, coef_names, n_re, n_subjects)
+
+  if (control$verbose > 0) {
+    if (results$convergence$converged) {
+      cli::cli_alert_success(results$convergence$message)
+    } else {
+      cli::cli_alert_warning(results$convergence$message)
+    }
+    cli::cli_alert_info(sprintf("Log-likelihood: %.2f", results$logLik))
+  }
+
+  # Store configs needed for predict
+  configs <- list(
+    biomarker = list(
+      fixed = parsed_long$biomarker$fixed,
+      random = parsed_long$biomarker$random
+    ),
+    velocity = list(
+      fixed = parsed_long$velocity$fixed,
+      random = parsed_long$velocity$random
+    ),
+    biomarker_clamp = parameters$configurations$biomarker_clamp
+  )
+  # Store longitudinal coefficients in named form
+  coefs <- list(
+    longitudinal = setNames(
+      as.numeric(obj$env$last.par.best[
+        names(obj$env$last.par.best) == "longitudinal"]),
+      coef_names$longitudinal
+    ),
+    initial_state = setNames(
+      as.numeric(obj$env$last.par.best[
+        names(obj$env$last.par.best) == "initial_state"]),
+      coef_names$initial_state
+    )
+  )
+
+  structure(c(results, list(
+    data = data_list, control = control, call = cl,
+    tmb_obj = obj, tmb_opt = opt,
+    configs = configs, coefs = coefs
+  )), class = "MarginalODE")
 }
 
 # -- S3 methods ---------------------------------------------------------------
@@ -170,7 +199,13 @@ print.MarginalODE <- function(
 #' @return Named numeric vector of parameter estimates
 #' @concept model-inspection
 #' @export
-coef.MarginalODE <- function(object, ...) object$parameters
+coef.MarginalODE <- function(object, ...) {
+  p <- object$parameters
+  is_init <- names(p) %in% .init_state_names
+  names(p)[!is_init] <- paste0("longitudinal:", names(p)[!is_init])
+  names(p)[is_init] <- paste0("initial:", names(p)[is_init])
+  p
+}
 
 #' Extract Variance-Covariance Matrix
 #' @param object A MarginalODE object
@@ -208,10 +243,52 @@ summary.MarginalODE <- function(object, ...) {
     rep(NA_real_, length(object$parameters))
   }
 
+  # Derived ODE physical parameters (period and damping ratio)
+  derived_params <- NULL
+  nms <- names(object$parameters)
+  has_bv <- "biomarker" %in% nms && "velocity" %in% nms
+  if (!is.null(object$vcov) && !all(is.na(object$vcov)) && has_bv) {
+    idx_b <- which(nms == "biomarker")
+    idx_v <- which(nms == "velocity")
+    value_coef <- object$parameters[idx_b]
+    slope_coef <- object$parameters[idx_v]
+    var_value <- object$vcov[idx_b, idx_b]
+    var_slope <- object$vcov[idx_v, idx_v]
+    cov_value_slope <- object$vcov[idx_b, idx_v]
+
+    if (value_coef < 0) {
+      omega_est <- sqrt(-value_coef)
+      period_est <- 2 * pi / omega_est
+      xi_est <- -slope_coef / (2 * omega_est)
+
+      grad_period_value <- pi / ((-value_coef)^(3 / 2))
+      var_period <- grad_period_value^2 * var_value
+      se_period <- sqrt(var_period)
+
+      grad_xi_value <- -slope_coef / (4 * (-value_coef)^(3 / 2))
+      grad_xi_slope <- -1 / (2 * sqrt(-value_coef))
+      var_xi <- grad_xi_value^2 * var_value +
+        grad_xi_slope^2 * var_slope +
+        2 * grad_xi_value * grad_xi_slope * cov_value_slope
+      se_xi <- sqrt(var_xi)
+
+      derived_params <- cbind(
+        Estimate = c(period_est, xi_est),
+        `Std. Error` = c(se_period, se_xi),
+        `z value` = c(period_est / se_period, xi_est / se_xi),
+        `Pr(>|z|)` = 2 * pnorm(-abs(c(
+          period_est / se_period, xi_est / se_xi
+        )))
+      )
+      rownames(derived_params) <- c("T (period)", "xi (damping ratio)")
+    }
+  }
+
   structure(
     list(
       call = object$call,
       coefficients = .coef_table(object$parameters, se),
+      derived_params = derived_params,
       sigma = c(sigma_e = object$measurement_error_sd),
       nobs = length(object$data),
       n_observations = .n_obs(object$data),
@@ -250,6 +327,12 @@ print.summary.MarginalODE <- function(
     x$coefficients,
     digits = digits, signif.stars = signif.stars, ...
   )
+
+  if (!is.null(x$derived_params)) {
+    cat("\nODE System Characteristics:\n")
+    .print_coefmat(x$derived_params, digits = digits,
+                   signif.stars = signif.stars, ...)
+  }
   cat(sprintf(
     "\nMeasurement Error SD: %.6f\n", x$sigma["sigma_e"]
   ))
@@ -261,59 +344,28 @@ print.summary.MarginalODE <- function(
 #' @param object A MarginalODE object
 #' @param newdata Not yet supported
 #' @param times Prediction times (NULL = observed)
-#' @param parallel Logical for parallel computation
-#' @param n_cores Number of cores (0 = auto)
 #' @param ... Additional arguments
 #' @return A data.frame with id, time, biomarker, velocity, acceleration
 #' @concept model-prediction
 #' @export
-predict.MarginalODE <- function(
-  object, newdata = NULL, times = NULL,
-  parallel = FALSE, n_cores = 0, ...
-) {
+predict.MarginalODE <- function(object, newdata = NULL, times = NULL, ...) {
   if (!is.null(newdata)) stop("newdata not yet supported")
 
   data_list <- object$data
 
-  pred_data <- if (!is.null(times)) {
-    lapply(seq_along(data_list), function(i) {
-      subj <- data_list[[i]]
-      obs_t <- subj$longitudinal$times
-      pred_t <- if (is.list(times)) {
-        tv <- times[[names(data_list)[i]]]
-        if (!is.null(tv)) sort(unique(tv)) else obs_t
-      } else {
-        sort(unique(times))
-      }
-      subj$longitudinal$times <- pred_t
-      subj$longitudinal$measurements <- rep(0, length(pred_t))
-      subj$longitudinal$covariates$fixed <- .extend_covariates(
-        subj$longitudinal$covariates$fixed, obs_t, pred_t
-      )
-      subj
-    })
+  if (!is.null(times)) {
+    .predict_marginal_trajectories(
+      data_list, times, object$coefs, object$configs,
+      object$random_effects
+    )
   } else {
-    data_list
-  }
-
-  sols <- .solve_batch_marginal(
-    pred_data, object$parameters,
-    attr(object$data, "biomarker_clamp")
-  )
-
-  result <- do.call(rbind, lapply(
-    seq_along(sols),
-    function(i) {
-      data.frame(
-        id = names(data_list)[i],
-        time = sols[[i]]$times,
-        biomarker = sols[[i]]$biomarker,
-        velocity = sols[[i]]$velocity,
-        acceleration = sols[[i]]$acceleration,
-        stringsAsFactors = FALSE
+    # Per-subject at own observation times
+    do.call(rbind, lapply(seq_along(data_list), function(i) {
+      obs_t <- data_list[[i]]$longitudinal$times
+      .predict_marginal_trajectories(
+        data_list[i], obs_t, object$coefs, object$configs,
+        object$random_effects[i, , drop = FALSE]
       )
-    }
-  ))
-  rownames(result) <- NULL
-  result
+    }))
+  }
 }

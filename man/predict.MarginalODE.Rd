@@ -4,14 +4,7 @@
 \alias{predict.MarginalODE}
 \title{Predict Method for MarginalODE Objects}
 \usage{
-\method{predict}{MarginalODE}(
-  object,
-  newdata = NULL,
-  times = NULL,
-  parallel = FALSE,
-  n_cores = 0,
-  ...
-)
+\method{predict}{MarginalODE}(object, newdata = NULL, times = NULL, ...)
 }
 \arguments{
 \item{object}{A MarginalODE object}
@@ -19,10 +12,6 @@
 \item{newdata}{Not yet supported}
 
 \item{times}{Prediction times (NULL = observed)}
-
-\item{parallel}{Logical for parallel computation}
-
-\item{n_cores}{Number of cores (0 = auto)}
 
 \item{...}{Additional arguments}
 }

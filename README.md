@@ -93,11 +93,12 @@ fit <- JointODE(
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = longitudinal_data,
   survival_data = sim$data$survival_data,
-  init = "marginal",
-  control = list(parallel = TRUE)
+  init = "marginal"
 )
+#> Warning in stats::nlminb(start = obj$par, objective = obj$fn, gradient =
+#> obj$gr, : NA/NaN function evaluation
 cat(sprintf("Elapsed: %.1f s\n", (proc.time() - t0)["elapsed"]))
-#> Elapsed: 175.1 s
+#> Elapsed: 110.8 s
 ```
 
 ``` r
@@ -108,66 +109,65 @@ summary(fit)
 #> JointODE(longitudinal_formula = observed ~ biomarker + velocity +
 #>     x1 + x2 + (biomarker + velocity | id), survival_formula = Surv(time,
 #>     status) ~ w1 + w2, longitudinal_data = longitudinal_data,
-#>     survival_data = sim$data$survival_data, init = "marginal",
-#>     control = list(parallel = TRUE))
+#>     survival_data = sim$data$survival_data, init = "marginal")
 #>
 #> Data Descriptives:
 #> Longitudinal Process            Survival Process
-#> Number of Observations: 17350   Number of Events: 61 (30%)
+#> Number of Observations: 17339   Number of Events: 59 (30%)
 #> Number of Subjects: 200
 #>
 #>        AIC        BIC     logLik
-#> -32488.560 -32396.207  16272.280
+#> -28960.371 -28874.614  14506.185
 #>
 #> Coefficients:
 #> Longitudinal Process: Second-Order ODE Model
 #>             Estimate Std. Error  z value Pr(>|z|)
-#> biomarker    -1.0844     0.0083 -129.995   <2e-16 ***
-#> velocity     -0.8223     0.0162  -50.876   <2e-16 ***
-#> (Intercept)   0.0003     0.0015    0.217    0.828
-#> x1            0.5427     0.0042  128.237   <2e-16 ***
-#> x2           -0.4885     0.0039 -124.359   <2e-16 ***
+#> biomarker    -1.0897     0.0078 -140.137   <2e-16 ***
+#> velocity     -0.8449     0.0179  -47.094   <2e-16 ***
+#> (Intercept)   0.0006     0.0014    0.392    0.695
+#> x1            0.5437     0.0039  137.755   <2e-16 ***
+#> x2           -0.4896     0.0036 -134.951   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> ODE System Characteristics:
 #>                    Estimate Std. Error z value Pr(>|z|)
-#> T (period)           6.0336     0.0232  259.99   <2e-16 ***
-#> xi (damping ratio)   0.3948     0.0075   52.64   <2e-16 ***
+#> T (period)           6.0191     0.0215  280.27   <2e-16 ***
+#> xi (damping ratio)   0.4047     0.0083   48.54   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Survival Process: Proportional Hazards Model
 #>         Estimate Std. Error z value Pr(>|z|)
-#> alpha_1   0.6774     0.1873   3.617 0.000298 ***
-#> alpha_2   1.9869     1.0253   1.938 0.052646 .
-#> w1        0.6762     0.1240   5.453 4.95e-08 ***
-#> w2       -1.3353     0.2857  -4.673 2.97e-06 ***
+#> alpha_1   0.8963     0.2166   4.138 3.50e-05 ***
+#> alpha_2   2.3209     0.6466   3.590 0.000331 ***
+#> w1        0.6563     0.1336   4.912 9.02e-07 ***
+#> w2       -0.8894     0.2761  -3.222 0.001275 **
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
-#> Baseline Hazard: B-spline with 6 basis functions
-#> (Coefficients range: [-6.506, -0.518] )
+#> Baseline Hazard: B-spline with 4 basis functions
+#> (Coefficients range: [-4.705, -2.450] )
 #>
 #> Initial State: Population Mean
-#>    Estimate Std. Error z value Pr(>|z|)
-#> m0  -0.5061     0.0085  -59.76  < 2e-16 ***
-#> v0  -0.0950     0.0228   -4.16 3.19e-05 ***
+#>           Estimate Std. Error z value Pr(>|z|)
+#> biomarker  -0.4887     0.0073  -67.05   <2e-16 ***
+#> velocity   -0.1146     0.0087  -13.15   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Variance Components:
-#> Measurement Error SD: 0.098143
+#> Measurement Error SD: 0.099619 (SE: 0.000547)
 #> Random Effect Covariance Matrix:
-#>            [,1]       [,2]       [,3]      [,4]
-#> [1,]  0.0119511  0.0307804 -0.0004738 -0.001493
-#> [2,]  0.0307804  0.0947550 -0.0001958 -0.003552
-#> [3,] -0.0004738 -0.0001958  0.0017180  0.001939
-#> [4,] -0.0014930 -0.0035520  0.0019394  0.038128
+#>            [,1]       [,2]       [,3]       [,4]
+#> [1,]  8.300e-03  2.218e-03  5.519e-04 -4.028e-05
+#> [2,]  2.218e-03  7.116e-03 -5.438e-05  3.002e-04
+#> [3,]  5.519e-04 -5.438e-05  1.338e-03  3.531e-04
+#> [4,] -4.028e-05  3.002e-04  3.531e-04  4.206e-02
 #>
 #> Model Diagnostics:
-#> C-index (Concordance): 0.868
-#> Convergence: Converged after 8 iterations
+#> C-index (Concordance): 0.613
+#> Convergence: Converged (relative convergence (4))
 
 # Plot results
 plot(fit)
@@ -192,6 +192,25 @@ The formula specifies:
   mathematical formulations
 - **Model Comparison**: See `vignette("comparison")` for comparisons
   with traditional joint models
+
+## Performance Baseline
+
+Use the helper scripts in `scripts/` to generate reproducible runtime
+baselines and compare two runs:
+
+``` bash
+# Generate baseline CSV (sequential + optional parallel case)
+Rscript scripts/perf-baseline.R --n=20 --reps=3 --maxit=10 --tol=1e-2 --out=perf-base.csv
+
+# Generate candidate CSV after code changes
+Rscript scripts/perf-baseline.R --n=20 --reps=3 --maxit=10 --tol=1e-2 --out=perf-new.csv
+
+# Compare elapsed_mean and fail if slowdown > 10%
+Rscript scripts/perf-compare.R --base=perf-base.csv --new=perf-new.csv --metric=elapsed_mean --fail_pct=10
+```
+
+These scripts are intended for quick engineering checks, not
+publication-grade benchmarking.
 
 ## Code of Conduct
 

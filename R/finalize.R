@@ -1,119 +1,134 @@
-# Model Finalization (Joint + Marginal)
+# TMB Result Extraction
 
+#' Extract results from fitted MarginalODE TMB object
 #' @noRd
-.finalize_joint <- function(
-  data_list,
-  parameters,
-  loglik,
-  control,
-  coef_names,
-  converged,
-  random_effects
-) {
-  n_subjects <- length(data_list)
+.finalize_marginal <- function(obj, opt, coef_names, n_re, n_subjects) {
+  sdr <- TMB::sdreport(obj)
+  reported <- obj$report()
+  par <- obj$env$last.par.best
+  pn <- names(par)
 
-  names(parameters$coefficients$baseline) <- coef_names$baseline
-  names(parameters$coefficients$hazard) <- coef_names$hazard
-  names(parameters$coefficients$longitudinal) <- coef_names$longitudinal
-  names(parameters$coefficients$initial_state) <- coef_names$initial_state
+  longitudinal <- as.numeric(par[pn == "longitudinal"])
+  names(longitudinal) <- coef_names$longitudinal
+  initial_state <- as.numeric(par[pn == "initial_state"])
+  names(initial_state) <- coef_names$initial_state
+  sigma_e <- unname(exp(par[pn == "log_sigma_e"]))
 
-  coef_names_expanded <- c(
-    paste0("baseline:", coef_names$baseline),
-    paste0("hazard:", coef_names$hazard),
-    paste0("longitudinal:", coef_names$longitudinal),
-    paste0("initial state:", coef_names$initial_state)
-  )
+  parameters <- c(longitudinal, initial_state)
 
-  n_coef <- length(coef_names_expanded)
-  vcov_matrix <- if (converged) {
-    .compute_vcov_sem(
-      data_list, parameters, random_effects, control
-    )
+  # Vcov of fixed effects
+  n_fixed <- length(parameters)
+  vcov_matrix <- if (!is.null(sdr$cov.fixed) && nrow(sdr$cov.fixed) >= n_fixed) {
+    sdr$cov.fixed[seq_len(n_fixed), seq_len(n_fixed), drop = FALSE]
   } else {
-    matrix(NA, n_coef, n_coef)
+    matrix(NA, n_fixed, n_fixed)
   }
-  dimnames(vcov_matrix) <- list(coef_names_expanded, coef_names_expanded)
+  dimnames(vcov_matrix) <- list(names(parameters), names(parameters))
 
-  n_params <- .count_params(parameters)
-  aic <- -2 * loglik + 2 * n_params
-  bic <- -2 * loglik + n_params * log(n_subjects)
+  # Variance component SEs
+  sdr_report <- summary(sdr, "report")
+  sdr_names <- rownames(sdr_report)
+  sigma_e_se <- as.numeric(sdr_report[sdr_names == "sigma_e", "Std. Error"])
+  sigma_b <- as.matrix(reported$Sigma_b)
+  sigma_b_se <- matrix(
+    sdr_report[sdr_names == "Sigma_b", "Std. Error"], n_re, n_re)
 
-  ode_solutions <- .solve_batch_joint(data_list, random_effects, parameters)
-  # nolint start: object_usage_linter
-  risk_scores <- vapply(
-    ode_solutions,
-    function(x) tail(x$log_hazard, 1),
-    numeric(1)
-  )
-  event_times <- vapply(data_list, `[[`, numeric(1), "time")
-  event_status <- vapply(data_list, `[[`, numeric(1), "status")
+  # Random effects posterior modes
+  random_effects <- matrix(par[pn == "random_effects"],
+                           nrow = n_subjects, ncol = n_re)
 
-  cindex <- survival::concordance(
-    Surv(event_times, event_status) ~ risk_scores,
-    reverse = TRUE
-  )$concordance
-  # nolint end
-
-  if (control$verbose > 0) {
-    cli::cli_alert_info(sprintf("C-index (concordance): %.3f", cindex))
-  }
+  loglik <- -opt$objective
+  n_total_params <- n_fixed + 1  # +1 for sigma_e
+  converged <- opt$convergence == 0
 
   list(
     parameters = parameters,
-    random_effects = random_effects,
+    measurement_error_sd = sigma_e,
+    measurement_error_sd_se = sigma_e_se,
+    random_effect_sigma = sigma_b,
+    random_effect_sigma_se = sigma_b_se,
+    logLik = loglik,
+    AIC = -2 * loglik + 2 * n_total_params,
+    BIC = -2 * loglik + n_total_params * log(n_subjects),
     vcov = vcov_matrix,
-    loglik = loglik,
-    aic = aic,
-    bic = bic,
-    cindex = cindex
+    random_effects = random_effects,
+    convergence = list(
+      converged = converged,
+      iterations = opt$iterations,
+      message = sprintf("%s (%s)",
+        if (converged) "Converged" else "Did not converge", opt$message))
   )
 }
 
 #' @noRd
-.finalize_marginal <- function(
-  theta, sse, data_list, biomarker_clamp,
-  param_names, converged, n_iter, has_state,
-  control, cl
-) {
-  hess <- attr(
-    .compute_marginal_objective(
-      theta, data_list, biomarker_clamp, FALSE, TRUE
-    ),
-    "hessian"
-  )
-  vcov_mat <- solve(hess)
-  dimnames(vcov_mat) <- list(param_names, param_names)
+.finalize_joint <- function(obj, opt, parameters, coef_names,
+                          data_list, n_re, control) {
+  sdr <- TMB::sdreport(obj)
+  reported <- obj$report()
+  par <- obj$env$last.par.best
+  pn <- names(par)
 
-  n_obs <- .n_obs(data_list)
-  n_params <- length(theta)
-  sigma_e <- sqrt(sse / (n_obs - n_params))
-  ll <- -0.5 * n_obs * (log(2 * pi) + log(sse / n_obs) + 1)
+  # Fixed effects
+  cf <- parameters$coefficients
+  for (nm in c("baseline", "hazard", "longitudinal", "initial_state"))
+    cf[[nm]] <- setNames(as.numeric(par[pn == nm]), coef_names[[nm]])
+  cf$measurement_error_sd <- unname(exp(par[pn == "log_sigma_e"]))
+  cf$random_effect_sigma <- as.matrix(reported$Sigma_b)
 
-  result <- structure(list(
-    parameters = setNames(theta, param_names),
-    measurement_error_sd = sigma_e,
-    logLik = ll,
-    AIC = 2 * n_params - 2 * ll,
-    BIC = log(n_obs) * n_params - 2 * ll,
-    convergence = list(
-      converged = converged, iterations = n_iter,
-      message = sprintf(
-        "%s after %d iterations",
-        if (converged) "Converged" else "Did not converge",
-        n_iter
-      )
-    ),
-    vcov = vcov_mat, data = data_list,
-    control = control, call = cl
-  ), class = "MarginalODE")
+  # Variance component SEs (delta method via ADREPORT)
+  sdr_report <- summary(sdr, "report")
+  sdr_names <- rownames(sdr_report)
+  cf$measurement_error_sd_se <- as.numeric(
+    sdr_report[sdr_names == "sigma_e", "Std. Error"])
+  cf$random_effect_sigma_se <- matrix(
+    sdr_report[sdr_names == "Sigma_b", "Std. Error"], n_re, n_re)
 
-  if (!has_state) {
-    mat <- do.call(
-      rbind, lapply(data_list, `[[`, "initial_state")
-    )
-    dimnames(mat) <- list(names(data_list), c("m0", "v0"))
-    result$initial_states <- mat
+  parameters$coefficients <- cf
+  parameters$random_effects_init <- NULL
+
+  # Vcov of fixed effects
+  coef_names_exp <- .prefixed_coef_names(coef_names)
+  n_fixed <- length(coef_names_exp)
+  vcov_matrix <- if (!is.null(sdr$cov.fixed) && nrow(sdr$cov.fixed) >= n_fixed) {
+    sdr$cov.fixed[seq_len(n_fixed), seq_len(n_fixed), drop = FALSE]
+  } else {
+    matrix(NA, n_fixed, n_fixed)
+  }
+  dimnames(vcov_matrix) <- list(coef_names_exp, coef_names_exp)
+
+  # C-index
+  n_subjects <- length(data_list)
+  event_t <- vapply(data_list, `[[`, numeric(1), "time")
+  event_s <- vapply(data_list, `[[`, numeric(1), "status")
+  cindex <- survival::concordance(
+    Surv(event_t, event_s) ~ as.numeric(reported$log_hazard_at_event),
+    reverse = TRUE
+  )$concordance
+
+  # Convergence reporting
+  loglik <- -opt$objective
+  converged <- opt$convergence == 0
+  if (control$verbose > 0) {
+    if (converged) cli::cli_alert_success(sprintf("Converged (%s)", opt$message))
+    else cli::cli_alert_warning(sprintf("Did not converge: %s", opt$message))
+    cli::cli_alert_info(sprintf("Log-likelihood: %.2f", loglik))
+    cli::cli_alert_info(sprintf("C-index: %.3f", cindex))
   }
 
-  result
+  n_params <- .count_params(parameters)
+  list(
+    parameters = parameters,
+    logLik = loglik,
+    AIC = -2 * loglik + 2 * n_params,
+    BIC = -2 * loglik + n_params * log(n_subjects),
+    cindex = cindex,
+    convergence = list(
+      converged = converged,
+      iterations = opt$iterations,
+      message = sprintf("%s (%s)",
+        if (converged) "Converged" else "Did not converge", opt$message)),
+    random_effects = matrix(par[pn == "random_effects"], nrow = n_subjects, ncol = n_re),
+    vcov = vcov_matrix,
+    tmb_report = reported
+  )
 }

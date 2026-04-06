@@ -4,14 +4,7 @@
 \alias{MarginalODE}
 \title{Marginal Second-Order ODE Parameter Estimation}
 \usage{
-MarginalODE(
-  formula,
-  data,
-  time = "time",
-  id = "id",
-  state = NULL,
-  control = list()
-)
+MarginalODE(formula, data, time = "time", id = "id", control = list())
 }
 \arguments{
 \item{formula}{Response and covariates
@@ -22,10 +15,6 @@ MarginalODE(
 \item{time}{Time variable name (default: \code{"time"})}
 
 \item{id}{Subject identifier name (default: \code{"id"})}
-
-\item{state}{Optional \eqn{n \times 2} matrix of initial
-conditions \eqn{[m(0), \dot{m}(0)]}. If \code{NULL},
-estimated from data.}
 
 \item{control}{List of control parameters.
 See \code{\link{MarginalODE.control}}.}
@@ -42,8 +31,7 @@ biomarker trajectories:
 \dontrun{
 fit <- MarginalODE(
   formula = observed ~ x1 + x2,
-  data = sim$data$longitudinal_data,
-  state = as.matrix(sim$data$state)
+  data = sim$data$longitudinal_data
 )
 }
 

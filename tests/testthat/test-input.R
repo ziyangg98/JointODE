@@ -278,11 +278,10 @@ test_that(".process_joint sorts unordered time data", {
 test_that("JointODE.control returns complete defaults", {
   ctrl <- JointODE.control()
   expect_equal(ctrl$maxit, 200)
-  expect_equal(ctrl$tol, 1e-3)
+  expect_equal(ctrl$tol, 1e-4)
   expect_equal(ctrl$verbose, 0)
   expect_false(ctrl$parallel)
   expect_equal(ctrl$n_cores, 0)
-  expect_equal(ctrl$quad_level, 3)
   expect_equal(ctrl$hazard_quadrature, 1)
 })
 
@@ -299,7 +298,6 @@ test_that("JointODE.control validates inputs", {
   expect_error(JointODE.control(tol = 0), "positive")
   expect_error(JointODE.control(parallel = "yes"), "TRUE or FALSE")
   expect_error(JointODE.control(n_cores = -1), "non-negative")
-  expect_error(JointODE.control(quad_level = 0), "positive")
   expect_error(JointODE.control(hazard_quadrature = 0), "positive integer")
   expect_error(JointODE.control(hazard_quadrature = 2.5), "positive integer")
   expect_error(JointODE.control(.list = "bad"), "\\.list must be a list")
@@ -350,26 +348,6 @@ test_that(".coef_table structure and computation", {
   expect_true(is.infinite(tbl2[1, "z value"]))
 })
 
-# --- .coef_to_vector / .vector_to_coef ---
-
-test_that(".coef_to_vector roundtrips correctly", {
-  params <- sim$init
-  theta <- .coef_to_vector(params)
-  recovered <- .vector_to_coef(params, theta)
-
-  expect_equal(
-    unname(recovered$coefficients$baseline),
-    unname(params$coefficients$baseline)
-  )
-  expect_equal(
-    unname(recovered$coefficients$hazard),
-    unname(params$coefficients$hazard)
-  )
-  expect_equal(
-    unname(recovered$coefficients$longitudinal),
-    unname(params$coefficients$longitudinal)
-  )
-})
 
 # --- .compute_dimensions ---
 
@@ -397,17 +375,18 @@ test_that(".compute_dimensions returns correct values", {
 test_that(".get_spline_config variants", {
   x <- seq(0, 10, length.out = 100)
   c1 <- .get_spline_config(
-    x, degree = 3, n_knots = 5, knot_placement = "quantile"
+    x,
+    degree = 2, n_knots = 1, knot_placement = "quantile"
   )
-  expect_equal(length(c1$knots), 5)
-  expect_equal(c1$df, 9)
+  expect_equal(length(c1$knots), 1)
+  expect_equal(c1$df, 4)
 
   c2 <- .get_spline_config(x, degree = 2, n_knots = 3, knot_placement = "equal")
   expect_equal(length(c2$knots), 3)
 
   c3 <- .get_spline_config(
     seq(1, 5, length.out = 50),
-    degree = 2, n_knots = 2, boundary_knots = c(0, 10)
+    degree = 2, n_knots = 1, boundary_knots = c(0, 10)
   )
   expect_equal(c3$boundary_knots, c(0, 10))
 
@@ -415,14 +394,4 @@ test_that(".get_spline_config variants", {
     .get_spline_config(1:10, knot_placement = "invalid"),
     "knot_placement"
   )
-})
-
-# --- .update_random_effect_sigma ---
-
-test_that(".update_random_effect_sigma computes mean of second moments", {
-  moments <- list(
-    list(mean = c(0, 0), second_moment = diag(2)),
-    list(mean = c(0, 0), second_moment = diag(2) * 3)
-  )
-  expect_equal(.update_random_effect_sigma(moments, 2), diag(2) * 2)
 })

@@ -25,7 +25,7 @@ fit <- JointODE(
   longitudinal_data, survival_data,
   init = "marginal",
   spline_baseline = list(degree = 1, n_knots = 1),
-  control = list(parallel = TRUE, verbose = 3)
+  control = list(parallel = TRUE, verbose = 1)
 )
 cat(sprintf("\nElapsed: %.1f s\n", (proc.time() - t0)["elapsed"]))
 summary(fit)

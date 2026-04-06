@@ -4,10 +4,14 @@
 
 # nolint start: object_usage_linter
 
+library(survival)
+
+data("sim", package = "JointODE", envir = environment())
+
 #' Subset sim data into processed test data
 .make_test_data <- function(n = 10) {
   test_ids <- unique(sim$data$longitudinal_data$id)[seq_len(n)]
-  data_list <- .process_joint(
+  data_list <- JointODE:::.process_joint(
     longitudinal_data = sim$data$longitudinal_data[
       sim$data$longitudinal_data$id %in% test_ids,
       c("id", "time", "observed", "x1", "x2")
@@ -21,8 +25,9 @@
   )
   list(
     data_list = data_list,
-    random_effects = sim$data$random_effects[seq_len(n), ],
-    params = .coef_to_vector(sim$init),
+    random_effects = sim$data$random_effects[seq_len(n), , drop = FALSE],
+    params = with(sim$init$coefficients,
+      c(baseline, hazard, longitudinal, initial_state)),
     parameters = sim$init
   )
 }
@@ -41,8 +46,7 @@
     c("value", "slope", "w1", "w2")
   )
 
-  n_params <- .count_params(parameters)
-  n_re <- nrow(parameters$coefficients$random_effect_sigma)
+  n_params <- JointODE:::.count_params(parameters)
   coef_names <- c(
     paste0("baseline:", names(parameters$coefficients$baseline)),
     paste0("hazard:", names(parameters$coefficients$hazard)),
@@ -63,10 +67,7 @@
         converged = TRUE, iterations = 10,
         message = "Converged after 10 iterations"
       ),
-      random_effects = list(
-        estimates = td$random_effects,
-        variances = lapply(seq_len(n_subjects), function(i) diag(0.01, n_re))
-      ),
+      random_effects = td$random_effects,
       vcov = vcov_matrix,
       data = td$data_list,
       control = JointODE.control(),
@@ -78,6 +79,11 @@
     ),
     class = "JointODE"
   )
+}
+
+#' Expect all values finite
+.expect_all_finite <- function(x) {
+  expect_true(all(is.finite(x)))
 }
 
 # nolint end
