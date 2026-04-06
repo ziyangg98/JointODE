@@ -351,6 +351,61 @@
     b1 * a1 * m + (a0 + b2 * a1) * v + f * (J0 + b2 * J1))
 }
 
+#' Predict marginal trajectories for all subjects at given times
+#' @noRd
+.predict_marginal_trajectories <- function(data_list, times, cf, configs, re) {
+  clamp_val <- configs$biomarker_clamp
+  lc <- unname(cf$longitudinal)
+
+  ids <- names(data_list)
+  n_times <- length(times)
+  out <- vector("list", length(ids))
+
+  for (i in seq_along(data_list)) {
+    subj <- data_list[[i]]
+    obs_t <- subj$longitudinal$times
+    fcov <- subj$longitudinal$covariates$fixed
+    rcov <- subj$longitudinal$covariates$random
+
+    bi <- re[i, ]
+    m <- cf$initial_state[1] + bi[1]
+    v <- cf$initial_state[2] + bi[2]
+
+    # b1, b2 from longitudinal + RE
+    b1 <- 0; b2 <- 0; fi <- 1; ri <- 3
+    if (configs$biomarker$fixed)  { b1 <- lc[fi]; fi <- fi + 1 }
+    if (configs$biomarker$random) { b1 <- b1 + bi[ri]; ri <- ri + 1 }
+    if (configs$velocity$fixed)   { b2 <- lc[fi]; fi <- fi + 1 }
+    if (configs$velocity$random)  { b2 <- b2 + bi[ri]; ri <- ri + 1 }
+    ffs <- fi; rfs <- ri
+
+    bio <- vel <- numeric(n_times)
+    prev_t <- 0
+
+    for (ti in seq_len(n_times)) {
+      tgt <- times[ti]; dt <- tgt - prev_t
+      if (dt > 0 && length(obs_t) > 0) {
+        ci <- findInterval(prev_t, obs_t)
+        ci <- max(1, min(ci, nrow(fcov)))
+        forcing <- sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci, ])
+        if (ncol(rcov) > 0)
+          forcing <- forcing + sum(bi[rfs:(rfs + ncol(rcov) - 1)] * rcov[ci, ])
+
+        mv <- .ode_step_r(m, v, b1, b2, forcing, dt)
+        m <- max(-clamp_val, min(clamp_val, mv[1]))
+        v <- max(-clamp_val, min(clamp_val, mv[2]))
+      }
+      bio[ti] <- m; vel[ti] <- v; prev_t <- tgt
+    }
+    out[[i]] <- data.frame(
+      id = ids[i], time = times,
+      biomarker = bio, velocity = vel,
+      stringsAsFactors = FALSE
+    )
+  }
+  do.call(rbind, out)
+}
+
 #' Hazard at time t (double)
 #' @noRd
 .eval_hazard_r <- function(m, v, t, baseline, hazard, surv_cov,

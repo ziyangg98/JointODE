@@ -23,7 +23,7 @@ fit <- JointODE(
   observed ~ biomarker + velocity + drug + (biomarker + velocity | id),
   Surv(time, status) ~ drug + age + sex,
   longitudinal_data, survival_data,
-  init = "default",
+  init = "marginal",
   spline_baseline = list(degree = 1, n_knots = 1),
   control = list(parallel = TRUE, verbose = 1)
 )

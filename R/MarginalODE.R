@@ -134,9 +134,36 @@ MarginalODE <- function(
     cli::cli_alert_info(sprintf("Log-likelihood: %.2f", results$logLik))
   }
 
+  # Store configs needed for predict
+  configs <- list(
+    biomarker = list(
+      fixed = parsed_long$biomarker$fixed,
+      random = parsed_long$biomarker$random
+    ),
+    velocity = list(
+      fixed = parsed_long$velocity$fixed,
+      random = parsed_long$velocity$random
+    ),
+    biomarker_clamp = parameters$configurations$biomarker_clamp
+  )
+  # Store longitudinal coefficients in named form
+  coefs <- list(
+    longitudinal = setNames(
+      as.numeric(obj$env$last.par.best[
+        names(obj$env$last.par.best) == "longitudinal"]),
+      coef_names$longitudinal
+    ),
+    initial_state = setNames(
+      as.numeric(obj$env$last.par.best[
+        names(obj$env$last.par.best) == "initial_state"]),
+      coef_names$initial_state
+    )
+  )
+
   structure(c(results, list(
     data = data_list, control = control, call = cl,
-    tmb_obj = obj, tmb_opt = opt
+    tmb_obj = obj, tmb_opt = opt,
+    configs = configs, coefs = coefs
   )), class = "MarginalODE")
 }
 
@@ -326,24 +353,14 @@ print.summary.MarginalODE <- function(
 predict.MarginalODE <- function(object, newdata = NULL, times = NULL, ...) {
   if (!is.null(newdata)) stop("newdata not yet supported")
 
-  reported <- object$tmb_obj$report()
   data_list <- object$data
 
-  obs_offset <- 0L
-  results <- vector("list", length(data_list))
-  for (i in seq_along(data_list)) {
-    ni <- length(data_list[[i]]$longitudinal$measurements)
-    idx <- obs_offset + seq_len(ni)
-
-    results[[i]] <- data.frame(
-      id = names(data_list)[i],
-      time = data_list[[i]]$longitudinal$times,
-      biomarker = as.numeric(reported$fitted_biomarker[idx]),
-      velocity = as.numeric(reported$fitted_velocity[idx]),
-      stringsAsFactors = FALSE
-    )
-    obs_offset <- obs_offset + ni
+  if (is.null(times)) {
+    all_t <- unlist(lapply(data_list, function(d) d$longitudinal$times))
+    times <- sort(unique(c(0, all_t)))
   }
 
-  do.call(rbind, results)
+  .predict_marginal_trajectories(
+    data_list, times, object$coefs, object$configs, object$random_effects
+  )
 }

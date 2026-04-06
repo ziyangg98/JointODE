@@ -231,7 +231,9 @@ JointODE <- function(
 
   structure(c(results, list(
     data = data_list, control = control, call = cl,
-    tmb_obj = obj, tmb_opt = opt
+    tmb_obj = obj, tmb_opt = opt,
+    parsed_long = parsed_long, parsed_surv = parsed_surv,
+    survival_formula = survival_formula
   )), class = "JointODE")
 }
 
@@ -513,10 +515,34 @@ print.JointODE <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
 #' @concept model-prediction
 #' @export
 predict.JointODE <- function(object, newdata = NULL, times = NULL, ...) {
-  data_list <- object$data
   cf <- object$parameters$coefficients
   configs <- object$parameters$configurations
   re <- object$random_effects
+
+  if (!is.null(newdata)) {
+    if (!is.list(newdata) || is.null(newdata$longitudinal_data) ||
+        is.null(newdata$survival_data)) {
+      stop("newdata must be a list with $longitudinal_data and $survival_data")
+    }
+    data_list <- .process_joint(
+      longitudinal_data = newdata$longitudinal_data,
+      survival_data = newdata$survival_data,
+      parsed_long = object$parsed_long,
+      parsed_surv = object$parsed_surv,
+      survival_formula = object$survival_formula
+    )
+    # Match RE by subject ID; zero for unseen subjects
+    orig_ids <- names(object$data)
+    new_ids <- names(data_list)
+    n_re <- ncol(re)
+    re_new <- matrix(0, nrow = length(new_ids), ncol = n_re)
+    matched <- match(new_ids, orig_ids)
+    has_match <- !is.na(matched)
+    if (any(has_match)) re_new[has_match, ] <- re[matched[has_match], , drop = FALSE]
+    re <- re_new
+  } else {
+    data_list <- object$data
+  }
 
   if (is.null(times)) {
     all_t <- unlist(lapply(data_list, function(d) d$longitudinal$times))

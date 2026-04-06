@@ -72,11 +72,40 @@ test_that("logLik.JointODE returns logLik class", {
 })
 
 # ==============================================================================
-# predict
+# predict / plot (requires real fitted model)
 # ==============================================================================
 
-# predict requires tmb_obj (not available in mock); tested in test-fit.R
+ld <- sim$data$longitudinal_data[, c("id", "time", "observed", "x1", "x2")]
+ids10 <- unique(ld$id)[1:10]
+fit_plot <- JointODE(
+  observed ~ biomarker + velocity + x1 + x2 + (biomarker + velocity | id),
+  Surv(time, status) ~ w1 + w2,
+  ld[ld$id %in% ids10, ],
+  sim$data$survival_data[sim$data$survival_data$id %in% ids10, ],
+  init = sim$init, control = list(maxit = 5, verbose = 0)
+)
 
+test_that("predict returns expected columns", {
+  pred <- predict(fit_plot)
+  expect_s3_class(pred, "data.frame")
+  expect_true(all(c("id", "time", "biomarker", "velocity") %in% names(pred)))
+})
 
+test_that("plot trajectory_biomarker works", {
+  p <- plot(fit_plot, type = "trajectory_biomarker")
+  expect_true(inherits(p, "gg") || inherits(p, "patchwork"))
+})
 
-# Plot and predict tests require TMB fit object — covered in test-fit.R
+test_that("plot survival works", {
+  p <- plot(fit_plot, type = "survival")
+  expect_true(inherits(p, "gg") || inherits(p, "patchwork"))
+})
+
+test_that("plot overview works", {
+  p <- plot(fit_plot, type = "overview")
+  expect_true(inherits(p, "gg") || inherits(p, "patchwork"))
+})
+
+test_that("plot errors on invalid type", {
+  expect_error(plot(fit_plot, type = "nonexistent"))
+})
