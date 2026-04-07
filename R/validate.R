@@ -196,16 +196,7 @@
 
   parts <- parsed
 
-  if (is.null(parts$grouping)) {
-    stop(
-      "Random effects specification is required in longitudinal formula.\n",
-      "Use syntax: response ~ fixed_terms + (random_terms | grouping)\n",
-      "Example: y ~ x + (biomarker + velocity | id)",
-      call. = FALSE
-    )
-  }
-
-  if (!(parts$grouping %in% names(data))) {
+  if (!is.null(parts$grouping) && !(parts$grouping %in% names(data))) {
     stop(
       "Grouping variable '",
       parts$grouping,

@@ -96,11 +96,12 @@ test_that("validate accepts valid formula", {
   expect_silent(.validate_longitudinal_formula(
     y ~ x + (biomarker + velocity | id), .formula_test_data()
   ))
+  # No RE term is valid (initial state RE are always included)
+  expect_silent(.validate_longitudinal_formula(y ~ x, .formula_test_data()))
 })
 
 test_that("validate rejects invalid longitudinal formulas", {
   d <- .formula_test_data()
-  expect_error(.validate_longitudinal_formula(y ~ x, d), "Random effects")
   expect_error(.validate_longitudinal_formula("bad", d), "formula object")
   expect_error(.validate_longitudinal_formula(~x, d), "two-sided")
   expect_error(

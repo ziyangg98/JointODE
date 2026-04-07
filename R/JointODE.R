@@ -99,6 +99,7 @@ JointODE <- function(
 
   # Parse formulas and config once
   parsed_long <- .parse_longitudinal_formula(longitudinal_formula)
+  if (is.null(parsed_long$grouping)) parsed_long$grouping <- "id"
   parsed_surv <- .parse_survival_formula(survival_formula)
   spline_config <- modifyList(.default_spline, spline_baseline)
 

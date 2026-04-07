@@ -17,14 +17,7 @@
 
   # Random effects dimension
   has_re_covs <- !is.null(parsed_long$random_terms)
-  has_re_bv <- parsed_long$biomarker$random || parsed_long$velocity$random
-  random_terms <- if (!has_re_covs && !has_re_bv) {
-    "(Intercept)"
-  } else if (has_re_covs) {
-    parsed_long$random_terms
-  } else {
-    character(0)
-  }
+  random_terms <- if (has_re_covs) parsed_long$random_terms else character(0)
 
   n_long_random <- if (length(random_terms) > 0) {
     ncol(model.matrix(
