@@ -16,7 +16,7 @@ JointODE(
   longitudinal_data,
   survival_data,
   gamma = 1,
-  spline_baseline = list(degree = 3, n_knots = 2, knot_placement = "equal",
+  spline_baseline = list(degree = 2, n_knots = 1, knot_placement = "equal",
     boundary_knots = NULL),
   init = "default",
   control = list(),
@@ -65,12 +65,12 @@ JointODE(
 
   `degree`
 
-  :   Polynomial degree of the B-spline basis functions (default: 3,
-      cubic splines)
+  :   Polynomial degree of the B-spline basis functions (default: 2,
+      quadratic splines)
 
   `n_knots`
 
-  :   Number of interior knots for flexibility (default: 2)
+  :   Number of interior knots for flexibility (default: 1)
 
   `knot_placement`
 
@@ -97,64 +97,10 @@ JointODE(
   - A list with the same structure as the fitted model's `parameters`
     component for full manual control.
 
-  When providing a list, it should have elements:
-
-  `coefficients`
-
-  :   A list containing:
-
-      - `baseline`: Vector of B-spline coefficients for baseline hazard
-        (length = number of spline basis functions)
-
-      - `hazard`: Vector of hazard parameters including association
-        parameters (2) and survival covariates
-
-      - `longitudinal`: Vector of longitudinal fixed effects including
-        intercept and covariates
-
-      - `measurement_error_sd`: Residual standard deviation (positive
-        scalar)
-
-      - `random_effect_sigma`: Random effect covariance matrix (positive
-        definite matrix)
-
-  `configurations`
-
-  :   Optional; if not provided, will use spline configuration from
-      `spline_baseline`
-
 - control:
 
   A list of control parameters for optimization, or output from
   [`JointODE.control`](https://gongziyang.com/JointODE/reference/JointODE.control.md).
-  Key parameters include:
-
-  `maxit`
-
-  :   Maximum number of EM iterations (default: 200)
-
-  `tol`
-
-  :   Convergence tolerance on max absolute parameter change (default:
-      1e-3)
-
-  `verbose`
-
-  :   Verbosity level: FALSE/0 for silent, TRUE/1 for progress messages,
-      2 for detailed output (default: FALSE)
-
-  `parallel`
-
-  :   Logical flag enabling parallel computation (default: FALSE)
-
-  `n_cores`
-
-  :   Number of CPU cores for parallel processing. If 0, automatically
-      detects available cores (default: 0)
-
-  See
-  [`JointODE.control`](https://gongziyang.com/JointODE/reference/JointODE.control.md)
-  for complete details and examples.
 
 - ...:
 
@@ -162,125 +108,21 @@ JointODE(
 
 ## Value
 
-An S3 object of class `"JointODE"` containing fitted model results:
-
-- `parameters`:
-
-  A list containing all estimated parameters:
-
-  - `coefficients`: Named list with `baseline` (B-spline coefficients
-    for baseline hazard), `hazard` (association and survival covariate
-    effects), `longitudinal` (longitudinal fixed effects),
-    `measurement_error_sd` (residual standard deviation), and
-    `random_effect_sigma` (random effect covariance matrix)
-
-  - `configurations`: Model configuration including spline basis
-    specifications
-
-- `logLik`:
-
-  Maximum log-likelihood value achieved at convergence
-
-- `AIC`:
-
-  Akaike Information Criterion for model comparison
-
-- `BIC`:
-
-  Bayesian Information Criterion adjusted for sample size
-
-- `cindex`:
-
-  Concordance index (C-index) measuring the model's discrimination
-  ability for survival prediction
-
-- `convergence`:
-
-  List containing convergence diagnostics:
-
-  - `converged`: Logical indicating convergence status
-
-  - `iterations`: Number of EM iterations performed
-
-  - `message`: Descriptive convergence message
-
-- `random_effects`:
-
-  Matrix of posterior mode random effects (n_subjects x n_re)
-
-- `data`:
-
-  Processed data used for model fitting in internal format
-
-- `control`:
-
-  List of control parameters used in optimization
-
-- `call`:
-
-  The matched function call for reproducibility
-
-## Details
-
-The joint modeling framework integrates longitudinal and survival
-processes through a shared random effects structure. The longitudinal
-biomarker evolution is characterized by a system of ODEs that can
-accommodate non-linear dynamics, feedback mechanisms, and complex
-temporal patterns. The survival component employs a proportional hazards
-model where the instantaneous risk depends on features derived from the
-longitudinal trajectory.
-
-Two association structures are supported:
-
-- Current value: hazard depends on the biomarker level at time t
-
-- Rate of change: hazard depends on the biomarker's instantaneous slope
-
-Parameter estimation employs a Monte Carlo EM (MCEM) algorithm with:
-
-- E-step: Laplace proposal plus importance sampling for posterior
-  moments of random effects
-
-- M-step: damped Newton step on the self-normalized importance-weighted
-  objective
+An S3 object of class `"JointODE"` containing fitted model results.
 
 ## Examples
 
 ``` r
 if (FALSE) { # \dontrun{
-# Generate example data
-sim <- simulate(n_subjects = 100, n_measurements = 10)
-
-# Fit with default control parameters
-fit1 <- JointODE(
-  longitudinal_formula = observed ~ x1 + x2,
-  survival_formula = Surv(event_time, event) ~ x1 + x2,
-  longitudinal_data = sim$longitudinal_data,
-  survival_data = sim$survival_data
+data(sim)
+fit <- JointODE(
+  longitudinal_formula = observed ~
+    biomarker + velocity + x1 + x2 + (biomarker + velocity | id),
+  survival_formula = Surv(time, status) ~ w1 + w2,
+  longitudinal_data = sim$data$longitudinal_data,
+  survival_data = sim$data$survival_data,
+  init = sim$init
 )
-
-# Fit with custom control parameters using JointODE.control()
-control <- JointODE.control(
-  maxit = 200, tol = 1e-4, verbose = TRUE
-)
-fit2 <- JointODE(
-  longitudinal_formula = observed ~ x1 + x2,
-  survival_formula = Surv(event_time, event) ~ x1 + x2,
-  longitudinal_data = sim$longitudinal_data,
-  survival_data = sim$survival_data,
-  control = control
-)
-
-# Fit with control parameters as a list
-# By default, uses MarginalODE for initialization (init = NULL)
-fit3 <- JointODE(
-  longitudinal_formula = observed ~ x1 + x2,
-  survival_formula = Surv(event_time, event) ~ x1 + x2,
-  longitudinal_data = sim$longitudinal_data,
-  survival_data = sim$survival_data,
-  control = list(maxit = 50, verbose = TRUE)
-)
-
-summary(fit1)
+summary(fit)
 } # }
 ```

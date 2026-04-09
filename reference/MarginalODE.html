@@ -11,7 +11,7 @@ biomarker trajectories:
 
     <a class="navbar-brand me-2" href="../index.html">JointODE</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.2</small>
+    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Unreleased version">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -45,7 +45,7 @@ biomarker trajectories:
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Marginal Second-Order ODE Parameter Estimation</h1>
-      <small class="dont-index">Source: <a href="https://github.com/ziyangg98/JointODE/blob/main/R/MarginalODE.R" class="external-link"><code>R/MarginalODE.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/ziyangg98/JointODE/blob/HEAD/R/MarginalODE.R" class="external-link"><code>R/MarginalODE.R</code></a></small>
       <div class="d-none name"><code>MarginalODE.Rd</code></div>
     </div>
 
@@ -57,14 +57,7 @@ biomarker trajectories:
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">MarginalODE</span><span class="op">(</span></span>
-<span>  <span class="va">formula</span>,</span>
-<span>  <span class="va">data</span>,</span>
-<span>  time <span class="op">=</span> <span class="st">"time"</span>,</span>
-<span>  id <span class="op">=</span> <span class="st">"id"</span>,</span>
-<span>  state <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">MarginalODE</span><span class="op">(</span><span class="va">formula</span>, <span class="va">data</span>, time <span class="op">=</span> <span class="st">"time"</span>, id <span class="op">=</span> <span class="st">"id"</span>, control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -88,12 +81,6 @@ biomarker trajectories:
 <dd><p>Subject identifier name (default: <code>"id"</code>)</p></dd>
 
 
-<dt id="arg-state">state<a class="anchor" aria-label="anchor" href="#arg-state"></a></dt>
-<dd><p>Optional \(n \times 2\) matrix of initial
-conditions \([m(0), \dot{m}(0)]\). If <code>NULL</code>,
-estimated from data.</p></dd>
-
-
 <dt id="arg-control">control<a class="anchor" aria-label="anchor" href="#arg-control"></a></dt>
 <dd><p>List of control parameters.
 See <code><a href="MarginalODE.control.html">MarginalODE.control</a></code>.</p></dd>
@@ -109,8 +96,7 @@ See <code><a href="MarginalODE.control.html">MarginalODE.control</a></code>.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
 <span class="r-in"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu">MarginalODE</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  formula <span class="op">=</span> <span class="va">observed</span> <span class="op">~</span> <span class="va">x1</span> <span class="op">+</span> <span class="va">x2</span>,</span></span>
-<span class="r-in"><span>  data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">data</span><span class="op">$</span><span class="va">longitudinal_data</span>,</span></span>
-<span class="r-in"><span>  state <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">sim</span><span class="op">$</span><span class="va">data</span><span class="op">$</span><span class="va">state</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">data</span><span class="op">$</span><span class="va">longitudinal_data</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
@@ -135,4 +121,3 @@ See <code><a href="MarginalODE.control.html">MarginalODE.control</a></code>.</p>
 
 
   </body></html>
-

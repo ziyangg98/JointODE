@@ -1,5 +1,17 @@
 # Changelog
 
+## JointODE 0.2.0
+
+- Migrated estimation from EM algorithm to TMB Laplace approximation
+  (~20x faster)
+- Two-phase warm start for subject-specific ODE dynamics random effects
+- [`predict()`](https://rdrr.io/r/stats/predict.html) supports custom
+  time grids and new subjects
+- Time-dependent Cox model for hazard initialization
+- ODE period and damping ratio in
+  [`summary()`](https://rdrr.io/r/base/summary.html)
+- PBC vignette with real data analysis
+
 ## JointODE 0.1.2
 
 ### Major Features

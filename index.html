@@ -12,8 +12,8 @@
 <script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Joint Modeling of Longitudinal and Survival Data Using ODEs">
-<meta name="description" content="Implements joint modeling of longitudinal biomarker trajectories and time-to-event outcomes using ordinary differential equations (ODEs). The package provides tools for simultaneous analysis of biomarker dynamics and survival data, capturing complex temporal patterns through ODE-based trajectory modeling while accounting for their association with event times through shared random effects.">
-<meta property="og:description" content="Implements joint modeling of longitudinal biomarker trajectories and time-to-event outcomes using ordinary differential equations (ODEs). The package provides tools for simultaneous analysis of biomarker dynamics and survival data, capturing complex temporal patterns through ODE-based trajectory modeling while accounting for their association with event times through shared random effects.">
+<meta name="description" content="Implements joint modeling of longitudinal biomarker trajectories and time-to-event outcomes using ordinary differential equations (ODEs). The package provides tools for simultaneous analysis of biomarker dynamics and survival data, capturing complex temporal patterns through ODE-based trajectory modeling while accounting for their association with event times through shared random effects. Estimation uses TMB (Template Model Builder) for automatic Laplace approximation of random effects and efficient gradient computation.">
+<meta property="og:description" content="Implements joint modeling of longitudinal biomarker trajectories and time-to-event outcomes using ordinary differential equations (ODEs). The package provides tools for simultaneous analysis of biomarker dynamics and survival data, capturing complex temporal patterns through ODE-based trajectory modeling while accounting for their association with event times through shared random effects. Estimation uses TMB (Template Model Builder) for automatic Laplace approximation of random effects and efficient gradient computation.">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -23,7 +23,7 @@
 
     <a class="navbar-brand me-2" href="index.html">JointODE</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.2</small>
+    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Unreleased version">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -79,7 +79,7 @@
 </h3>
 <p><strong>Longitudinal Model:</strong> Biomarker trajectories evolve according to a second-order ODE:</p>
 <p><span class="math display">\ddot{m}_i(t) + 2 \xi_i \omega_i \dot{m}_i(t) + \omega_i^2 m_i(t) = k \omega_i^2 \mu_i(t)</span></p>
-<p>where <span class="math inline">m_i(t)</span> is the biomarker value, <span class="math inline">\dot{m}_i(t)</span> is velocity (rate of change), and <span class="math inline">\ddot{m}_i(t)</span> is acceleration. Subject-specific dynamics are characterized by natural frequency <span class="math inline">\omega_i</span> and damping ratio <span class="math inline">\xi_i</span>, with <span class="math inline">\mu_i(t)</span> representing external forcing (e.g., treatment effects, covariates). Individual heterogeneity is captured through random effects on these ODE parameters.</p>
+<p>with initial conditions <span class="math inline">m_i(0) = m_{0,i}</span> and <span class="math inline">\dot{m}_i(0) = v_{0,i}</span>, where <span class="math inline">\omega_i</span> is the natural frequency, <span class="math inline">\xi_i</span> is the damping ratio, and <span class="math inline">\mu_i(t)</span> is covariate-driven forcing. Stability (<span class="math inline">\omega &gt; 0</span>, <span class="math inline">\xi &gt; 0</span>) is enforced by estimating <span class="math inline">\log(\omega^2)</span> and <span class="math inline">\log(2\xi\omega)</span>. Individual heterogeneity is captured through random effects on initial states <span class="math inline">(m_{0,i}, v_{0,i})</span> and multiplicative random effects on ODE parameters.</p>
 <p><strong>Survival Model:</strong> The hazard function incorporates biomarker dynamics:</p>
 <p><span class="math display">\lambda_i(t) = \lambda_{0}(t)\exp\left[\alpha_1 m_i(t) + \alpha_2 \dot{m}_i^{\gamma}(t) + \mathbf{W}_i^{\top}\boldsymbol{\phi}\right]</span></p>
 <p>where <span class="math inline">\gamma \in \{0, 1, 2\}</span> controls the velocity power (0: no velocity, 1: linear, 2: quadratic).</p>
@@ -132,11 +132,10 @@
 <span>  survival_formula <span class="op">=</span> <span class="fu"><a href="reference/Surv.html">Surv</a></span><span class="op">(</span><span class="va">time</span>, <span class="va">status</span><span class="op">)</span> <span class="op">~</span> <span class="va">w1</span> <span class="op">+</span> <span class="va">w2</span>,</span>
 <span>  longitudinal_data <span class="op">=</span> <span class="va">longitudinal_data</span>,</span>
 <span>  survival_data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">data</span><span class="op">$</span><span class="va">survival_data</span>,</span>
-<span>  init <span class="op">=</span> <span class="st">"marginal"</span>,</span>
-<span>  control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>parallel <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span>  init <span class="op">=</span> <span class="st">"marginal"</span></span>
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"Elapsed: %.1f s\n"</span>, <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/proc.time.html" class="external-link">proc.time</a></span><span class="op">(</span><span class="op">)</span> <span class="op">-</span> <span class="va">t0</span><span class="op">)</span><span class="op">[</span><span class="st">"elapsed"</span><span class="op">]</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Elapsed: 124.0 s</span></span></code></pre></div>
+<span><span class="co">#&gt; Elapsed: 145.7 s</span></span></code></pre></div>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Model summary</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
@@ -145,78 +144,80 @@
 <span><span class="co">#&gt; JointODE(longitudinal_formula = observed ~ biomarker + velocity +</span></span>
 <span><span class="co">#&gt;     x1 + x2 + (biomarker + velocity | id), survival_formula = Surv(time,</span></span>
 <span><span class="co">#&gt;     status) ~ w1 + w2, longitudinal_data = longitudinal_data,</span></span>
-<span><span class="co">#&gt;     survival_data = sim$data$survival_data, init = "marginal",</span></span>
-<span><span class="co">#&gt;     control = list(parallel = TRUE))</span></span>
+<span><span class="co">#&gt;     survival_data = sim$data$survival_data, init = "marginal")</span></span>
 <span><span class="co">#&gt;</span></span>
 <span><span class="co">#&gt; Data Descriptives:</span></span>
 <span><span class="co">#&gt; Longitudinal Process            Survival Process</span></span>
-<span><span class="co">#&gt; Number of Observations: 17350   Number of Events: 61 (30%)</span></span>
+<span><span class="co">#&gt; Number of Observations: 17319   Number of Events: 58 (29%)</span></span>
 <span><span class="co">#&gt; Number of Subjects: 200</span></span>
 <span><span class="co">#&gt;</span></span>
 <span><span class="co">#&gt;        AIC        BIC     logLik</span></span>
-<span><span class="co">#&gt; -39111.219 -39018.866  19583.609</span></span>
+<span><span class="co">#&gt; -28945.644 -28859.887  14498.822</span></span>
 <span><span class="co">#&gt;</span></span>
 <span><span class="co">#&gt; Coefficients:</span></span>
 <span><span class="co">#&gt; Longitudinal Process: Second-Order ODE Model</span></span>
-<span><span class="co">#&gt;             Estimate Std. Error  z value Pr(&gt;|z|)</span></span>
-<span><span class="co">#&gt; biomarker    -1.0774     0.0059 -181.456   &lt;2e-16 ***</span></span>
-<span><span class="co">#&gt; velocity     -0.8139     0.0047 -174.335   &lt;2e-16 ***</span></span>
-<span><span class="co">#&gt; (Intercept)  -0.0001     0.0009   -0.147    0.883</span></span>
-<span><span class="co">#&gt; x1            0.5386     0.0033  165.429   &lt;2e-16 ***</span></span>
-<span><span class="co">#&gt; x2           -0.4854     0.0029 -166.535   &lt;2e-16 ***</span></span>
+<span><span class="co">#&gt;               Estimate Std. Error  z value Pr(&gt;|z|)</span></span>
+<span><span class="co">#&gt; log_omega2      0.0867     0.0075   11.540   &lt;2e-16 ***</span></span>
+<span><span class="co">#&gt; log_2xi_omega  -0.1915     0.0200   -9.564   &lt;2e-16 ***</span></span>
+<span><span class="co">#&gt; (Intercept)    -0.0014     0.0015   -0.910    0.363</span></span>
+<span><span class="co">#&gt; x1              0.5475     0.0040  135.824   &lt;2e-16 ***</span></span>
+<span><span class="co">#&gt; x2             -0.4908     0.0037 -131.456   &lt;2e-16 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt;</span></span>
 <span><span class="co">#&gt; ODE System Characteristics:</span></span>
-<span><span class="co">#&gt;                    Estimate Std. Error z value Pr(&gt;|z|)</span></span>
-<span><span class="co">#&gt; T (period)           6.0534     0.0167   362.9   &lt;2e-16 ***</span></span>
-<span><span class="co">#&gt; xi (damping ratio)   0.3921     0.0018   216.6   &lt;2e-16 ***</span></span>
+<span><span class="co">#&gt;                           Estimate Std. Error z value Pr(&gt;|z|)</span></span>
+<span><span class="co">#&gt; omega (natural frequency)   1.0443     0.0039  266.18   &lt;2e-16 ***</span></span>
+<span><span class="co">#&gt; xi (damping ratio)          0.3953     0.0077   51.13   &lt;2e-16 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt;</span></span>
 <span><span class="co">#&gt; Survival Process: Proportional Hazards Model</span></span>
-<span><span class="co">#&gt;         Estimate Std. Error z value Pr(&gt;|z|)</span></span>
-<span><span class="co">#&gt; alpha_1   0.6792     0.1871   3.630 0.000284 ***</span></span>
-<span><span class="co">#&gt; alpha_2   1.9311     1.0118   1.909 0.056309 .</span></span>
-<span><span class="co">#&gt; w1        0.6767     0.1241   5.455 4.91e-08 ***</span></span>
-<span><span class="co">#&gt; w2       -1.3368     0.2857  -4.680 2.87e-06 ***</span></span>
+<span><span class="co">#&gt;          Estimate Std. Error z value Pr(&gt;|z|)</span></span>
+<span><span class="co">#&gt; value      0.9348     0.2147   4.354 1.34e-05 ***</span></span>
+<span><span class="co">#&gt; velocity   2.1078     0.6317   3.337 0.000848 ***</span></span>
+<span><span class="co">#&gt; w1         0.6991     0.1359   5.144 2.69e-07 ***</span></span>
+<span><span class="co">#&gt; w2        -0.9099     0.2766  -3.289 0.001006 **</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt;</span></span>
-<span><span class="co">#&gt; Baseline Hazard: B-spline with 6 basis functions</span></span>
-<span><span class="co">#&gt; (Coefficients range: [-6.456, -0.531] )</span></span>
+<span><span class="co">#&gt; Baseline Hazard: B-spline with 4 basis functions</span></span>
+<span><span class="co">#&gt; (Coefficients range: [-4.635, -2.483] )</span></span>
 <span><span class="co">#&gt;</span></span>
 <span><span class="co">#&gt; Initial State: Population Mean</span></span>
-<span><span class="co">#&gt;    Estimate Std. Error z value Pr(&gt;|z|)</span></span>
-<span><span class="co">#&gt; m0  -0.5073     0.0030 -171.13   &lt;2e-16 ***</span></span>
-<span><span class="co">#&gt; v0  -0.0941     0.0051  -18.32   &lt;2e-16 ***</span></span>
+<span><span class="co">#&gt;                   Estimate Std. Error z value Pr(&gt;|z|)</span></span>
+<span><span class="co">#&gt; initial_biomarker  -0.4988     0.0073  -68.73   &lt;2e-16 ***</span></span>
+<span><span class="co">#&gt; initial_velocity   -0.1002     0.0093  -10.77   &lt;2e-16 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt;</span></span>
 <span><span class="co">#&gt; Variance Components:</span></span>
-<span><span class="co">#&gt; Measurement Error SD: 0.098863</span></span>
+<span><span class="co">#&gt; Measurement Error SD: 0.099448 (SE: 0.000545)</span></span>
 <span><span class="co">#&gt; Random Effect Covariance Matrix:</span></span>
-<span><span class="co">#&gt;            [,1]       [,2]       [,3]      [,4]</span></span>
-<span><span class="co">#&gt; [1,]  0.0105661  0.0315126 -0.0003927 -0.002762</span></span>
-<span><span class="co">#&gt; [2,]  0.0315126  0.0949087 -0.0007375 -0.003633</span></span>
-<span><span class="co">#&gt; [3,] -0.0003927 -0.0007375  0.0005088  0.001521</span></span>
-<span><span class="co">#&gt; [4,] -0.0027615 -0.0036329  0.0015213  0.025505</span></span>
+<span><span class="co">#&gt;                   initial_biomarker initial_velocity log_omega2 log_2xi_omega</span></span>
+<span><span class="co">#&gt; initial_biomarker         0.0082210        0.0009966  0.0002002     0.0006619</span></span>
+<span><span class="co">#&gt; initial_velocity          0.0009966        0.0090838  0.0001854     0.0003816</span></span>
+<span><span class="co">#&gt; log_omega2                0.0002002        0.0001854  0.0016667    -0.0005260</span></span>
+<span><span class="co">#&gt; log_2xi_omega             0.0006619        0.0003816 -0.0005260     0.0499643</span></span>
 <span><span class="co">#&gt;</span></span>
 <span><span class="co">#&gt; Model Diagnostics:</span></span>
-<span><span class="co">#&gt; C-index (Concordance): 0.868</span></span>
-<span><span class="co">#&gt; Convergence: Converged after 8 iterations</span></span>
+<span><span class="co">#&gt; C-index (Concordance): 0.622</span></span>
+<span><span class="co">#&gt; Convergence: Converged (relative convergence (4))</span></span>
 <span></span>
 <span><span class="co"># Plot results</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span></code></pre></div>
 <p><img src="reference/figures/README-output-1.png" alt="" width="100%"></p>
-<p>The formula specifies:</p>
+<p>The formula uses two reserved keywords (not data columns):</p>
 <ul>
 <li>
-<strong>ODE terms</strong>: <code>biomarker</code> and <code>velocity</code> are the state variables (value and slope) in the ODE</li>
+<strong><code>biomarker</code></strong>: includes the frequency parameter <span class="math inline">\omega^2</span> in the ODE (<span class="math inline">b_1 m(t)</span> term)</li>
 <li>
-<strong>Covariates</strong>: <code>x1</code> and <code>x2</code> are external variables affecting the dynamics</li>
+<strong><code>velocity</code></strong>: includes the damping parameter <span class="math inline">2\xi\omega</span> in the ODE (<span class="math inline">b_2 \dot{m}(t)</span> term)</li>
 <li>
-<strong>Random effects</strong>: <code>(biomarker + velocity | id)</code> allows subject-specific coefficients on the ODE value and slope terms</li>
+<strong><code>(biomarker + velocity | id)</code></strong>: adds subject-specific multiplicative random effects on these ODE parameters</li>
+<li>
+<strong><code>x1</code>, <code>x2</code></strong>: standard covariates driving the forcing function <span class="math inline">f(t)</span>
+</li>
 </ul>
 </div>
 <div class="section level2">
@@ -285,7 +286,6 @@
 <h2 data-toc-skip>Developers</h2>
 <ul class="list-unstyled">
 <li>Ziyang Gong <br><small class="roles"> Author, maintainer </small>   </li>
-<li><a href="authors.html">More about authors...</a></li>
 </ul>
 </div>
 

@@ -7,14 +7,7 @@ X\beta\\
 ## Usage
 
 ``` r
-MarginalODE(
-  formula,
-  data,
-  time = "time",
-  id = "id",
-  state = NULL,
-  control = list()
-)
+MarginalODE(formula, data, time = "time", id = "id", control = list())
 ```
 
 ## Arguments
@@ -35,11 +28,6 @@ MarginalODE(
 
   Subject identifier name (default: `"id"`)
 
-- state:
-
-  Optional \\n \times 2\\ matrix of initial conditions \\\[m(0),
-  \dot{m}(0)\]\\. If `NULL`, estimated from data.
-
 - control:
 
   List of control parameters. See
@@ -55,8 +43,7 @@ S3 object of class `MarginalODE`
 if (FALSE) { # \dontrun{
 fit <- MarginalODE(
   formula = observed ~ x1 + x2,
-  data = sim$data$longitudinal_data,
-  state = as.matrix(sim$data$state)
+  data = sim$data$longitudinal_data
 )
 } # }
 ```

@@ -1,378 +1,325 @@
 # Technical Details
 
-This vignette describes the mathematical framework and computational
-implementation of the JointODE model, which jointly models longitudinal
-biomarker trajectories and survival outcomes through a coupled ordinary
-differential equation (ODE) system.
+## 1. Model Framework
 
-## Model Framework
+### 1.1 Longitudinal Sub-Model
 
-### Longitudinal Sub-Model
+Observed biomarker measurements for subject i at time T\_{ij}:
 
-The observed biomarker measurements are modeled as:
+V\_{ij} = m_i(T\_{ij}) + \varepsilon\_{ij}, \quad \varepsilon\_{ij} \sim
+\mathcal{N}(0, \sigma_e^2), \quad i = 1,\ldots,n, \quad j = 1,\ldots,n_i
 
-V\_{ij}=m_i(T\_{ij})+\varepsilon\_{ij},\quad i=1,\ldots,n,\quad
-j=1,\ldots,n_i
+The true trajectory m_i(t) satisfies a second-order linear ODE:
+
+\ddot{m}\_i(t) + 2\xi_i\omega_i\\\dot{m}\_i(t) + \omega_i^2\\m_i(t) =
+f_i(t)
+
+with initial conditions m_i(0) = m\_{0,i} and \dot{m}\_i(0) = v\_{0,i},
+where:
+
+- \omega_i \> 0: natural frequency (controls oscillation speed)
+- \xi_i \> 0: damping ratio (\xi \< 1: underdamped oscillation; \xi \>
+  1: overdamped monotonic decay; \xi = 1: critical damping)
+- f_i(t) = \boldsymbol{\beta}\_X^\top \mathbf{X}\_i(t): covariate-driven
+  forcing
+
+### 1.2 Parameterization and Random Effects
+
+Rewriting as \ddot{m}\_i(t) = b\_{1,i}\\m_i(t) +
+b\_{2,i}\\\dot{m}\_i(t) + f_i(t), the ODE coefficients are:
+
+b\_{1,i} = -\omega_i^2, \quad b\_{2,i} = -2\xi_i\omega_i
+
+Stability requires b\_{1,i} \< 0 and b\_{2,i} \< 0 (both eigenvalues of
+the characteristic equation have negative real parts). This is enforced
+through a log parameterization with multiplicative random effects:
+
+b\_{1,i} = -\exp(\theta_1 + u\_{1,i}), \quad b\_{2,i} = -\exp(\theta_2 +
+u\_{2,i})
+
+where \theta_1 = \log(\omega^2) and \theta_2 = \log(2\xi\omega) are
+population-level parameters, and u\_{1,i}, u\_{2,i} are zero-mean random
+effects. Since \exp(\cdot) \> 0, we have b\_{1,i} \< 0 and b\_{2,i} \< 0
+for all subjects regardless of random effect values. The multiplicative
+structure preserves the sign while allowing subject-specific variation:
+\omega_i^2 = \omega^2 e^{u\_{1,i}}.
+
+The complete random effects vector for subject i is:
+
+\mathbf{b}\_i = \begin{pmatrix} m\_{0,i} - \bar{m}\_0 \\ v\_{0,i} -
+\bar{v}\_0 \\ u\_{1,i} \\ u\_{2,i} \\ \vdots \end{pmatrix} \sim
+\mathcal{N}(\mathbf{0}, \boldsymbol{\Sigma}\_b)
+
+where the first two components capture initial-state heterogeneity
+(additive), followed by dynamics RE (multiplicative on log scale), and
+optional forcing RE.
+
+### 1.3 Survival Sub-Model
+
+The hazard function links the biomarker trajectory to event risk:
+
+\lambda_i(t) = \lambda_0(t)\\\exp\\\left\[\alpha\_\text{value}\\m_i(t) +
+\alpha\_\text{velocity}\\\dot{m}\_i^\gamma(t) +
+\mathbf{W}\_i^\top\boldsymbol{\phi}\right\]
 
 where:
 
-- V\_{ij}: Observed biomarker value for subject i at time T\_{ij}
-- m_i(t): True underlying biomarker trajectory
-- \varepsilon\_{ij}\sim\mathcal{N}(0,\sigma\_{e}^{2}): Measurement error
+- \lambda_0(t) = \exp\[\boldsymbol{\eta}^\top\mathbf{B}(t)\]: B-spline
+  baseline hazard with basis \mathbf{B}(t) and coefficients
+  \boldsymbol{\eta}
+- \gamma \in \\0, 1, 2\\: velocity power (0 = value only, 1 = linear
+  velocity, 2 = quadratic velocity)
+- \mathbf{W}\_i: baseline covariates with coefficients \boldsymbol{\phi}
 
-The evolution of biomarker trajectories is governed by a second-order
-linear differential equation, which captures the dynamic behavior of the
-system:
+The cumulative hazard \Lambda_i(t) = \int_0^t \lambda_i(s)\\ds is
+computed via composite Simpson’s rule.
 
-\ddot{m}\_i(t) + 2 \xi_i \omega_i \dot{m}\_i(t) + \omega_i^2 m_i(t) = k
-\omega_i^2 \mu_i(t),
+### 1.4 Joint Likelihood
 
-where \xi_i denotes the damping ratio, \omega_i represents the natural
-frequency, k serves as a scaling parameter, and \mu_i(t) characterizes
-the external input function driving the system.
+Assuming conditional independence of the longitudinal and survival
+processes given \mathbf{b}\_i, the joint likelihood for subject i is:
 
-To accommodate subject-specific heterogeneity and covariate effects, we
-reformulate the differential equation using a linear mixed-effects
-approach:
+L_i(\boldsymbol{\theta}) = \int \underbrace{p(\mathbf{V}\_i \mid
+\mathbf{b}\_i)}\_{\text{longitudinal}} \cdot \underbrace{p(T_i, \delta_i
+\mid \mathbf{b}\_i)}\_{\text{survival}} \cdot
+\underbrace{p(\mathbf{b}\_i)}\_{\text{prior}}\\d\mathbf{b}\_i
 
-\ddot{m}\_{i}(t) = (\beta\_{m} + b\_{i,m}) m\_{i}(t) +
-(\beta\_{\dot{m}} + b\_{i,\dot{m}}) \dot{m}\_{i}(t) +
-(\boldsymbol{\beta}\_{X} + \mathbf{b}\_{i,X})^{\top} \mathbf{X}\_i(t),
+with components:
 
-where \boldsymbol{\beta} = (\beta\_{m}, \beta\_{\dot{m}},
-\boldsymbol{\beta}\_{X}^{\top})^{\top} are fixed effects, \mathbf{b}\_i
-= (b\_{i,m}, b\_{i,\dot{m}}, \mathbf{b}\_{i,X}^{\top})^{\top} \sim
-\mathcal{N}(\mathbf{0}, \boldsymbol{\Sigma}\_b) are random effects, and
-\mathbf{X}\_i(t) are covariates. The parameters connect to the standard
-form via:
-
-\beta\_{m} + b\_{i,m} = -\omega_i^2, \quad \beta\_{\dot{m}} +
-b\_{i,\dot{m}} = -2\xi_i\omega_i, \quad (\boldsymbol{\beta}\_{X} +
-\mathbf{b}\_{i,X})^{\top} \mathbf{X}\_i(t) = k\omega_i^2\mu_i(t)
-
-yielding subject-specific dynamics: natural frequency \omega_i =
-\sqrt{-(\beta\_{m} + b\_{i,m})}, damping ratio \xi_i =
--\frac{\beta\_{\dot{m}} + b\_{i,\dot{m}}}{2\omega_i}, and external
-forcing k\mu_i(t) = \frac{(\boldsymbol{\beta}\_{X} +
-\mathbf{b}\_{i,X})^{\top} \mathbf{X}\_i(t)}{\omega_i^2}.
+\begin{aligned} p(\mathbf{V}\_i \mid \mathbf{b}\_i) &=
+\prod\_{j=1}^{n_i} \phi\\\left(V\_{ij};\\ m_i(T\_{ij} \mid
+\mathbf{b}\_i),\\ \sigma_e^2\right) \\ p(T_i, \delta_i \mid
+\mathbf{b}\_i) &= \lambda_i(T_i \mid
+\mathbf{b}\_i)^{\delta_i}\\\exp\\\left\[-\Lambda_i(T_i \mid
+\mathbf{b}\_i)\right\] \\ p(\mathbf{b}\_i) &= \mathcal{N}(\mathbf{0},
+\boldsymbol{\Sigma}\_b) \end{aligned}
 
-### Survival Sub-Model
-
-The hazard function incorporates the biomarker dynamics:
+where \boldsymbol{\theta} collects all fixed parameters:
+(\boldsymbol{\eta}, \alpha\_\text{value}, \alpha\_\text{velocity},
+\boldsymbol{\phi}, \theta_1, \theta_2, \boldsymbol{\beta}\_X,
+\bar{m}\_0, \bar{v}\_0, \sigma_e, \text{vech}(\boldsymbol{\Sigma}\_b)).
 
-\lambda_i(t) = \lambda\_{0}(t)\exp\left\[\alpha_1 m_i(t) + \alpha_2
-\dot{m}\_i^{\gamma}(t) +
-\mathbf{W}\_i(t)^{\top}\boldsymbol{\phi}\right\]
-
-where:
-
-- \lambda\_{0}(t): Baseline hazard function
-- \mathbf{W}\_i(t): Covariate vector (time-dependent or
-  time-independent) with regression coefficients \boldsymbol{\phi}
-- \gamma \in \\0, 1, 2\\: Power parameter for the velocity contribution,
-  where \gamma = 0 corresponds to no velocity effect (i.e., \alpha_2
-  term is excluded), \gamma = 1 yields linear velocity effect
-  \alpha_2\dot{m}\_i(t), and \gamma = 2 yields quadratic velocity effect
-  \alpha_2\[\dot{m}\_i(t)\]^2
-
-### ODE System
-
-The complete system couples the biomarker trajectory dynamics with the
-survival process. The state vector \mathbf{s}\_i(t) = (\Lambda_i(t),
-m_i(t), \dot{m}\_i(t))^{\top} evolves according to:
-
-\frac{d\mathbf{s}\_i}{dt} = \begin{pmatrix} \lambda_i(t) \\
-\dot{m}\_i(t) \\ \ddot{m}\_i(t) \end{pmatrix}
-
-with initial conditions \mathbf{s}\_i(0) = (0, m\_{i0},
-\dot{m}\_{i0})^{\top}, where m\_{i0} and \dot{m}\_{i0} are the initial
-biomarker value and velocity for subject i.
+## 2. ODE Solver
 
-### Model Parameterization
+### 2.1 Exact Solution via Cayley–Hamilton
 
-For parameter estimation, we specify the following parametric forms:
+The ODE \ddot{m} = b_1 m + b_2 \dot{m} + f with constant forcing over
+\[t, t{+}\Delta t\] has the exact solution:
 
-**Survival Hazard:** The log baseline hazard is modeled flexibly using
-B-splines:
-
-\log\lambda_0(t) = \boldsymbol{\eta}^{\top} \mathbf{B}^{(\lambda)}(t)
-
-where \mathbf{B}^{(\lambda)}(t) = \[B_1^{(\lambda)}(t), \ldots,
-B_q^{(\lambda)}(t)\]^{\top} is a B-spline basis with q basis functions,
-and \boldsymbol{\eta} \in \mathbb{R}^q are the corresponding
-coefficients.
-
-\lambda_i(t) = \exp\left\[\boldsymbol{\eta}^{\top}
-\mathbf{B}^{(\lambda)}(t) + \alpha_1 m_i(t) + \alpha_2
-\dot{m}\_i^{\gamma}(t) +
-\mathbf{W}\_i(t)^{\top}\boldsymbol{\phi}\right\]
-
-**Trajectory Dynamics:** For computational convenience, we express the
-differential equation in compact matrix form:
-
-\ddot{m}\_{i}(t) = \mathbf{Z}\_i(t)^{\top}(\boldsymbol{\beta} +
-\mathbf{b}\_i)
+\begin{pmatrix} m(t{+}\Delta t) \\ \dot{m}(t{+}\Delta t) \end{pmatrix} =
+\exp(A\Delta t) \begin{pmatrix} m(t) \\ \dot{m}(t) \end{pmatrix} +
+\int_0^{\Delta t} \exp(As)\\ds \begin{pmatrix} 0 \\ f \end{pmatrix}
 
-where \mathbf{Z}\_i(t) = \[m\_{i}(t), \dot{m}\_{i}(t),
-\mathbf{X}\_i(t)^{\top}\]^{\top} combines the state variables and
-covariates.
+where A = \bigl(\begin{smallmatrix} 0 & 1 \\ b_1 & b_2
+\end{smallmatrix}\bigr) is the companion matrix. By the Cayley–Hamilton
+theorem, for any 2 \times 2 matrix A with characteristic polynomial
+\lambda^2 - b_2\lambda - b_1 = 0, the matrix exponential can be written
+as \exp(A\Delta t) = a_0 I + a_1 A for scalar coefficients a_0, a_1.
+Expanding:
 
-## Parameter Estimation
-
-The model contains continuous random effects \mathbf{b}\_i \in
-\mathbb{R}^p as latent variables, necessitating the use of the
-Expectation-Maximization (EM) algorithm for maximum likelihood
-estimation.
-
-The marginal likelihood for subject i is obtained by integrating over
-the unobserved random effects:
-
-L_i(\boldsymbol{\theta}) = \int p(\mathbf{V}\_i \| \mathbf{b}\_i) \cdot
-p(T_i, \delta_i \| \mathbf{b}\_i) \cdot p(\mathbf{b}\_i) \\
-d\mathbf{b}\_i
-
-where \boldsymbol{\theta} = (\boldsymbol{\beta}, \boldsymbol{\eta},
-\boldsymbol{\phi}, \alpha_1, \alpha_2, \gamma, \sigma_e^2,
-\boldsymbol{\Sigma}\_b) includes all model parameters, with the
-following likelihood components:
-
-\begin{aligned} \text{Longitudinal:} \quad & p(\mathbf{V}\_i \|
-\mathbf{b}\_i) = \prod\_{j=1}^{n_i} \mathcal{N}(V\_{ij};
-m\_{i}(T\_{ij}\|\mathbf{b}\_i), \sigma_e^2) = (2\pi\sigma_e^2)^{-n_i/2}
-\exp\left\[-\frac{1}{2\sigma_e^2}\sum\_{j=1}^{n_i}\[V\_{ij} -
-m\_{i}(T\_{ij}\|\mathbf{b}\_i)\]^2\right\]\\ \text{Survival:} \quad &
-p(T_i, \delta_i \| \mathbf{b}\_i) =
-\[\lambda\_{i}(T_i\|\mathbf{b}\_i)\]^{\delta_i}
-\exp\[-\Lambda\_{i}(T_i\|\mathbf{b}\_i)\]\\ \text{Random Effects:} \quad
-& p(\mathbf{b}\_i) = \mathcal{N}(\mathbf{0}, \boldsymbol{\Sigma}\_b) =
-(2\pi)^{-p/2}\|\boldsymbol{\Sigma}\_b\|^{-1/2}\exp\left\[-\frac{1}{2}\mathbf{b}\_i^{\top}\boldsymbol{\Sigma}\_b^{-1}\mathbf{b}\_i\right\]
-\end{aligned}
-
-where m\_{i}(t\|\mathbf{b}\_i) denotes the trajectory solution with
-random effects \mathbf{b}\_i, and p = \dim(\mathbf{b}\_i) is the
-dimension of the random effects.
-
-### E-Step: AGHQ Posterior Approximation
-
-For each subject i, apply AGHQ to approximate p(\mathbf{b}\_i \|
-\mathcal{O}\_i, \boldsymbol{\theta}^{(t)}) where \mathcal{O}\_i =
-\\\mathbf{V}\_i, T_i, \delta_i\\. The joint log-density is:
-
-\begin{aligned} \log p(\mathcal{O}\_i, \mathbf{b}\_i) &=
--\frac{n_i}{2}\log(2\pi\sigma_e^2) -
-\frac{1}{2\sigma_e^2}\sum\_{j=1}^{n_i}\[V\_{ij} -
-m\_{i}(T\_{ij}\|\mathbf{b}\_i)\]^2 \\ &\quad +
-\delta_i\log\lambda\_{i}(T_i\|\mathbf{b}\_i) -
-\Lambda\_{i}(T_i\|\mathbf{b}\_i) \\ &\quad - \frac{p}{2}\log(2\pi) -
-\frac{1}{2}\log\|\boldsymbol{\Sigma}\_b\| -
-\frac{1}{2}\mathbf{b}\_i^{\top}\boldsymbol{\Sigma}\_b^{-1}\mathbf{b}\_i
-\end{aligned}
-
-AGHQ procedure:
-
-1.  Find mode: \hat{\mathbf{b}}\_i = \arg\max\_{\mathbf{b}\_i} \log
-    p(\mathcal{O}\_i, \mathbf{b}\_i)
-2.  Compute Hessian: \mathbf{H}\_i = -\nabla^2 \log p(\mathcal{O}\_i,
-    \mathbf{b}\_i)\big\|\_{\mathbf{b}\_i = \hat{\mathbf{b}}\_i}
-3.  Cholesky decomposition: \mathbf{H}\_i^{-1} = \mathbf{L}\_i
-    \mathbf{L}\_i^{\top}
-
-The **AGHQ marginal likelihood** is:
-
-\tilde{p}(\mathcal{O}\_i) = \|\mathbf{L}\_i\| \sum\_{k=1}^{K} \omega_k
-p(\mathcal{O}\_i, \mathbf{L}\_i \mathbf{x}\_k + \hat{\mathbf{b}}\_i)
-
-The **AGHQ posterior density** is:
-
-\tilde{p}(\mathbf{b}\_i \| \mathcal{O}\_i) = \frac{p(\mathcal{O}\_i,
-\mathbf{b}\_i)}{\tilde{p}(\mathcal{O}\_i)}
-
-### M-Step: Maximize Q-Function
-
-The Q-function is Q(\boldsymbol{\theta}) = \sum\_{i=1}^n
-\mathbb{E}\_{\mathbf{b}\_i \| \mathcal{O}\_i,
-\boldsymbol{\theta}^{(t)}}\[\ell_i(\mathbf{b}\_i; \boldsymbol{\theta})\]
-where \ell_i(\mathbf{b}; \boldsymbol{\theta}) = \log p(\mathcal{O}\_i,
-\mathbf{b} \| \boldsymbol{\theta}). Using AGHQ posterior approximation
-with nodes \mathbf{b}\_{ik} = \mathbf{L}\_i \mathbf{x}\_k +
-\hat{\mathbf{b}}\_i:
+\begin{pmatrix} m(t{+}\Delta t) \\ \dot{m}(t{+}\Delta t) \end{pmatrix} =
+\begin{pmatrix} a_0 & a_1 \\ b_1 a_1 & a_0 + b_2 a_1 \end{pmatrix}
+\begin{pmatrix} m(t) \\ \dot{m}(t) \end{pmatrix} + f \begin{pmatrix} J_1
+\\ a_1 \end{pmatrix}
 
-Q(\boldsymbol{\theta}) \approx \sum\_{i=1}^n \|\mathbf{L}\_i\|
-\sum\_{k=1}^{K} \omega_k \ell_i(\mathbf{b}\_{ik}; \boldsymbol{\theta})
-\tilde{p}(\mathbf{b}\_{ik} \| \mathcal{O}\_i, \boldsymbol{\theta}^{(t)})
+The forcing integrals are derived from the augmented 3 \times 3 system
+with state (m, \dot{m}, f)^\top: the position forcing integral is J_1 =
+(a_0 - 1)/b_1, and the velocity forcing term is simply f \cdot a_1
+(which can also be verified by differentiating the position solution).
 
-Since the AGHQ posterior is normalized, define weights \tilde{w}\_{ik} =
-\|\mathbf{L}\_i\| \omega_k \tilde{p}(\mathbf{b}\_{ik} \| \mathcal{O}\_i,
-\boldsymbol{\theta}^{(t)}). Using the definitions:
-
-\tilde{p}(\mathbf{b}\_{ik} \| \mathcal{O}\_i) = \frac{p(\mathcal{O}\_i,
-\mathbf{b}\_{ik})}{\tilde{p}(\mathcal{O}\_i)}, \quad
-\tilde{p}(\mathcal{O}\_i) = \|\mathbf{L}\_i\| \sum\_{j=1}^{K} \omega_j
-p(\mathcal{O}\_i, \mathbf{b}\_{ij})
-
-we obtain:
-
-\tilde{w}\_{ik} = \frac{\omega_k \exp\[\ell_i(\mathbf{b}\_{ik};
-\boldsymbol{\theta}^{(t)})\]}{\sum\_{j=1}^{K} \omega_j
-\exp\[\ell_i(\mathbf{b}\_{ij}; \boldsymbol{\theta}^{(t)})\]}
-
-where the Jacobian cancels. Thus:
-
-\boxed{Q(\boldsymbol{\theta}) \approx \sum\_{i=1}^n \sum\_{k=1}^{K}
-\tilde{w}\_{ik} \ell_i(\mathbf{b}\_{ik}; \boldsymbol{\theta})}
-
-where: \begin{aligned} \ell_i(\mathbf{b}\_{ik}; \boldsymbol{\theta}) &=
--\frac{n_i}{2}\log(2\pi\sigma_e^2) -
-\frac{1}{2\sigma_e^2}\sum\_{j=1}^{n_i}\[V\_{ij} -
-m\_{i}(T\_{ij}\|\mathbf{b}\_{ik})\]^2 \\ &\quad +
-\delta_i\log\lambda\_{i}(T_i\|\mathbf{b}\_{ik}) -
-\Lambda\_{i}(T_i\|\mathbf{b}\_{ik}) \\ &\quad - \frac{p}{2}\log(2\pi) -
-\frac{1}{2}\log\|\boldsymbol{\Sigma}\_b\| -
-\frac{1}{2}\mathbf{b}\_{ik}^{\top}\boldsymbol{\Sigma}\_b^{-1}\mathbf{b}\_{ik}
-\end{aligned}
-
-**Parameter updates**: Maximize Q(\boldsymbol{\theta}) via L-BFGS-B.
-Variance components have closed-form updates:
-
-\boxed{\sigma_e^2 = \frac{1}{N}\sum\_{i=1}^n \sum\_{k=1}^{K}
-\tilde{w}\_{ik} \sum\_{j=1}^{n_i} \[V\_{ij} -
-m\_{i}(T\_{ij}\|\mathbf{b}\_{ik})\]^2}
-
-\boxed{\boldsymbol{\Sigma}\_b = \frac{1}{n}\sum\_{i=1}^n
-\left\[\hat{\mathbf{b}}\_i\hat{\mathbf{b}}\_i^{\top} +
-\hat{\mathbf{V}}\_i\right\]}
-
-where N = \sum\_{i=1}^n n_i and \tilde{w}\_{ik} are the subject-specific
-normalized weights.
-
-## Inference
-
-### Standard Errors via SEM
-
-Standard errors are computed using the **Supplemented EM (SEM)
-algorithm**. Let M(\boldsymbol{\theta}) denote the EM operator mapping
-\boldsymbol{\theta} to \boldsymbol{\theta}^{(t+1)}. At convergence
-M(\hat{\boldsymbol{\theta}}) = \hat{\boldsymbol{\theta}}, the observed
-information matrix is:
-
-\mathcal{I}(\hat{\boldsymbol{\theta}}) =
-\mathcal{I}\_c(\hat{\boldsymbol{\theta}}) \left\[\mathbf{I} -
-\mathbf{D}M(\hat{\boldsymbol{\theta}})^{\top}\right\]^{-1}
-
-where \mathcal{I}\_c(\boldsymbol{\theta}) = -\nabla^2
-Q(\boldsymbol{\theta}) is the complete-data information, and
-\mathbf{D}M(\hat{\boldsymbol{\theta}}) is the Jacobian of the EM mapping
-computed numerically via finite differences. The variance-covariance
-matrix is \text{Var}(\hat{\boldsymbol{\theta}}) =
-\mathcal{I}(\hat{\boldsymbol{\theta}})^{-1}.
-
-### Dynamic Parameters
-
-We use the delta method to obtain standard errors for \omega_0 and
-\xi_0:
-
-\frac{\partial \omega_0}{\partial \beta\_{1}} =
--\frac{1}{2\sqrt{-\beta\_{1}}}, \quad \frac{\partial \omega_0}{\partial
-\beta\_{2}} = 0
-
-\frac{\partial \xi_0}{\partial \beta\_{1}} =
--\frac{\beta\_{2}}{4(-\beta\_{1})^{3/2}}, \quad \frac{\partial
-\xi_0}{\partial \beta\_{2}} = -\frac{1}{2\sqrt{-\beta\_{1}}}
-
-The variance-covariance matrix for (\omega_0, \xi_0) is:
-\text{Var}\begin{pmatrix}\omega_0 \\ \xi_0\end{pmatrix} = \mathbf{J}
-\text{Var}\begin{pmatrix}\beta\_{1} \\ \beta\_{2}\end{pmatrix}
-\mathbf{J}^{\top}
-
-where the Jacobian matrix is: \mathbf{J} = \begin{pmatrix}
-\frac{\partial \omega_0}{\partial \beta\_{1}} & \frac{\partial
-\omega_0}{\partial \beta\_{2}} \\ \frac{\partial \xi_0}{\partial
-\beta\_{1}} & \frac{\partial \xi_0}{\partial \beta\_{2}} \end{pmatrix}
-
-## Computational Implementation
-
-The gradient expressions above involve two types of sensitivities that
-must be computed numerically:
-
-### Cumulative Hazard Sensitivities
-
-The cumulative hazard function \Lambda\_{i}(T_i) depends on parameters
-through the instantaneous hazard. For parameters affecting the hazard
-directly, the sensitivities are computed as:
-
-\begin{aligned}
-\frac{\partial\Lambda\_{i}(T_i)}{\partial\boldsymbol{\eta}} &=
-\int\_{0}^{T_i}\lambda\_{i}(t)\mathbf{B}^{(\lambda)}(t)\\\mathrm{d}t\\
-\frac{\partial\Lambda\_{i}(T_i)}{\partial\alpha_1} &=
-\int\_{0}^{T_i}\lambda\_{i}(t)m\_{i}(t)\\\mathrm{d}t\\
-\frac{\partial\Lambda\_{i}(T_i)}{\partial\alpha_2} &=
-\int\_{0}^{T_i}\lambda\_{i}(t)\dot{m}\_{i}^{\gamma}(t)\\\mathrm{d}t\\
-\frac{\partial\Lambda\_{i}(T_i)}{\partial\boldsymbol{\phi}} &=
-\int\_{0}^{T_i}\lambda\_{i}(t)\mathbf{W}\_i(t)\\\mathrm{d}t
-\end{aligned}
-
-For parameters affecting the trajectory m\_{i}(t) through the ODE
-dynamics, the chain rule yields:
-
-\frac{\partial\Lambda\_{i}(T_i)}{\partial\boldsymbol{\beta}}=\int\_{0}^{T_i}\lambda\_{i}(t)\left\[\alpha_1\frac{\partial
-m\_{i}(t)}{\partial\boldsymbol{\beta}} + \alpha_2 \frac{\partial
-\dot{m}\_{i}^{\gamma}(t)}{\partial\boldsymbol{\beta}}\right\]\\\mathrm{d}t
-
-where the velocity term derivative depends on \gamma:
-
-\frac{\partial \dot{m}\_{i}^{\gamma}(t)}{\partial\boldsymbol{\beta}} =
-\begin{cases} 0, & \gamma = 0 \text{ (no velocity effect)} \\
-\frac{\partial \dot{m}\_{i}(t)}{\partial\boldsymbol{\beta}}, & \gamma =
-1 \text{ (linear velocity)} \\ 2\dot{m}\_{i}(t)\frac{\partial
-\dot{m}\_{i}(t)}{\partial\boldsymbol{\beta}}, & \gamma = 2 \text{
-(quadratic velocity)} \end{cases}
-
-### Trajectory Sensitivities
-
-The trajectory sensitivities with respect to parameters affecting the
-ODE system are computed through the chain rule. Since \ddot{m}\_{i}(t) =
-(\boldsymbol{\beta} + \hat{\mathbf{b}}\_i)^{\top} \mathbf{Z}\_{i}(t), we
-have:
-
-\frac{\partial \ddot{m}\_{i}(t)}{\partial \boldsymbol{\beta}} =
-\mathbf{Z}\_{i}(t) + (\boldsymbol{\beta} + \hat{\mathbf{b}}\_i)^{\top}
-\frac{\partial \mathbf{Z}\_{i}(t)}{\partial \boldsymbol{\beta}}
-
-where \mathbf{Z}\_{i}(t) = \[m\_{i}(t), \dot{m}\_{i}(t),
-\mathbf{X}\_i(t)^{\top}\]^{\top}.
-
-The trajectory sensitivities evolve as:
-
-\frac{\partial m\_{i}(t)}{\partial \boldsymbol{\beta}} = \int\_{0}^{t}
-\frac{\partial\dot{m}\_{i}(s)}{\partial \boldsymbol{\beta}}
-\\\mathrm{d}s,\quad \frac{\partial\dot{m}\_{i}(t)}{\partial
-\boldsymbol{\beta}} = \int\_{0}^{t} \frac{\partial
-\ddot{m}\_{i}(s)}{\partial \boldsymbol{\beta}} \\\mathrm{d}s
-
-### Numerical Methods
-
-Augment the ODE system with sensitivity equations with respect to
-\boldsymbol{\beta}:
-
-\frac{d}{dt}\begin{bmatrix} \Lambda\_{i}(t) \\ m\_{i} \\ \dot{m}\_{i} \\
-\frac{\partial \Lambda\_{i}(t)}{\partial \boldsymbol{\eta}} \\
-\frac{\partial \Lambda\_{i}(t)}{\partial \boldsymbol{\alpha}} \\
-\frac{\partial m\_{i}}{\partial \boldsymbol{\beta}} \\ \frac{\partial
-\dot{m}\_{i}}{\partial \boldsymbol{\beta}} \\ \frac{\partial
-\Lambda\_{i}(t)}{\partial \boldsymbol{\beta}} \end{bmatrix} =
-\begin{bmatrix} \lambda\_{i}(t) \\ \dot{m}\_{i}(t) \\
-(\boldsymbol{\beta} + \hat{\mathbf{b}}\_i)^{\top} \mathbf{Z}\_{i}(t) \\
-\lambda\_{i}(t)\mathbf{B}^{(\lambda)}(t) \\
-\lambda\_{i}(t)\begin{bmatrix}m\_{i}(t) \\
-\dot{m}\_{i}^{\gamma}(t)\end{bmatrix} \\ \frac{\partial
-\dot{m}\_{i}}{\partial \boldsymbol{\beta}} \\ \mathbf{Z}\_{i}(t) +
-(\boldsymbol{\beta} + \hat{\mathbf{b}}\_i)^{\top} \frac{\partial
-\mathbf{Z}\_{i}(t)}{\partial \boldsymbol{\beta}} \\ \lambda\_{i}(t)
-\left\[\alpha_1\frac{\partial m\_{i}}{\partial \boldsymbol{\beta}} +
-\alpha_2 \frac{\partial \dot{m}\_{i}^{\gamma}}{\partial
-\boldsymbol{\beta}}\right\] \end{bmatrix}
-
-where \mathbf{Z}\_{i}(t) = \[m\_{i}(t), \dot{m}\_{i}(t),
-\mathbf{X}\_i(t)^{\top}\]^{\top}, and the last component uses the
-piecewise derivative for \frac{\partial \dot{m}\_{i}^{\gamma}}{\partial
-\boldsymbol{\beta}} as defined above.
+The coefficients a_0, a_1 depend on the eigenvalue structure. Let \mu =
+b_2\Delta t/2 (half-trace), D = b_2^2 + 4b_1 (discriminant), and s^2 =
+D\Delta t^2/4:
+
+**Underdamped** (D \< 0, \xi \< 1): complex eigenvalues with damped
+frequency \omega_d = \sqrt{-s^2}.
+
+a_0 = e^{\mu}(\cos\omega_d - \mu\\\text{sinc}(\omega_d)), \quad a_1 =
+e^{\mu}\Delta t\\\text{sinc}(\omega_d)
+
+where \text{sinc}(x) = \sin(x)/x.
+
+**Overdamped** (D \> 0, \xi \> 1): two distinct real eigenvalues with
+\delta = \sqrt{s^2}.
+
+a_0 = e^{\mu}(\cosh\delta - \mu\\\text{sinhc}(\delta)), \quad a_1 =
+e^{\mu}\Delta t\\\text{sinhc}(\delta)
+
+where \text{sinhc}(x) = \sinh(x)/x.
+
+**Critically damped** (D = 0, \xi = 1): repeated eigenvalue.
+
+a_0 = e^{\mu}(1 - \mu), \quad a_1 = e^{\mu}\Delta t
+
+### 2.2 Numerical Stability for Automatic Differentiation
+
+The exact formulas above are mathematically equivalent but present
+numerical challenges for gradient-based optimization with automatic
+differentiation (AD):
+
+1.  **Branch discontinuity at D = 0**: The transition between \sin/\cos
+    and \sinh/\cosh branches involves \sqrt{\|D\|}, whose derivative
+    \frac{d}{dD}\sqrt{\|D\|} \to \infty as D \to 0. During optimization,
+    random effects can push individual D_i across zero, creating
+    gradient spikes that destabilize Newton’s method.
+
+2.  **Division by zero**: \text{sinc}(x) = \sin(x)/x and \text{sinhc}(x)
+    = \sinh(x)/x are removable singularities at x = 0, but naive
+    evaluation produces 0/0.
+
+3.  **AD tape evaluation**: AD frameworks evaluate both branches of a
+    conditional expression during the forward pass (selecting the result
+    via a smooth switch). The non-selected branch must remain finite to
+    avoid corrupting gradients.
+
+The implementation addresses these via a **three-way conditional** in
+s^2:
+
+**Taylor branch** (\|s^2\| \< \epsilon): Bypasses \sqrt{\cdot} entirely
+using the unified Taylor expansion. Since \text{sinc}(ix) =
+\text{sinhc}(x) (because \sin(ix)/(ix) = \sinh(x)/x), both branches
+share the same series in s^2:
+
+\text{Sc} \approx 1 + \frac{s^2}{6} + \frac{s^4}{120}, \quad \text{Cc}
+\approx 1 + \frac{s^2}{2} + \frac{s^4}{24}
+
+**Direct branches** (\|s^2\| \geq \epsilon): The \text{sinhc} and
+\text{sinc} functions guard against 0/0 by replacing the denominator
+with 1 when \|x\| \< \epsilon', so the non-selected branch evaluates to
+a finite value with finite gradient.
+
+**Forcing integral singularity**: J_1 = (a_0 - 1)/b_1 has a removable
+singularity at b_1 = 0. The limit \lim\_{b_1 \to 0} J_1 = \Delta
+t^2\\\text{expm1c2}(b_2\Delta t) where \text{expm1c2}(x) = (e^x - 1 -
+x)/x^2 is used as a Taylor fallback.
+
+### 2.3 Physical Stability Guarantee
+
+The log parameterization b_1 = -\exp(\theta_1), b_2 = -\exp(\theta_2)
+ensures b_1 \< 0 and b_2 \< 0 for all parameter values. This provides:
+
+- **Bounded trajectories**: Both eigenvalues have negative real parts
+  (underdamped: \text{Re}(\lambda) = b_2/2 \< 0; overdamped:
+  \lambda\_{1,2} \< 0 since \sqrt{D} \< \|b_2\|), so trajectories decay
+  rather than grow. The factor e^\mu = e^{b_2\Delta t/2} \< 1 prevents
+  overflow in the matrix exponential.
+- **Convex inner optimization**: With stable dynamics, the negative
+  log-likelihood as a function of random effects is unimodal, ensuring
+  the Laplace approximation (Section 3) is valid.
+- **Well-conditioned Hessian**: The inner Hessian eigenvalues remain
+  bounded, enabling fast Newton convergence for the random effects mode.
+
+## 3. Parameter Estimation
+
+### 3.1 Laplace Approximation
+
+The marginal log-likelihood \ell(\boldsymbol{\theta}) = \sum\_{i=1}^n
+\log L_i(\boldsymbol{\theta}) is intractable due to the random effects
+integral. We use the Laplace approximation:
+
+\log L_i(\boldsymbol{\theta}) \approx g_i(\boldsymbol{\theta},\\
+\hat{\mathbf{b}}\_i) +
+\frac{1}{2}\log\\\left\|2\pi\\\mathbf{H}\_i^{-1}\right\|
+
+where g_i(\boldsymbol{\theta}, \mathbf{b}) =
+\log\\\left\[p(\mathbf{V}\_i, T_i, \delta_i \mid \mathbf{b})\\
+p(\mathbf{b})\right\] is the joint log-density, \hat{\mathbf{b}}\_i =
+\arg\max\_{\mathbf{b}} g_i(\boldsymbol{\theta}, \mathbf{b}) is the
+posterior mode, and \mathbf{H}\_i = -\nabla^2\_{\mathbf{b}}
+g_i\big\|\_{\hat{\mathbf{b}}\_i} is the negative Hessian.
+
+### 3.2 Optimization
+
+Estimation proceeds as a nested optimization:
+
+1.  **Inner problem**: For given \boldsymbol{\theta}, find the posterior
+    modes \hat{\mathbf{b}}\_i(\boldsymbol{\theta}) via Newton’s method
+2.  **Outer problem**: Maximize the Laplace-approximated marginal
+    log-likelihood over \boldsymbol{\theta}
+
+The gradient of the outer objective is computed via the implicit
+function theorem: since \nabla\_{\mathbf{b}} g_i = \mathbf{0} at
+\hat{\mathbf{b}}\_i, the derivative
+d\hat{\mathbf{b}}\_i/d\boldsymbol{\theta} does not need to be computed
+explicitly. Automatic differentiation provides exact gradients through
+both the log-determinant correction and the joint log-density.
+
+### 3.3 Standard Errors
+
+The observed information matrix is obtained from the Hessian of the
+Laplace-approximated marginal log-likelihood. Standard errors for fixed
+effects \boldsymbol{\theta} are:
+
+\text{SE}(\hat{\theta}\_k) =
+\sqrt{\[\mathcal{I}(\hat{\boldsymbol{\theta}})^{-1}\]\_{kk}}
+
+### 3.4 Warm Start Strategy
+
+For models with dynamics random effects, a two-phase approach improves
+convergence:
+
+1.  **Phase 1**: Fit a reduced model without dynamics RE (only
+    initial-state RE). This converges quickly because the inner
+    optimization is low-dimensional.
+2.  **Phase 2**: Use Phase 1 estimates as starting values for the full
+    model. The inner Newton starts near the mode, accelerating
+    convergence.
+
+For the joint model, `MarginalODE` (longitudinal only) provides initial
+values, followed by time-dependent Cox regression for survival
+parameters.
+
+## 4. Derived Physical Parameters
+
+### 4.1 Point Estimates
+
+From the estimated log-scale parameters \hat\theta_1 and \hat\theta_2:
+
+\hat\omega = \exp(\hat\theta_1 / 2), \quad \hat\xi =
+\frac{1}{2}\exp(\hat\theta_2 - \hat\theta_1/2)
+
+The natural period is \hat{T} = 2\pi/\hat\omega.
+
+### 4.2 Standard Errors via Delta Method
+
+Let \mathbf{V} = \text{Var}(\hat\theta_1, \hat\theta_2) be the estimated
+covariance from the information matrix.
+
+**Natural frequency:**
+
+\frac{\partial\omega}{\partial\theta_1} = \frac{\omega}{2}, \quad
+\text{SE}(\hat\omega) = \frac{\hat\omega}{2}\sqrt{V\_{11}}
+
+**Damping ratio:**
+
+\frac{\partial\xi}{\partial\theta_1} = -\frac{\xi}{2}, \quad
+\frac{\partial\xi}{\partial\theta_2} = \xi
+
+\text{Var}(\hat\xi) = \frac{\hat\xi^2}{4}V\_{11} + \hat\xi^2 V\_{22} -
+\hat\xi^2 V\_{12}
+
+## 5. Computational Details
+
+### 5.1 Hazard Integration
+
+The cumulative hazard \Lambda_i(T_i) = \int_0^{T_i}\lambda_i(t)\\dt is
+approximated via composite Simpson’s rule. Each observation interval
+\[t_k, t\_{k+1}\] is subdivided into Q quadrature sub-intervals, with
+the ODE solved at midpoints and endpoints:
+
+\int\_{t_k}^{t\_{k+1}} \lambda_i(t)\\dt \approx \sum\_{q=1}^{Q}
+\frac{\Delta t_q}{6}\\\left\[\lambda_i^{(L)} + 4\lambda_i^{(M)} +
+\lambda_i^{(R)}\right\]
+
+### 5.2 Covariance Structure
+
+The random effects covariance \boldsymbol{\Sigma}\_b is parameterized
+via the log-Cholesky decomposition: \boldsymbol{\Sigma}\_b = D\\R\\D
+where D = \text{diag}(\exp(\boldsymbol{\sigma})) and R is a correlation
+matrix from an unconstrained vector. This ensures positive-definiteness.
+
+### 5.3 Parallel Computation
+
+The log-likelihood decomposes as \ell(\boldsymbol{\theta}) =
+\sum\_{i=1}^n \ell_i(\boldsymbol{\theta}), where each subject’s
+contribution is independent. This is parallelized across subjects.

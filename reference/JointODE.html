@@ -17,7 +17,7 @@ shared random effects and flexible hazard specifications."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">JointODE</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.2</small>
+    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Unreleased version">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -51,7 +51,7 @@ shared random effects and flexible hazard specifications."></head><body>
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Joint Modeling of Longitudinal and Survival Data Using ODEs</h1>
-      <small class="dont-index">Source: <a href="https://github.com/ziyangg98/JointODE/blob/main/R/JointODE.R" class="external-link"><code>R/JointODE.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/ziyangg98/JointODE/blob/HEAD/R/JointODE.R" class="external-link"><code>R/JointODE.R</code></a></small>
       <div class="d-none name"><code>JointODE.Rd</code></div>
     </div>
 
@@ -72,7 +72,7 @@ shared random effects and flexible hazard specifications.</p>
 <span>  <span class="va">longitudinal_data</span>,</span>
 <span>  <span class="va">survival_data</span>,</span>
 <span>  gamma <span class="op">=</span> <span class="fl">1</span>,</span>
-<span>  spline_baseline <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>degree <span class="op">=</span> <span class="fl">3</span>, n_knots <span class="op">=</span> <span class="fl">2</span>, knot_placement <span class="op">=</span> <span class="st">"equal"</span>,</span>
+<span>  spline_baseline <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>degree <span class="op">=</span> <span class="fl">2</span>, n_knots <span class="op">=</span> <span class="fl">1</span>, knot_placement <span class="op">=</span> <span class="st">"equal"</span>,</span>
 <span>    boundary_knots <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span>,</span>
 <span>  init <span class="op">=</span> <span class="st">"default"</span>,</span>
 <span>  control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -123,11 +123,11 @@ squared velocity. Default is 1 (default: 1).</p></dd>
 <dd><p>A list controlling the B-spline representation of the
 baseline hazard function with the following components:</p><dl><dt><code>degree</code></dt>
 <dd><p>Polynomial degree of the B-spline basis functions
-(default: 3, cubic splines)</p></dd>
+(default: 2, quadratic splines)</p></dd>
 
 <dt><code>n_knots</code></dt>
 <dd><p>Number of interior knots for flexibility
-(default: 2)</p></dd>
+(default: 1)</p></dd>
 
 <dt><code>knot_placement</code></dt>
 <dd><p>Strategy for positioning knots:
@@ -149,50 +149,12 @@ range of observed event times (default: <code>NULL</code>)</p></dd>
 data-driven initial estimates.</p></li>
 <li><p>A list with the same structure as the fitted model's
 <code>parameters</code> component for full manual control.</p></li>
-</ul><p>When providing a list, it should have elements:</p><dl><dt><code>coefficients</code></dt>
-<dd><p>A list containing:</p><ul><li><p><code>baseline</code>: Vector of B-spline coefficients for baseline
-hazard (length = number of spline basis functions)</p></li>
-<li><p><code>hazard</code>: Vector of hazard parameters including
-association parameters (2) and survival covariates</p></li>
-<li><p><code>longitudinal</code>: Vector of longitudinal fixed effects
-including intercept and covariates</p></li>
-<li><p><code>measurement_error_sd</code>: Residual standard deviation
-(positive scalar)</p></li>
-<li><p><code>random_effect_sigma</code>: Random effect covariance matrix
-(positive definite matrix)</p></li>
 </ul></dd>
-
-<dt><code>configurations</code></dt>
-<dd><p>Optional; if not provided, will use
-spline configuration from <code>spline_baseline</code></p></dd>
-
-
-</dl></dd>
 
 
 <dt id="arg-control">control<a class="anchor" aria-label="anchor" href="#arg-control"></a></dt>
 <dd><p>A list of control parameters for optimization, or output from
-<code><a href="JointODE.control.html">JointODE.control</a></code>. Key parameters include:</p><dl><dt><code>maxit</code></dt>
-<dd><p>Maximum number of EM iterations (default: 200)</p></dd>
-
-<dt><code>tol</code></dt>
-<dd><p>Convergence tolerance on max absolute
-parameter change (default: 1e-3)</p></dd>
-
-<dt><code>verbose</code></dt>
-<dd><p>Verbosity level: FALSE/0 for silent, TRUE/1 for
-progress messages, 2 for detailed output (default: FALSE)</p></dd>
-
-<dt><code>parallel</code></dt>
-<dd><p>Logical flag enabling parallel computation
-(default: FALSE)</p></dd>
-
-<dt><code>n_cores</code></dt>
-<dd><p>Number of CPU cores for parallel processing.
-If 0, automatically detects available cores (default: 0)</p></dd>
-
-
-</dl><p>See <code><a href="JointODE.control.html">JointODE.control</a></code> for complete details and examples.</p></dd>
+<code><a href="JointODE.control.html">JointODE.control</a></code>.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -202,109 +164,22 @@ If 0, automatically detects available cores (default: 0)</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>An S3 object of class <code>"JointODE"</code> containing fitted model
-results:</p><dl><dt><code>parameters</code></dt>
-<dd><p>A list containing all estimated parameters:</p><ul><li><p><code>coefficients</code>: Named list with <code>baseline</code> (B-spline
-coefficients for baseline hazard), <code>hazard</code> (association and
-survival covariate effects), <code>longitudinal</code> (longitudinal
-fixed effects), <code>measurement_error_sd</code> (residual standard
-deviation), and <code>random_effect_sigma</code> (random effect
-covariance matrix)</p></li>
-<li><p><code>configurations</code>: Model configuration including spline
-basis specifications</p></li>
-</ul></dd>
-
-<dt><code>logLik</code></dt>
-<dd><p>Maximum log-likelihood value achieved at
-convergence</p></dd>
-
-<dt><code>AIC</code></dt>
-<dd><p>Akaike Information Criterion for model comparison</p></dd>
-
-<dt><code>BIC</code></dt>
-<dd><p>Bayesian Information Criterion adjusted for sample
-size</p></dd>
-
-<dt><code>cindex</code></dt>
-<dd><p>Concordance index (C-index) measuring the model's
-discrimination ability for survival prediction</p></dd>
-
-<dt><code>convergence</code></dt>
-<dd><p>List containing convergence diagnostics:</p><ul><li><p><code>converged</code>: Logical indicating convergence status</p></li>
-<li><p><code>iterations</code>: Number of EM iterations performed</p></li>
-<li><p><code>message</code>: Descriptive convergence message</p></li>
-</ul></dd>
-
-<dt><code>random_effects</code></dt>
-<dd><p>Matrix of posterior mode random effects
-(n_subjects x n_re)</p></dd>
-
-<dt><code>data</code></dt>
-<dd><p>Processed data used for model fitting in internal
-format</p></dd>
-
-<dt><code>control</code></dt>
-<dd><p>List of control parameters used in optimization</p></dd>
-
-<dt><code>call</code></dt>
-<dd><p>The matched function call for reproducibility</p></dd>
-
-
-</dl></div>
-    <div class="section level2">
-    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>The joint modeling framework integrates longitudinal and survival processes
-through a shared random effects structure. The longitudinal biomarker
-evolution is characterized by a system of ODEs that can accommodate
-non-linear dynamics, feedback mechanisms, and complex temporal patterns.
-The survival component employs a proportional hazards model where the
-instantaneous risk depends on
-features derived from the longitudinal trajectory.</p>
-<p>Two association structures are supported:</p><ul><li><p>Current value: hazard depends on the biomarker level at time t</p></li>
-<li><p>Rate of change: hazard depends on the biomarker's instantaneous
-slope</p></li>
-</ul><p>Parameter estimation employs a Monte Carlo EM (MCEM) algorithm with:</p><ul><li><p>E-step: Laplace proposal plus importance sampling for posterior
-moments of random effects</p></li>
-<li><p>M-step: damped Newton step on the self-normalized
-importance-weighted objective</p></li>
-</ul></div>
+results.</p>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
-<span class="r-in"><span><span class="co"># Generate example data</span></span></span>
-<span class="r-in"><span><span class="va">sim</span> <span class="op">&lt;-</span> <span class="fu"><a href="simulate.html">simulate</a></span><span class="op">(</span>n_subjects <span class="op">=</span> <span class="fl">100</span>, n_measurements <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Fit with default control parameters</span></span></span>
-<span class="r-in"><span><span class="va">fit1</span> <span class="op">&lt;-</span> <span class="fu">JointODE</span><span class="op">(</span></span></span>
-<span class="r-in"><span>  longitudinal_formula <span class="op">=</span> <span class="va">observed</span> <span class="op">~</span> <span class="va">x1</span> <span class="op">+</span> <span class="va">x2</span>,</span></span>
-<span class="r-in"><span>  survival_formula <span class="op">=</span> <span class="fu"><a href="Surv.html">Surv</a></span><span class="op">(</span><span class="va">event_time</span>, <span class="va">event</span><span class="op">)</span> <span class="op">~</span> <span class="va">x1</span> <span class="op">+</span> <span class="va">x2</span>,</span></span>
-<span class="r-in"><span>  longitudinal_data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">longitudinal_data</span>,</span></span>
-<span class="r-in"><span>  survival_data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">survival_data</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">sim</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu">JointODE</span><span class="op">(</span></span></span>
+<span class="r-in"><span>  longitudinal_formula <span class="op">=</span> <span class="va">observed</span> <span class="op">~</span></span></span>
+<span class="r-in"><span>    <span class="va">biomarker</span> <span class="op">+</span> <span class="va">velocity</span> <span class="op">+</span> <span class="va">x1</span> <span class="op">+</span> <span class="va">x2</span> <span class="op">+</span> <span class="op">(</span><span class="va">biomarker</span> <span class="op">+</span> <span class="va">velocity</span> <span class="op">|</span> <span class="va">id</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  survival_formula <span class="op">=</span> <span class="fu"><a href="Surv.html">Surv</a></span><span class="op">(</span><span class="va">time</span>, <span class="va">status</span><span class="op">)</span> <span class="op">~</span> <span class="va">w1</span> <span class="op">+</span> <span class="va">w2</span>,</span></span>
+<span class="r-in"><span>  longitudinal_data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">data</span><span class="op">$</span><span class="va">longitudinal_data</span>,</span></span>
+<span class="r-in"><span>  survival_data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">data</span><span class="op">$</span><span class="va">survival_data</span>,</span></span>
+<span class="r-in"><span>  init <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">init</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Fit with custom control parameters using JointODE.control()</span></span></span>
-<span class="r-in"><span><span class="va">control</span> <span class="op">&lt;-</span> <span class="fu"><a href="JointODE.control.html">JointODE.control</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>  maxit <span class="op">=</span> <span class="fl">200</span>, tol <span class="op">=</span> <span class="fl">1e-4</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span></span></span>
-<span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">fit2</span> <span class="op">&lt;-</span> <span class="fu">JointODE</span><span class="op">(</span></span></span>
-<span class="r-in"><span>  longitudinal_formula <span class="op">=</span> <span class="va">observed</span> <span class="op">~</span> <span class="va">x1</span> <span class="op">+</span> <span class="va">x2</span>,</span></span>
-<span class="r-in"><span>  survival_formula <span class="op">=</span> <span class="fu"><a href="Surv.html">Surv</a></span><span class="op">(</span><span class="va">event_time</span>, <span class="va">event</span><span class="op">)</span> <span class="op">~</span> <span class="va">x1</span> <span class="op">+</span> <span class="va">x2</span>,</span></span>
-<span class="r-in"><span>  longitudinal_data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">longitudinal_data</span>,</span></span>
-<span class="r-in"><span>  survival_data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">survival_data</span>,</span></span>
-<span class="r-in"><span>  control <span class="op">=</span> <span class="va">control</span></span></span>
-<span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Fit with control parameters as a list</span></span></span>
-<span class="r-in"><span><span class="co"># By default, uses MarginalODE for initialization (init = NULL)</span></span></span>
-<span class="r-in"><span><span class="va">fit3</span> <span class="op">&lt;-</span> <span class="fu">JointODE</span><span class="op">(</span></span></span>
-<span class="r-in"><span>  longitudinal_formula <span class="op">=</span> <span class="va">observed</span> <span class="op">~</span> <span class="va">x1</span> <span class="op">+</span> <span class="va">x2</span>,</span></span>
-<span class="r-in"><span>  survival_formula <span class="op">=</span> <span class="fu"><a href="Surv.html">Surv</a></span><span class="op">(</span><span class="va">event_time</span>, <span class="va">event</span><span class="op">)</span> <span class="op">~</span> <span class="va">x1</span> <span class="op">+</span> <span class="va">x2</span>,</span></span>
-<span class="r-in"><span>  longitudinal_data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">longitudinal_data</span>,</span></span>
-<span class="r-in"><span>  survival_data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">survival_data</span>,</span></span>
-<span class="r-in"><span>  control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>maxit <span class="op">=</span> <span class="fl">50</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit1</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
@@ -328,4 +203,3 @@ importance-weighted objective</p></li>
 
 
   </body></html>
-

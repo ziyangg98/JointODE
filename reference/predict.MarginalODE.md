@@ -6,14 +6,7 @@ Predict Method for MarginalODE Objects
 
 ``` r
 # S3 method for class 'MarginalODE'
-predict(
-  object,
-  newdata = NULL,
-  times = NULL,
-  parallel = FALSE,
-  n_cores = 0,
-  ...
-)
+predict(object, newdata = NULL, times = NULL, ...)
 ```
 
 ## Arguments
@@ -29,14 +22,6 @@ predict(
 - times:
 
   Prediction times (NULL = observed)
-
-- parallel:
-
-  Logical for parallel computation
-
-- n_cores:
-
-  Number of cores (0 = auto)
 
 - ...:
 

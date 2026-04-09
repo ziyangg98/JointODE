@@ -4,22 +4,19 @@
 
 - **Ziyang Gong**. Author, maintainer.
 
-- **Bradley M. Bell**. Copyright holder.  
-  CppAD library author
-
 ## Citation
 
 Source:
-[`DESCRIPTION`](https://github.com/ziyangg98/JointODE/blob/main/DESCRIPTION)
+[`DESCRIPTION`](https://github.com/ziyangg98/JointODE/blob/HEAD/DESCRIPTION)
 
 Gong Z (2026). *JointODE: Joint Modeling of Longitudinal and Survival
-Data Using ODEs*. R package version 0.1.2,
+Data Using ODEs*. R package version 0.2.0,
 <https://github.com/ziyangg98/JointODE>.
 
     @Manual{,
       title = {JointODE: Joint Modeling of Longitudinal and Survival Data Using ODEs},
       author = {Ziyang Gong},
       year = {2026},
-      note = {R package version 0.1.2},
+      note = {R package version 0.2.0},
       url = {https://github.com/ziyangg98/JointODE},
     }

@@ -59,13 +59,13 @@ for modeling physiological processes.
 
 ### Theoretical Analysis
 
-| Damping           | Condition                       | Solution Form                                             | Behavior                          |
-|-------------------|---------------------------------|-----------------------------------------------------------|-----------------------------------|
-| Underdamped       | 0 \< \xi \< 1, \omega^2 \> 0    | e^{-\xi\omega t}\[A\cos(\omega_d t) + B\sin(\omega_d t)\] | Decaying oscillations             |
-| Critically damped | \xi = 1, \omega^2 \> 0          | (A + Bt)e^{-\omega t}                                     | Fastest decay without oscillation |
-| Overdamped        | \xi \> 1, \omega^2 \> 0         | Ae^{\lambda_1 t} + Be^{\lambda_2 t}                       | Slow exponential decay            |
-| Undamped          | \xi = 0, \omega^2 \> 0          | A\cos(\omega t) + B\sin(\omega t)                         | Sustained oscillations            |
-| Unstable          | \omega^2 \< 0 or \omega\xi \< 0 | Exponential growth                                        | System diverges                   |
+| Damping | Condition | Solution Form | Behavior |
+|----|----|----|----|
+| Underdamped | 0 \< \xi \< 1, \omega^2 \> 0 | e^{-\xi\omega t}\[A\cos(\omega_d t) + B\sin(\omega_d t)\] | Decaying oscillations |
+| Critically damped | \xi = 1, \omega^2 \> 0 | (A + Bt)e^{-\omega t} | Fastest decay without oscillation |
+| Overdamped | \xi \> 1, \omega^2 \> 0 | Ae^{\lambda_1 t} + Be^{\lambda_2 t} | Slow exponential decay |
+| Undamped | \xi = 0, \omega^2 \> 0 | A\cos(\omega t) + B\sin(\omega t) | Sustained oscillations |
+| Unstable | \omega^2 \< 0 or \omega\xi \< 0 | Exponential growth | System diverges |
 
 where:
 

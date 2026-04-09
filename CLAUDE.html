@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="index.html">JointODE</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.2</small>
+    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Unreleased version">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -41,7 +41,7 @@
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>CLAUDE.md</h1>
-      <small class="dont-index">Source: <a href="https://github.com/ziyangg98/JointODE/blob/main/CLAUDE.md" class="external-link"><code>CLAUDE.md</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/ziyangg98/JointODE/blob/HEAD/CLAUDE.md" class="external-link"><code>CLAUDE.md</code></a></small>
     </div>
 
 <div id="claudemd" class="section level1">
@@ -49,123 +49,123 @@
 <p>This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.</p>
 <div class="section level2">
 <h2 id="what-is-jointode">What is JointODE<a class="anchor" aria-label="anchor" href="#what-is-jointode"></a></h2>
-<p>An R package for joint modeling of longitudinal biomarker trajectories and time-to-event outcomes using ODEs. Biomarker dynamics follow a second-order linear ODE solved via matrix exponential (Cayley-Hamilton, not Runge-Kutta), linked to a Cox proportional hazards model with B-spline baseline hazard. Estimation uses an EM algorithm with CppAD automatic differentiation.</p>
+<p>An R package for joint modeling of longitudinal biomarker trajectories and time-to-event outcomes using ODEs. Biomarker dynamics follow a second-order linear ODE solved via matrix exponential (Cayley-Hamilton), linked to a Cox proportional hazards model with B-spline baseline hazard. Estimation uses TMB (Template Model Builder) for automatic differentiation and Laplace approximation of random effects.</p>
 </div>
 <div class="section level2">
 <h2 id="build--test-commands">Build &amp; Test Commands<a class="anchor" aria-label="anchor" href="#build--test-commands"></a></h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co"># Full R CMD check (includes build, tests, examples, vignettes)</span></span>
+<div class="sourceCode" id="cb1"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co"># Full R CMD check</span></span>
 <span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="ex">R</span> CMD check .</span>
 <span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a></span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="co"># Build and install</span></span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="ex">R</span> CMD INSTALL .</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="co"># Rebuild C++ and install (fast iteration)</span></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="ex">R</span> CMD INSTALL <span class="at">--no-docs</span> <span class="at">--no-multiarch</span> .</span>
 <span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a></span>
-<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="co"># Run all tests</span></span>
-<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'testthat::test_local()'</span></span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="co"># Clean rebuild (after C++ header changes)</span></span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="fu">rm</span> <span class="at">-f</span> src/<span class="pp">*</span>.o <span class="kw">&amp;&amp;</span> <span class="ex">R</span> CMD INSTALL .</span>
 <span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a></span>
-<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a><span class="co"># Run a single test file</span></span>
-<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'testthat::test_file("tests/testthat/test-ode.R")'</span></span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a><span class="co"># Run all tests</span></span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'testthat::test_local()'</span></span>
 <span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a></span>
-<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a><span class="co"># Regenerate Rcpp exports after changing C++ [[Rcpp::export]] functions</span></span>
-<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a><span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'Rcpp::compileAttributes()'</span></span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a><span class="co"># Run a single test file</span></span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a><span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'testthat::test_file("tests/testthat/test-fit.R")'</span></span>
 <span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a></span>
 <span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a><span class="co"># Regenerate roxygen docs and NAMESPACE</span></span>
 <span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a><span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'roxygen2::roxygenise()'</span></span>
 <span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a></span>
-<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a><span class="co"># Rebuild C++ only (faster iteration)</span></span>
-<span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a><span class="ex">R</span> CMD INSTALL <span class="at">--no-docs</span> <span class="at">--no-multiarch</span> .</span></code></pre></div>
+<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a><span class="co"># Build pkgdown site</span></span>
+<span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a><span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'pkgdown::build_site()'</span></span>
+<span id="cb1-21"><a href="#cb1-21" tabindex="-1"></a></span>
+<span id="cb1-22"><a href="#cb1-22" tabindex="-1"></a><span class="co"># Build README from README.Rmd</span></span>
+<span id="cb1-23"><a href="#cb1-23" tabindex="-1"></a><span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'devtools::build_readme()'</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="architecture">Architecture<a class="anchor" aria-label="anchor" href="#architecture"></a></h2>
 <div class="section level3">
-<h3 id="em-algorithm-flow-r-side">EM Algorithm Flow (R side)<a class="anchor" aria-label="anchor" href="#em-algorithm-flow-r-side"></a></h3>
-<p><code><a href="reference/JointODE.html">JointODE()</a></code> in <code>R/JointODE.R</code> is the main entry point. It runs a PQL-ECM loop:</p>
+<h3 id="tmb-estimation-flow">TMB Estimation Flow<a class="anchor" aria-label="anchor" href="#tmb-estimation-flow"></a></h3>
+<p><code><a href="reference/JointODE.html">JointODE()</a></code> in <code>R/JointODE.R</code> is the main entry point:</p>
 <ol style="list-style-type: decimal"><li>
-<strong>E-step</strong> (<code>R/posterior.R</code>): For each subject, find posterior mode of random effects via Laplace approximation (<code>nlm</code>). Calls <code>.compute_joint_logpost()</code> (C++). Uses <code>.safe_chol()</code> (Gill-Murray) when the posterior Hessian is not positive definite.</li>
+<strong>Parse &amp; validate</strong> — Formula parsing (<code>.parse_longitudinal_formula</code>, <code>.parse_survival_formula</code> in <code>R/utils.R</code>), input validation (<code>R/validate.R</code>)</li>
 <li>
-<strong>M-step</strong> (<code>R/posterior.R</code>): Trust region optimization (<code>trust::trust</code>) of Laplace marginal likelihood. The C++ objective (<code>compute_joint_objective</code>) includes <code>-0.5·log|H_z(θ)|</code> via nested AD (<code>AD&lt;AD&lt;double&gt;&gt;</code>). Fixed effects θ = [baseline, hazard, longitudinal, initial_state]; σ_e and Σ_b are fixed during M-step.</li>
+<strong>Data processing</strong> (<code>R/process.R</code>) — Build per-subject data lists, pack into flat TMB input vectors</li>
 <li>
-<strong>Variance updates</strong> (<code>R/posterior.R</code>): Laplace-corrected closed form — Σ_b = (1/n)Σ(b̂b̂ᵀ + H_z⁻¹), σ_e = sqrt(RSS/N).</li>
+<strong>Model setup</strong> (<code>R/setup.R</code>) — Compute dimensions, spline config, coefficient names, RE layout</li>
 <li>
-<strong>SEM vcov</strong> (<code>R/posterior.R</code>): Post-convergence variance-covariance via supplemented EM (Louis formula). Numerical Jacobian of EM map.</li>
+<strong>Initialization</strong> (<code>R/initial.R</code>) — Either <code>init = "marginal"</code> (fits MarginalODE → time-dependent Cox → Weibull baseline) or user-provided parameters</li>
+<li>
+<strong>TMB optimization</strong> — <code>MakeADFun(random = "random_effects", normalize = TRUE)</code> + <code>nlminb</code> with Laplace approximation</li>
+<li>
+<strong>Result extraction</strong> (<code>R/finalize.R</code>) — <code>sdreport</code>, C-index, vcov, convergence</li>
 </ol></div>
+<div class="section level3">
+<h3 id="marginalode-warm-start">MarginalODE Warm Start<a class="anchor" aria-label="anchor" href="#marginalode-warm-start"></a></h3>
+<p>When <code><a href="reference/MarginalODE.html">MarginalODE()</a></code> has dynamics RE (<code>biomarker + velocity | id</code>), it uses two-phase fitting: - <strong>Phase 1</strong>: Fit reduced model (no dynamics RE) — fast, inner Newton converges quickly - <strong>Phase 2</strong>: Fit full model using Phase 1 estimates as starting values — inner Newton starts near mode</p>
+<p>This is implemented in <code>.warm_start_marginal()</code> in <code>R/initial.R</code>. The same warm start is used by <code>.initialize_from_marginal()</code> for JointODE.</p>
+</div>
 <div class="section level3">
 <h3 id="c-layer-src">C++ Layer (<code>src/</code>)<a class="anchor" aria-label="anchor" href="#c-layer-src"></a></h3>
 <ul><li>
-<strong><code>solver.h</code></strong> — Header-only: all shared logic including <code>SubjectData</code>/<code>ODEParams</code> structs, ODE solver (<code>ode_step</code>, <code>ode_solve_joint</code>, <code>ode_solve_marginal</code>), joint/marginal log-likelihood, B-spline basis, AD tape evaluation (<code>eval_tape</code>), and log-linear hazard integration.</li>
+<strong><code>src/include/utils.hpp</code></strong> — Shared: ODE solver (<code>ode_step</code> template, works with both AD and double via CondExp dispatch), B-spline basis (double only), hazard evaluation, time grid utilities, safe math (<code>safe_exp</code>, <code>clamp</code>, <code>safe_sqrt</code>)</li>
 <li>
-<strong><code>exports.cpp</code></strong> — 7 <code>Rcpp::export</code> functions: <code>compute_joint_objective</code> (M-step, AD over theta), <code>compute_joint_logpost</code> (E-step, AD over b), <code>compute_joint_state</code> (state opt, AD over initial states), <code>solve_batch_joint</code> (prediction, no AD), <code>compute_marginal_objective</code>, <code>compute_marginal_state</code>, <code>solve_batch_marginal</code>.</li>
+<strong><code>src/include/joint.hpp</code></strong> — Joint model TMB template: longitudinal + survival likelihood with Simpson’s rule hazard integration</li>
 <li>
-<strong><code>cppad_stub.cpp</code></strong> — Minimal CppAD compilation unit required for linking.</li>
-</ul><p>CppAD headers are vendored in <code>inst/include/cppad/</code> and included via <code>PKG_CPPFLAGS = -I../inst/include</code> in <code>src/Makevars</code>.</p>
-<p>Three AD tapes share the same ODE solver and likelihood code; they differ only in <strong>which variable is the AD independent variable</strong>. A fourth nested AD tape (<code>AD&lt;AD&lt;double&gt;&gt;</code>) computes the Laplace correction: inner tape over b yields H_z as <code>AD&lt;double&gt;</code> values tracked by the outer theta tape, enabling exact gradient propagation of -0.5·log|H_z(θ)| through <code>CppAD::LuSolve</code>.</p>
+<strong><code>src/include/marginal.hpp</code></strong> — Marginal (longitudinal-only) TMB template</li>
+<li>
+<strong><code>src/TMB/JointODE.hpp</code></strong> — Dispatch: <code>model_type == 1</code> → marginal, else → joint</li>
+</ul></div>
+<div class="section level3">
+<h3 id="ode-solver">ODE Solver<a class="anchor" aria-label="anchor" href="#ode-solver"></a></h3>
+<p>Solved analytically via Cayley-Hamilton: exp(A·dt) decomposed using discriminant of characteristic equation. Uses <code>CppAD::CondExpGt</code> to select between REAL (D&gt;0) and COMPLEX (D&lt;0) branches without breaking the AD tape — both branches are always computed, selected via CondExp. This enables AD through branch changes when dynamics RE modify eigenvalues during optimization.</p>
 </div>
 <div class="section level3">
-<h3 id="ode-solver-matrix-exponential">ODE Solver: Matrix Exponential<a class="anchor" aria-label="anchor" href="#ode-solver-matrix-exponential"></a></h3>
-<p>The ODE is solved analytically via Cayley-Hamilton decomposition of exp(A*dt), with 5 branches based on discriminant of the characteristic equation (<code>REAL</code>, <code>COMPLEX</code>, <code>REPEATED</code>, <code>FIRST_ORD</code>, <code>ZERO</code>). Branch classification happens <strong>before</strong> <code>CppAD::Independent()</code> using double values — this is critical for correct AD taping. Biomarker/velocity values are clamped after each step to prevent overflow (data-adaptive clamp = 5x max observed value).</p>
-</div>
-<div class="section level3">
-<h3 id="hazard-integration">Hazard Integration<a class="anchor" aria-label="anchor" href="#hazard-integration"></a></h3>
-<p>Composite Simpson’s rule over configurable sub-intervals (<code>hazard_quadrature</code> control parameter) for cumulative hazard integration within each ODE time step.</p>
+<h3 id="r-side-prediction">R-side Prediction<a class="anchor" aria-label="anchor" href="#r-side-prediction"></a></h3>
+<p><code><a href="reference/predict.JointODE.html">predict.JointODE()</a></code> and <code><a href="reference/predict.MarginalODE.html">predict.MarginalODE()</a></code> use pure R implementations (<code>.predict_trajectories</code>, <code>.predict_marginal_trajectories</code> in <code>R/utils.R</code>) with a 5-branch if/else ODE solver (<code>.ode_step_r</code>). No AD overhead. Supports custom time grids and per-subject observation times.</p>
 </div>
 <div class="section level3">
 <h3 id="key-r-modules">Key R Modules<a class="anchor" aria-label="anchor" href="#key-r-modules"></a></h3>
 <ul><li>
-<code>R/posterior.R</code> — E-step (Laplace), M-step (trust region + nested AD Laplace correction), SEM vcov</li>
+<code>R/JointODE.R</code> — Main entry + S3 methods (summary, coef, vcov, logLik, predict, print)</li>
 <li>
-<code>R/utils.R</code> — Formula parsing, <code>.safe_chol</code> (Gill-Murray), parameter conversion, convergence tracking</li>
+<code>R/MarginalODE.R</code> — Longitudinal-only model + S3 methods</li>
 <li>
-<code>R/process.R</code> — Data preprocessing: parses formulas, builds per-subject data lists for C++</li>
+<code>R/process.R</code> — Data processing, TMB data/param packing, <code>.pack_correlation_theta()</code> helper</li>
 <li>
-<code>R/initial.R</code> — Default parameter construction and <code>MarginalODE</code>-based initial value computation</li>
+<code>R/setup.R</code> — <code>.setup_model()</code>, <code>.setup_marginal_model()</code> for dimensions and config</li>
 <li>
-<code>R/finalize.R</code> — Post-convergence: C-index, AIC/BIC, SEM vcov call</li>
+<code>R/initial.R</code> — <code>.default_parameters()</code>, <code>.initialize_from_marginal()</code>, <code>.warm_start_marginal()</code>
+</li>
 <li>
-<code>R/control.R</code> — <code><a href="reference/JointODE.control.html">JointODE.control()</a></code> / <code><a href="reference/MarginalODE.control.html">MarginalODE.control()</a></code> for algorithm settings</li>
+<code>R/finalize.R</code> — <code>.finalize_joint()</code>, <code>.finalize_marginal()</code> for TMB result extraction</li>
+<li>
+<code>R/utils.R</code> — Formula parsing, constants, prediction helpers, <code>.build_counting_process()</code>
+</li>
+<li>
+<code>R/control.R</code> — <code><a href="reference/JointODE.control.html">JointODE.control()</a></code> / <code><a href="reference/MarginalODE.control.html">MarginalODE.control()</a></code>
+</li>
 <li>
 <code>R/validate.R</code> — Input validation</li>
 <li>
-<code>R/MarginalODE.R</code> — Longitudinal-only model (no survival)</li>
+<code>R/simulate.R</code> — <code>simulate.JointODE()</code> with physical parameterization (damping ratio, period)</li>
 <li>
-<code>R/state.R</code> — Per-subject initial state optimization via <code>nlm</code>
-</li>
-<li>
-<code>R/simulate.R</code> — <code>simulate.JointODE()</code> data generation with physical parameterization (damping ratio, period)</li>
-<li>
-<code>R/plot.R</code> — <code><a href="reference/plot.JointODE.html">plot.JointODE()</a></code> diagnostic plots (trajectories, survival, residuals)</li>
+<code>R/plot.R</code> — <code><a href="reference/plot.JointODE.html">plot.JointODE()</a></code> diagnostic plots</li>
 </ul></div>
 <div class="section level3">
 <h3 id="test-data-sim-dataset">Test Data: <code>sim</code> Dataset<a class="anchor" aria-label="anchor" href="#test-data-sim-dataset"></a></h3>
-<p>Tests use the bundled <code>sim</code> dataset (<code>data/sim.rda</code>), structured as: - <code>sim$data$longitudinal_data</code> — data frame with columns: id, time, biomarker, velocity, observed, x1, x2 - <code>sim$data$survival_data</code> — data frame with columns: id, time, status, w1, w2 - <code>sim$data$state</code> — matrix (n x 2): initial biomarker and velocity per subject - <code>sim$data$random_effects</code> — matrix (n x 2): dyn_value, dyn_slope random effects - <code>sim$init</code> — initial parameter list with <code>$coefficients</code> and <code>$configurations</code>, suitable for direct use in model fitting and test helpers</p>
+<p>Tests use the bundled <code>sim</code> dataset (<code>data/sim.rda</code>): - <code>sim$data$longitudinal_data</code> — columns: id, time, biomarker, velocity, observed, x1, x2 - <code>sim$data$survival_data</code> — columns: id, time, status, w1, w2 - <code>sim$data$random_effects</code> — matrix (n × 4): init_biomarker, init_velocity, dyn_biomarker, dyn_velocity - <code>sim$init</code> — initial parameter list for direct use in <code>JointODE(init = sim$init)</code></p>
+<p>Note: <code>longitudinal_data</code> has reserved column names (<code>biomarker</code>, <code>velocity</code>). When passing to <code><a href="reference/JointODE.html">JointODE()</a></code>, filter these out: <code>ld[, c("id", "time", "observed", "x1", "x2")]</code></p>
 </div>
 </div>
 <div class="section level2">
 <h2 id="conventions">Conventions<a class="anchor" aria-label="anchor" href="#conventions"></a></h2>
-<ul><li>Commit messages: English with emoji prefix (e.g., <code>refactor:</code>, <code>fix:</code>, <code>feat:</code>)</li>
-<li>C++ uses CppAD for AD and RcppArmadillo for linear algebra; <code>LinkingTo: Rcpp, RcppArmadillo</code>
+<ul><li>Commit messages: English with prefix (e.g., <code>refactor:</code>, <code>fix:</code>, <code>feat:</code>)</li>
+<li>C++ uses TMB for AD; <code>LinkingTo: RcppEigen, TMB</code>
 </li>
 <li>Errors must <code><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop()</a></code> directly — never use <code>tryCatch</code> to silently fall back, <code>suppressWarnings</code>, <code>ginv</code>, or silent guards. Fix root causes in C++ when possible.</li>
-<li>testthat edition 3; test helpers in <code>tests/testthat/helper-*.R</code>
+<li>testthat edition 3; test helpers in <code>tests/testthat/helper.R</code>
 </li>
-<li>Tests rely on the bundled <code>sim</code> dataset (<code>data/sim.rda</code>) for processed data, initial parameters, and random effects</li>
-<li>Ad-hoc test scripts (PBC, sim benchmarks) go in <code>scripts/</code>, not <code>tests/</code>
+<li>Tests rely on the bundled <code>sim</code> dataset</li>
+<li>Ad-hoc test scripts go in <code>scripts/</code>, not <code>tests/</code>
 </li>
+<li>Verbose levels: 0 = silent, 1 = progress, 2 = outer iterations, 3 = inner Newton detail</li>
 </ul></div>
-<div class="section level2">
-<h2 id="performance-baseline">Performance Baseline<a class="anchor" aria-label="anchor" href="#performance-baseline"></a></h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Generate baseline CSV (sequential + optional parallel)</span></span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="ex">Rscript</span> scripts/perf-baseline.R <span class="at">--n</span><span class="op">=</span>20 <span class="at">--reps</span><span class="op">=</span>3 <span class="at">--maxit</span><span class="op">=</span>10 <span class="at">--tol</span><span class="op">=</span>1e-2 <span class="at">--out</span><span class="op">=</span>perf-base.csv</span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co"># Generate candidate CSV after code changes</span></span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="ex">Rscript</span> scripts/perf-baseline.R <span class="at">--n</span><span class="op">=</span>20 <span class="at">--reps</span><span class="op">=</span>3 <span class="at">--maxit</span><span class="op">=</span>10 <span class="at">--tol</span><span class="op">=</span>1e-2 <span class="at">--out</span><span class="op">=</span>perf-new.csv</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co"># Compare elapsed_mean; fail if slowdown &gt; 10%</span></span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="ex">Rscript</span> scripts/perf-compare.R <span class="at">--base</span><span class="op">=</span>perf-base.csv <span class="at">--new</span><span class="op">=</span>perf-new.csv <span class="at">--metric</span><span class="op">=</span>elapsed_mean <span class="at">--fail_pct</span><span class="op">=</span>10</span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="formula-syntax">Formula Syntax<a class="anchor" aria-label="anchor" href="#formula-syntax"></a></h2>
-<p><code>longitudinal_formula</code>: <code>observed ~ biomarker + velocity + x1 + x2 + (biomarker + velocity | id)</code> - <code>biomarker</code> and <code>velocity</code> are reserved names for ODE state variables (value and slope) - Other terms (<code>x1</code>, <code>x2</code>) are external covariates affecting the forcing function - <code>(biomarker + velocity | id)</code> specifies subject-specific random effects on ODE coefficients</p>
-<p><code>survival_formula</code>: <code>Surv(time, status) ~ w1 + w2</code> — standard Cox-style formula</p>
-</div>
 </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
@@ -187,4 +187,3 @@
 
 
   </body></html>
-

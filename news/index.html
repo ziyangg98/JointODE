@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">JointODE</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.2</small>
+    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Unreleased version">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -41,9 +41,20 @@
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Changelog</h1>
-      <small>Source: <a href="https://github.com/ziyangg98/JointODE/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
+      <small>Source: <a href="https://github.com/ziyangg98/JointODE/blob/HEAD/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.2.0" id="jointode-020">JointODE 0.2.0<a class="anchor" aria-label="anchor" href="#jointode-020"></a></h2>
+<ul><li>Migrated estimation from EM algorithm to TMB Laplace approximation (~20x faster)</li>
+<li>Two-phase warm start for subject-specific ODE dynamics random effects</li>
+<li>
+<code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> supports custom time grids and new subjects</li>
+<li>Time-dependent Cox model for hazard initialization</li>
+<li>ODE period and damping ratio in <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>
+</li>
+<li>PBC vignette with real data analysis</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.1.2" id="jointode-012">JointODE 0.1.2<a class="anchor" aria-label="anchor" href="#jointode-012"></a></h2>
 <div class="section level3">
@@ -143,4 +154,3 @@
 
 
   </body></html>
-
