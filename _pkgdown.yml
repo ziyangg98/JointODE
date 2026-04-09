@@ -1,5 +1,8 @@
 url: https://gongziyang.com/JointODE/
 
+development:
+  mode: unreleased
+
 template:
   bootstrap: 5
   bootswatch: cosmo
