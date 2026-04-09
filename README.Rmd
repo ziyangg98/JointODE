@@ -33,7 +33,7 @@ JointODE models biomarker evolution using **ordinary differential equations** (O
 
 $$\ddot{m}_i(t) + 2 \xi_i \omega_i \dot{m}_i(t) + \omega_i^2 m_i(t) = k \omega_i^2 \mu_i(t)$$
 
-where $m_i(t)$ is the biomarker value, $\dot{m}_i(t)$ is velocity (rate of change), and $\ddot{m}_i(t)$ is acceleration. Subject-specific dynamics are characterized by natural frequency $\omega_i$ and damping ratio $\xi_i$, with $\mu_i(t)$ representing external forcing (e.g., treatment effects, covariates). Individual heterogeneity is captured through random effects on these ODE parameters.
+with initial conditions $m_i(0) = m_{0,i}$ and $\dot{m}_i(0) = v_{0,i}$, where $\omega_i$ is the natural frequency, $\xi_i$ is the damping ratio, and $\mu_i(t)$ is covariate-driven forcing. Stability ($\omega > 0$, $\xi > 0$) is enforced by estimating $\log(\omega^2)$ and $\log(2\xi\omega)$. Individual heterogeneity is captured through random effects on initial states $(m_{0,i}, v_{0,i})$ and multiplicative random effects on ODE parameters.
 
 **Survival Model:** The hazard function incorporates biomarker dynamics:
 
@@ -92,11 +92,12 @@ summary(fit)
 plot(fit)
 ```
 
-The formula specifies:
+The formula uses two reserved keywords (not data columns):
 
-- **ODE terms**: `biomarker` and `velocity` are the state variables (value and slope) in the ODE
-- **Covariates**: `x1` and `x2` are external variables affecting the dynamics
-- **Random effects**: `(biomarker + velocity | id)` allows subject-specific coefficients on the ODE value and slope terms
+- **`biomarker`**: includes the frequency parameter $\omega^2$ in the ODE ($b_1 m(t)$ term)
+- **`velocity`**: includes the damping parameter $2\xi\omega$ in the ODE ($b_2 \dot{m}(t)$ term)
+- **`(biomarker + velocity | id)`**: adds subject-specific multiplicative random effects on these ODE parameters
+- **`x1`, `x2`**: standard covariates driving the forcing function $f(t)$
 
 ## Learn More
 

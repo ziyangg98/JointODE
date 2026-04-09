@@ -20,13 +20,10 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
   DATA_INTEGER(n_random_covariates);
   DATA_VECTOR(long_fixed_covariates);
   DATA_VECTOR(long_random_covariates);
-  DATA_SCALAR(clamp_value);
   DATA_INTEGER(biomarker_fixed);
   DATA_INTEGER(biomarker_random);
   DATA_INTEGER(velocity_fixed);
   DATA_INTEGER(velocity_random);
-
-  double clamp_val = asDouble(clamp_value);
 
   // Pre-compute per-subject offsets
   vector<int> obs_offset(n_subjects), fixed_offset(n_subjects);
@@ -50,7 +47,6 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
   using namespace density;
   UNSTRUCTURED_CORR_t<Type> corr_structure(corr_par);
   Type sigma_e = exp(log_sigma_e);
-  Type BC = Type(clamp_val);
 
   int n_total_obs = obs_times.size();
   vector<Type> fitted_biomarker(n_total_obs), fitted_velocity(n_total_obs);
@@ -93,10 +89,10 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
     // b1, b2: constant across time steps
     Type b1(0), b2(0);
     int fixed_idx = 0, re_idx = 2;
-    if (biomarker_fixed)  b1  = longitudinal(fixed_idx++);
-    if (biomarker_random) b1 += bi(re_idx++);
-    if (velocity_fixed)   b2  = longitudinal(fixed_idx++);
-    if (velocity_random)  b2 += bi(re_idx++);
+    if (biomarker_fixed)  b1  = -exp(longitudinal(fixed_idx++));
+    if (biomarker_random) b1 *= exp(bi(re_idx++));
+    if (velocity_fixed)   b2  = -exp(longitudinal(fixed_idx++));
+    if (velocity_random)  b2 *= exp(bi(re_idx++));
     int forcing_fixed_start = fixed_idx;
     int forcing_re_start = re_idx;
 
@@ -112,8 +108,6 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
         forcing += bi(forcing_re_start + k) * Type(long_random_covariates_i(cov_idx, k));
 
       ode_step(m, v, b1, b2, forcing, dt);
-      m = clamp(m, -BC, BC);
-      v = clamp(v, -BC, BC);
       sol_m(ti) = m;  sol_v(ti) = v;
     }
 

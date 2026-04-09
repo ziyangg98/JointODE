@@ -26,8 +26,10 @@ data("sim", package = "JointODE", envir = environment())
   list(
     data_list = data_list,
     random_effects = sim$data$random_effects[seq_len(n), , drop = FALSE],
-    params = with(sim$init$coefficients,
-      c(baseline, hazard, longitudinal, initial_state)),
+    params = with(
+      sim$init$coefficients,
+      c(baseline, hazard, longitudinal, initial_state)
+    ),
     parameters = sim$init
   )
 }

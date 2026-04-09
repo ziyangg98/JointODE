@@ -155,15 +155,16 @@
 
   # Flatten design matrices (row-major)
   flatten_design <- function(type) {
-    result <- unlist(lapply(data_list, function(d)
-      as.vector(t(d$longitudinal$covariates[[type]]))))
+    result <- unlist(lapply(data_list, function(d) {
+      as.vector(t(d$longitudinal$covariates[[type]]))
+    }))
     result %||% numeric(0)
   }
 
   # Survival covariates
   first_covariates <- data_list[[1]]$covariates
   n_surv_covariates <- if (is.data.frame(first_covariates) ||
-                           is.matrix(first_covariates)) {
+    is.matrix(first_covariates)) {
     ncol(first_covariates)
   } else {
     0L
@@ -190,7 +191,6 @@
     long_random_covariates = flatten_design("random"),
     surv_covariates = surv_covariates,
     n_surv_covariates = as.integer(n_surv_covariates),
-    clamp_value = configs$biomarker_clamp,
     hazard_quadrature = as.integer(control$hazard_quadrature),
     velocity_power = configs$gamma,
     baseline_degree = as.integer(baseline_config$degree),
@@ -232,7 +232,8 @@
   if (is.matrix(data)) data <- as.data.frame(data)
 
   fixed_formula <- .build_formula(
-    parsed_long$fixed_terms, response = parsed_long$response
+    parsed_long$fixed_terms,
+    response = parsed_long$response
   )
   random_formula <- if (!is.null(parsed_long$random_terms)) {
     .build_formula(parsed_long$random_terms, is_random = TRUE)
@@ -288,8 +289,6 @@
     )
   }
 
-  all_y <- unlist(lapply(subject_data, function(d) d$longitudinal$measurements))
-  attr(subject_data, "biomarker_clamp") <- max(abs(all_y)) * 5
   subject_data
 }
 
@@ -297,7 +296,6 @@
 #' @noRd
 .pack_marginal_data <- function(data_list, parsed_long, n_re) {
   n_subjects <- length(data_list)
-  clamp_value <- attr(data_list, "biomarker_clamp")
 
   n_observations <- vapply(data_list, function(d) {
     length(d$longitudinal$measurements)
@@ -310,8 +308,9 @@
   n_random_covariates <- ncol(data_list[[1]]$longitudinal$covariates$random)
 
   flatten_design <- function(type) {
-    result <- unlist(lapply(data_list, function(d)
-      as.vector(t(d$longitudinal$covariates[[type]]))))
+    result <- unlist(lapply(data_list, function(d) {
+      as.vector(t(d$longitudinal$covariates[[type]]))
+    }))
     result %||% numeric(0)
   }
 
@@ -326,7 +325,6 @@
     n_random_covariates = as.integer(n_random_covariates),
     long_fixed_covariates = flatten_design("fixed"),
     long_random_covariates = flatten_design("random"),
-    clamp_value = clamp_value,
     biomarker_fixed = as.integer(parsed_long$biomarker$fixed),
     biomarker_random = as.integer(parsed_long$biomarker$random),
     velocity_fixed = as.integer(parsed_long$velocity$fixed),

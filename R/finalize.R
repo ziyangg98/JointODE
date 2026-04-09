@@ -15,30 +15,31 @@
   sigma_e <- unname(exp(par[pn == "log_sigma_e"]))
 
   parameters <- c(longitudinal, initial_state)
-
-  # Vcov of fixed effects
   n_fixed <- length(parameters)
-  vcov_matrix <- if (!is.null(sdr$cov.fixed) && nrow(sdr$cov.fixed) >= n_fixed) {
+  vcov_matrix <- if (
+    !is.null(sdr$cov.fixed) && nrow(sdr$cov.fixed) >= n_fixed
+  ) {
     sdr$cov.fixed[seq_len(n_fixed), seq_len(n_fixed), drop = FALSE]
   } else {
     matrix(NA, n_fixed, n_fixed)
   }
   dimnames(vcov_matrix) <- list(names(parameters), names(parameters))
 
-  # Variance component SEs
   sdr_report <- summary(sdr, "report")
   sdr_names <- rownames(sdr_report)
   sigma_e_se <- as.numeric(sdr_report[sdr_names == "sigma_e", "Std. Error"])
   sigma_b <- as.matrix(reported$Sigma_b)
   sigma_b_se <- matrix(
-    sdr_report[sdr_names == "Sigma_b", "Std. Error"], n_re, n_re)
+    sdr_report[sdr_names == "Sigma_b", "Std. Error"], n_re, n_re
+  )
 
   # Random effects posterior modes
   random_effects <- matrix(par[pn == "random_effects"],
-                           nrow = n_subjects, ncol = n_re)
+    nrow = n_subjects, ncol = n_re
+  )
 
   loglik <- -opt$objective
-  n_total_params <- n_fixed + 1  # +1 for sigma_e
+  n_total_params <- n_fixed + 1 # +1 for sigma_e
   converged <- opt$convergence == 0
 
   list(
@@ -55,14 +56,18 @@
     convergence = list(
       converged = converged,
       iterations = opt$iterations,
-      message = sprintf("%s (%s)",
-        if (converged) "Converged" else "Did not converge", opt$message))
+      message = sprintf(
+        "%s (%s)",
+        if (converged) "Converged" else "Did not converge", opt$message
+      )
+    )
   )
 }
 
+
 #' @noRd
 .finalize_joint <- function(obj, opt, parameters, coef_names,
-                          data_list, n_re, control) {
+                            data_list, n_re, control) {
   sdr <- TMB::sdreport(obj)
   reported <- obj$report()
   par <- obj$env$last.par.best
@@ -70,8 +75,9 @@
 
   # Fixed effects
   cf <- parameters$coefficients
-  for (nm in c("baseline", "hazard", "longitudinal", "initial_state"))
+  for (nm in c("baseline", "hazard", "longitudinal", "initial_state")) {
     cf[[nm]] <- setNames(as.numeric(par[pn == nm]), coef_names[[nm]])
+  }
   cf$measurement_error_sd <- unname(exp(par[pn == "log_sigma_e"]))
   cf$random_effect_sigma <- as.matrix(reported$Sigma_b)
 
@@ -79,22 +85,25 @@
   sdr_report <- summary(sdr, "report")
   sdr_names <- rownames(sdr_report)
   cf$measurement_error_sd_se <- as.numeric(
-    sdr_report[sdr_names == "sigma_e", "Std. Error"])
+    sdr_report[sdr_names == "sigma_e", "Std. Error"]
+  )
   cf$random_effect_sigma_se <- matrix(
-    sdr_report[sdr_names == "Sigma_b", "Std. Error"], n_re, n_re)
+    sdr_report[sdr_names == "Sigma_b", "Std. Error"], n_re, n_re
+  )
 
-  parameters$coefficients <- cf
-  parameters$random_effects_init <- NULL
-
-  # Vcov of fixed effects
   coef_names_exp <- .prefixed_coef_names(coef_names)
   n_fixed <- length(coef_names_exp)
-  vcov_matrix <- if (!is.null(sdr$cov.fixed) && nrow(sdr$cov.fixed) >= n_fixed) {
+  vcov_matrix <- if (
+    !is.null(sdr$cov.fixed) && nrow(sdr$cov.fixed) >= n_fixed
+  ) {
     sdr$cov.fixed[seq_len(n_fixed), seq_len(n_fixed), drop = FALSE]
   } else {
     matrix(NA, n_fixed, n_fixed)
   }
   dimnames(vcov_matrix) <- list(coef_names_exp, coef_names_exp)
+
+  parameters$coefficients <- cf
+  parameters$random_effects_init <- NULL
 
   # C-index
   n_subjects <- length(data_list)
@@ -109,8 +118,11 @@
   loglik <- -opt$objective
   converged <- opt$convergence == 0
   if (control$verbose > 0) {
-    if (converged) cli::cli_alert_success(sprintf("Converged (%s)", opt$message))
-    else cli::cli_alert_warning(sprintf("Did not converge: %s", opt$message))
+    if (converged) {
+      cli::cli_alert_success(sprintf("Converged (%s)", opt$message))
+    } else {
+      cli::cli_alert_warning(sprintf("Did not converge: %s", opt$message))
+    }
     cli::cli_alert_info(sprintf("Log-likelihood: %.2f", loglik))
     cli::cli_alert_info(sprintf("C-index: %.3f", cindex))
   }
@@ -125,8 +137,11 @@
     convergence = list(
       converged = converged,
       iterations = opt$iterations,
-      message = sprintf("%s (%s)",
-        if (converged) "Converged" else "Did not converge", opt$message)),
+      message = sprintf(
+        "%s (%s)",
+        if (converged) "Converged" else "Did not converge", opt$message
+      )
+    ),
     random_effects = matrix(par[pn == "random_effects"], nrow = n_subjects, ncol = n_re),
     vcov = vcov_matrix,
     tmb_report = reported

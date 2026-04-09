@@ -45,7 +45,7 @@ MarginalODE <- function(
     stop("control must be a list or NULL")
   }
 
-  # Parse formula (same as JointODE, supports (... | id) RE syntax)
+  # Parse formula
   parsed_long <- .parse_longitudinal_formula(formula)
   if (is.null(parsed_long$grouping)) parsed_long$grouping <- id
 
@@ -58,24 +58,20 @@ MarginalODE <- function(
   coef_names <- model_config$coef_names
   n_re <- model_config$n_re
 
-  # Build parameters (default or user-provided)
+  # Build parameters
   parameters <- .default_marginal_parameters(model_config, parsed_long)
-
   all_y <- unlist(lapply(data_list, function(d) d$longitudinal$measurements))
   mean_y <- mean(all_y)
   has_dynamics_re <- parsed_long$biomarker$random ||
     parsed_long$velocity$random
 
   if (has_dynamics_re) {
-    # Phase 1: fit reduced model to warm-start dynamics RE
     ws <- .warm_start_marginal(
       formula, data, time, id, parsed_long, control
     )
     parameters$coefficients$longitudinal <- ws$longitudinal
     parameters$coefficients$initial_state <- ws$initial_state
     parameters$coefficients$measurement_error_sd <- ws$measurement_error_sd
-
-    # Expand RE matrix: cols 1-2 from warm start, rest = 0
     random_effects_init <- matrix(0, n_subjects, n_re)
     random_effects_init[, 1:2] <- ws$random_effects
   } else {
@@ -89,7 +85,6 @@ MarginalODE <- function(
   re_sds <- pmax(apply(random_effects_init, 2, sd), sd(all_y) * 0.1)
   parameters$coefficients$random_effect_sigma <- diag(re_sds^2, n_re)
   parameters$random_effects_init <- random_effects_init
-  parameters$configurations$biomarker_clamp <- max(abs(all_y)) * 5
 
   # Pack TMB inputs
   tmb_data <- .pack_marginal_data(data_list, parsed_long, n_re)
@@ -103,8 +98,7 @@ MarginalODE <- function(
   }
 
   obj <- TMB::MakeADFun(
-    data = tmb_data,
-    parameters = tmb_params,
+    data = tmb_data, parameters = tmb_params,
     random = "random_effects",
     DLL = "JointODE",
     silent = control$verbose < 3,
@@ -124,6 +118,9 @@ MarginalODE <- function(
   )
 
   results <- .finalize_marginal(obj, opt, coef_names, n_re, n_subjects)
+  re_nms <- model_config$re_names
+  dimnames(results$random_effect_sigma) <- list(re_nms, re_nms)
+  dimnames(results$random_effect_sigma_se) <- list(re_nms, re_nms)
 
   if (control$verbose > 0) {
     if (results$convergence$converged) {
@@ -143,19 +140,19 @@ MarginalODE <- function(
     velocity = list(
       fixed = parsed_long$velocity$fixed,
       random = parsed_long$velocity$random
-    ),
-    biomarker_clamp = parameters$configurations$biomarker_clamp
+    )
   )
-  # Store longitudinal coefficients in named form
   coefs <- list(
     longitudinal = setNames(
       as.numeric(obj$env$last.par.best[
-        names(obj$env$last.par.best) == "longitudinal"]),
+        names(obj$env$last.par.best) == "longitudinal"
+      ]),
       coef_names$longitudinal
     ),
     initial_state = setNames(
       as.numeric(obj$env$last.par.best[
-        names(obj$env$last.par.best) == "initial_state"]),
+        names(obj$env$last.par.best) == "initial_state"
+      ]),
       coef_names$initial_state
     )
   )
@@ -235,6 +232,7 @@ logLik.MarginalODE <- function(object, ...) {
 #' @param ... Additional arguments
 #' @return A summary.MarginalODE object
 #' @concept model-summary
+#' @method summary MarginalODE
 #' @export
 summary.MarginalODE <- function(object, ...) {
   se <- if (!is.null(object$vcov) && !all(is.na(object$vcov))) {
@@ -243,45 +241,39 @@ summary.MarginalODE <- function(object, ...) {
     rep(NA_real_, length(object$parameters))
   }
 
-  # Derived ODE physical parameters (period and damping ratio)
+  # Derived ODE physical parameters
   derived_params <- NULL
   nms <- names(object$parameters)
-  has_bv <- "biomarker" %in% nms && "velocity" %in% nms
+  has_bv <- "log_omega2" %in% nms && "log_2xi_omega" %in% nms
   if (!is.null(object$vcov) && !all(is.na(object$vcov)) && has_bv) {
-    idx_b <- which(nms == "biomarker")
-    idx_v <- which(nms == "velocity")
-    value_coef <- object$parameters[idx_b]
-    slope_coef <- object$parameters[idx_v]
-    var_value <- object$vcov[idx_b, idx_b]
-    var_slope <- object$vcov[idx_v, idx_v]
-    cov_value_slope <- object$vcov[idx_b, idx_v]
+    idx_b <- which(nms == "log_omega2")
+    idx_v <- which(nms == "log_2xi_omega")
+    raw_b1 <- object$parameters[idx_b]
+    raw_b2 <- object$parameters[idx_v]
+    var_b1 <- object$vcov[idx_b, idx_b]
+    var_b2 <- object$vcov[idx_v, idx_v]
+    cov_b12 <- object$vcov[idx_b, idx_v]
 
-    if (value_coef < 0) {
-      omega_est <- sqrt(-value_coef)
-      period_est <- 2 * pi / omega_est
-      xi_est <- -slope_coef / (2 * omega_est)
+    # omega = exp(raw_b1/2), xi = exp(raw_b2 - raw_b1/2)/2
+    omega_est <- exp(raw_b1 / 2)
+    xi_est <- exp(raw_b2 - raw_b1 / 2) / 2
 
-      grad_period_value <- pi / ((-value_coef)^(3 / 2))
-      var_period <- grad_period_value^2 * var_value
-      se_period <- sqrt(var_period)
+    se_omega <- sqrt((omega_est / 2)^2 * var_b1)
+    var_xi <- (xi_est / 2)^2 * var_b1 + xi_est^2 * var_b2 -
+      xi_est^2 * cov_b12
+    se_xi <- sqrt(var_xi)
 
-      grad_xi_value <- -slope_coef / (4 * (-value_coef)^(3 / 2))
-      grad_xi_slope <- -1 / (2 * sqrt(-value_coef))
-      var_xi <- grad_xi_value^2 * var_value +
-        grad_xi_slope^2 * var_slope +
-        2 * grad_xi_value * grad_xi_slope * cov_value_slope
-      se_xi <- sqrt(var_xi)
-
-      derived_params <- cbind(
-        Estimate = c(period_est, xi_est),
-        `Std. Error` = c(se_period, se_xi),
-        `z value` = c(period_est / se_period, xi_est / se_xi),
-        `Pr(>|z|)` = 2 * pnorm(-abs(c(
-          period_est / se_period, xi_est / se_xi
-        )))
-      )
-      rownames(derived_params) <- c("T (period)", "xi (damping ratio)")
-    }
+    derived_params <- cbind(
+      Estimate = c(omega_est, xi_est),
+      `Std. Error` = c(se_omega, se_xi),
+      `z value` = c(omega_est / se_omega, xi_est / se_xi),
+      `Pr(>|z|)` = 2 * pnorm(-abs(c(
+        omega_est / se_omega, xi_est / se_xi
+      )))
+    )
+    rownames(derived_params) <- c(
+      "omega (natural frequency)", "xi (damping ratio)"
+    )
   }
 
   structure(
@@ -330,8 +322,10 @@ print.summary.MarginalODE <- function(
 
   if (!is.null(x$derived_params)) {
     cat("\nODE System Characteristics:\n")
-    .print_coefmat(x$derived_params, digits = digits,
-                   signif.stars = signif.stars, ...)
+    .print_coefmat(x$derived_params,
+      digits = digits,
+      signif.stars = signif.stars, ...
+    )
   }
   cat(sprintf(
     "\nMeasurement Error SD: %.6f\n", x$sigma["sigma_e"]

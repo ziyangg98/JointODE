@@ -31,12 +31,13 @@ second-order ODE:
 
 $$\ddot{m}_i(t) + 2 \xi_i \omega_i \dot{m}_i(t) + \omega_i^2 m_i(t) = k \omega_i^2 \mu_i(t)$$
 
-where $m_i(t)$ is the biomarker value, $\dot{m}_i(t)$ is velocity (rate
-of change), and $\ddot{m}_i(t)$ is acceleration. Subject-specific
-dynamics are characterized by natural frequency $\omega_i$ and damping
-ratio $\xi_i$, with $\mu_i(t)$ representing external forcing (e.g.,
-treatment effects, covariates). Individual heterogeneity is captured
-through random effects on these ODE parameters.
+with initial conditions $m_i(0) = m_{0,i}$ and $\dot{m}_i(0) = v_{0,i}$,
+where $\omega_i$ is the natural frequency, $\xi_i$ is the damping ratio,
+and $\mu_i(t)$ is covariate-driven forcing. Stability ($\omega > 0$,
+$\xi > 0$) is enforced by estimating $\log(\omega^2)$ and
+$\log(2\xi\omega)$. Individual heterogeneity is captured through random
+effects on initial states $(m_{0,i}, v_{0,i})$ and multiplicative random
+effects on ODE parameters.
 
 **Survival Model:** The hazard function incorporates biomarker dynamics:
 
@@ -95,10 +96,8 @@ fit <- JointODE(
   survival_data = sim$data$survival_data,
   init = "marginal"
 )
-#> Warning in stats::nlminb(start = obj$par, objective = obj$fn, gradient =
-#> obj$gr, : NA/NaN function evaluation
 cat(sprintf("Elapsed: %.1f s\n", (proc.time() - t0)["elapsed"]))
-#> Elapsed: 110.8 s
+#> Elapsed: 145.7 s
 ```
 
 ``` r
@@ -113,60 +112,60 @@ summary(fit)
 #>
 #> Data Descriptives:
 #> Longitudinal Process            Survival Process
-#> Number of Observations: 17339   Number of Events: 59 (30%)
+#> Number of Observations: 17319   Number of Events: 58 (29%)
 #> Number of Subjects: 200
 #>
 #>        AIC        BIC     logLik
-#> -28960.371 -28874.614  14506.185
+#> -28945.644 -28859.887  14498.822
 #>
 #> Coefficients:
 #> Longitudinal Process: Second-Order ODE Model
-#>             Estimate Std. Error  z value Pr(>|z|)
-#> biomarker    -1.0897     0.0078 -140.137   <2e-16 ***
-#> velocity     -0.8449     0.0179  -47.094   <2e-16 ***
-#> (Intercept)   0.0006     0.0014    0.392    0.695
-#> x1            0.5437     0.0039  137.755   <2e-16 ***
-#> x2           -0.4896     0.0036 -134.951   <2e-16 ***
+#>               Estimate Std. Error  z value Pr(>|z|)
+#> log_omega2      0.0867     0.0075   11.540   <2e-16 ***
+#> log_2xi_omega  -0.1915     0.0200   -9.564   <2e-16 ***
+#> (Intercept)    -0.0014     0.0015   -0.910    0.363
+#> x1              0.5475     0.0040  135.824   <2e-16 ***
+#> x2             -0.4908     0.0037 -131.456   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> ODE System Characteristics:
-#>                    Estimate Std. Error z value Pr(>|z|)
-#> T (period)           6.0191     0.0215  280.27   <2e-16 ***
-#> xi (damping ratio)   0.4047     0.0083   48.54   <2e-16 ***
+#>                           Estimate Std. Error z value Pr(>|z|)
+#> omega (natural frequency)   1.0443     0.0039  266.18   <2e-16 ***
+#> xi (damping ratio)          0.3953     0.0077   51.13   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Survival Process: Proportional Hazards Model
-#>         Estimate Std. Error z value Pr(>|z|)
-#> alpha_1   0.8963     0.2166   4.138 3.50e-05 ***
-#> alpha_2   2.3209     0.6466   3.590 0.000331 ***
-#> w1        0.6563     0.1336   4.912 9.02e-07 ***
-#> w2       -0.8894     0.2761  -3.222 0.001275 **
+#>          Estimate Std. Error z value Pr(>|z|)
+#> value      0.9348     0.2147   4.354 1.34e-05 ***
+#> velocity   2.1078     0.6317   3.337 0.000848 ***
+#> w1         0.6991     0.1359   5.144 2.69e-07 ***
+#> w2        -0.9099     0.2766  -3.289 0.001006 **
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Baseline Hazard: B-spline with 4 basis functions
-#> (Coefficients range: [-4.705, -2.450] )
+#> (Coefficients range: [-4.635, -2.483] )
 #>
 #> Initial State: Population Mean
-#>           Estimate Std. Error z value Pr(>|z|)
-#> biomarker  -0.4887     0.0073  -67.05   <2e-16 ***
-#> velocity   -0.1146     0.0087  -13.15   <2e-16 ***
+#>                   Estimate Std. Error z value Pr(>|z|)
+#> initial_biomarker  -0.4988     0.0073  -68.73   <2e-16 ***
+#> initial_velocity   -0.1002     0.0093  -10.77   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Variance Components:
-#> Measurement Error SD: 0.099619 (SE: 0.000547)
+#> Measurement Error SD: 0.099448 (SE: 0.000545)
 #> Random Effect Covariance Matrix:
-#>            [,1]       [,2]       [,3]       [,4]
-#> [1,]  8.300e-03  2.218e-03  5.519e-04 -4.028e-05
-#> [2,]  2.218e-03  7.116e-03 -5.438e-05  3.002e-04
-#> [3,]  5.519e-04 -5.438e-05  1.338e-03  3.531e-04
-#> [4,] -4.028e-05  3.002e-04  3.531e-04  4.206e-02
+#>                   initial_biomarker initial_velocity log_omega2 log_2xi_omega
+#> initial_biomarker         0.0082210        0.0009966  0.0002002     0.0006619
+#> initial_velocity          0.0009966        0.0090838  0.0001854     0.0003816
+#> log_omega2                0.0002002        0.0001854  0.0016667    -0.0005260
+#> log_2xi_omega             0.0006619        0.0003816 -0.0005260     0.0499643
 #>
 #> Model Diagnostics:
-#> C-index (Concordance): 0.613
+#> C-index (Concordance): 0.622
 #> Convergence: Converged (relative convergence (4))
 
 # Plot results
@@ -175,14 +174,16 @@ plot(fit)
 
 <img src="man/figures/README-output-1.png" alt="" width="100%" />
 
-The formula specifies:
+The formula uses two reserved keywords (not data columns):
 
-- **ODE terms**: `biomarker` and `velocity` are the state variables
-  (value and slope) in the ODE
-- **Covariates**: `x1` and `x2` are external variables affecting the
-  dynamics
-- **Random effects**: `(biomarker + velocity | id)` allows
-  subject-specific coefficients on the ODE value and slope terms
+- **`biomarker`**: includes the frequency parameter $\omega^2$ in the
+  ODE ($b_1 m(t)$ term)
+- **`velocity`**: includes the damping parameter $2\xi\omega$ in the ODE
+  ($b_2 \dot{m}(t)$ term)
+- **`(biomarker + velocity | id)`**: adds subject-specific
+  multiplicative random effects on these ODE parameters
+- **`x1`, `x2`**: standard covariates driving the forcing function
+  $f(t)$
 
 ## Learn More
 

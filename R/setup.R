@@ -53,22 +53,33 @@
 
   # Longitudinal coefficient names (biomarker/velocity first)
   long_names <- character(0)
-  if (parsed_long$biomarker$fixed) long_names <- c(long_names, "biomarker")
-  if (parsed_long$velocity$fixed) long_names <- c(long_names, "velocity")
+  if (parsed_long$biomarker$fixed) long_names <- c(long_names, "log_omega2")
+  if (parsed_long$velocity$fixed) long_names <- c(long_names, "log_2xi_omega")
   long_names <- c(long_names, long_fixed_names)
 
-  # Random effects layout: [init_biomarker, init_velocity, dyn_coefs...]
-  n_re_total <- n_re + 2 # +2 for initial state random effects
+  # Random effects layout: [initial_biomarker, initial_velocity, dyn_coefs...]
+  n_re_total <- n_re + 2
   random_effects <- matrix(0, nrow(survival_data), n_re_total)
+
+  re_names <- c("initial_biomarker", "initial_velocity")
+  if (parsed_long$biomarker$random) re_names <- c(re_names, "log_omega2")
+  if (parsed_long$velocity$random) re_names <- c(re_names, "log_2xi_omega")
+  if (length(random_terms) > 0) {
+    re_cov_names <- colnames(model.matrix(
+      .build_formula(random_terms, is_random = TRUE), longitudinal_data
+    ))
+    re_names <- c(re_names, paste0("forcing_", re_cov_names))
+  }
 
   list(
     dims = .compute_dimensions(parsed_long, parsed_surv, spline_config),
     random_effects = random_effects,
+    re_names = re_names,
     coef_names = list(
       baseline = paste0("bs", seq_len(sbc$df)),
-      hazard = c("alpha_1", "alpha_2", surv_names),
+      hazard = c("value", "velocity", surv_names),
       longitudinal = long_names,
-      initial_state = c("biomarker", "velocity")
+      initial_state = c("initial_biomarker", "initial_velocity")
     ),
     spline_baseline_config = sbc
   )
@@ -78,14 +89,15 @@
 #' @noRd
 .setup_marginal_model <- function(data, parsed_long) {
   fixed_formula <- .build_formula(parsed_long$fixed_terms,
-                                  response = parsed_long$response)
+    response = parsed_long$response
+  )
   fixed_names <- colnames(model.matrix(
     fixed_formula, model.frame(fixed_formula, data)
   ))
 
   long_names <- character(0)
-  if (parsed_long$biomarker$fixed) long_names <- c(long_names, "biomarker")
-  if (parsed_long$velocity$fixed) long_names <- c(long_names, "velocity")
+  if (parsed_long$biomarker$fixed) long_names <- c(long_names, "log_omega2")
+  if (parsed_long$velocity$fixed) long_names <- c(long_names, "log_2xi_omega")
   long_names <- c(long_names, fixed_names)
 
   # RE dimension
@@ -99,9 +111,20 @@
   n_re <- 2L + n_long_random +
     sum(parsed_long$biomarker$random, parsed_long$velocity$random)
 
+  re_names <- c("initial_biomarker", "initial_velocity")
+  if (parsed_long$biomarker$random) re_names <- c(re_names, "log_omega2")
+  if (parsed_long$velocity$random) re_names <- c(re_names, "log_2xi_omega")
+  if (length(random_terms) > 0) {
+    re_cov_names <- colnames(model.matrix(
+      .build_formula(random_terms, is_random = TRUE), data
+    ))
+    re_names <- c(re_names, paste0("forcing_", re_cov_names))
+  }
+
   list(
     n_longitudinal_coef = length(long_names),
     n_re = n_re,
+    re_names = re_names,
     coef_names = list(
       longitudinal = long_names,
       initial_state = .init_state_names

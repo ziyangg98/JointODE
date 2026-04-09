@@ -41,12 +41,14 @@
   re <- matrix(0, nrow = n_subjects, ncol = max(n_re, 2L))
   for (i in seq_along(data_list)) {
     obs <- data_list[[i]]$longitudinal
-    if (length(obs$measurements) >= 1)
+    if (length(obs$measurements) >= 1) {
       re[i, 1] <- obs$measurements[1] - m0
+    }
     if (length(obs$measurements) >= 2) {
       dt <- obs$times[2] - obs$times[1]
-      if (dt > 0)
+      if (dt > 0) {
         re[i, 2] <- (obs$measurements[2] - obs$measurements[1]) / dt - v0
+      }
     }
   }
   re
@@ -92,7 +94,7 @@
 
 .reserved_words <- c("biomarker", "velocity")
 
-.init_state_names <- c("init_biomarker", "init_velocity")
+.init_state_names <- c("initial_biomarker", "initial_velocity")
 
 # Formula Parsing ==============================================================
 
@@ -303,58 +305,44 @@
 
 # Prediction Utilities =========================================================
 
-#' ODE step (double, 5-branch)
+#' ODE step via Cayley-Hamilton (sinhc/sinc formulation)
 #' @noRd
 .ode_step_r <- function(m, v, b1, b2, f, dt) {
-  h <- b2 / 2
+  h <- b2 * dt / 2
   D <- b2^2 + 4 * b1
-  eps <- 1e-10
+  s2 <- D * dt^2 / 4
 
-  if (abs(b1) < 1e-12 && abs(b2) < 1e-12) {
-    a0 <- 1; a1 <- dt; J0 <- dt; J1 <- dt^2 / 2
-  } else if (abs(b1) < 1e-12) {
-    eb <- exp(b2 * dt); a0 <- 1
-    a1 <- if (abs(b2) > eps) (eb - 1) / b2 else dt
-    J1 <- if (abs(b2) > eps) (eb - 1) / b2^2 - dt / b2 else dt^2 / 2
-    J0 <- if (abs(b2) > eps) (eb - 1) / b2 else dt
-  } else if (abs(D) < 1e-10) {
-    ert <- exp(h * dt)
-    a0 <- ert * (1 - h * dt); a1 <- ert * dt
-    if (abs(h) > eps) {
-      ir <- (ert - 1) / h
-      isr <- (ert * (h * dt - 1) + 1) / h^2
-      J1 <- isr; J0 <- ir - h * isr
-    } else { J0 <- dt; J1 <- dt^2 / 2 }
-  } else if (D > 0) {
-    sD <- sqrt(D)
-    r1 <- h + sD / 2; r2 <- h - sD / 2
-    r1s <- if (r1^2 > 1e-20) r1 else eps
-    r2s <- if (r2^2 > 1e-20) r2 else -eps
-    sDs <- max(sD, eps)
-    e1 <- exp(r1 * dt); e2 <- exp(r2 * dt)
-    a0 <- (r1 * e2 - r2 * e1) / sDs
-    a1 <- (e1 - e2) / sDs
-    i1 <- (e1 - 1) / r1s; i2 <- (e2 - 1) / r2s
-    J1 <- (i1 - i2) / sDs; J0 <- (r1 * i2 - r2 * i1) / sDs
+  if (D >= 0) {
+    delta <- sqrt(max(s2, 0))
+    sc <- if (delta^2 < 1e-8) 1 + delta^2 / 6 else sinh(delta) / delta
+    cc <- cosh(delta)
   } else {
-    w <- sqrt(-D) / 2; ws <- max(w, eps)
-    ms <- max(h^2 + w^2, 1e-20)
-    er <- exp(h * dt)
-    cw <- cos(w * dt); sw <- sin(w * dt)
-    a0 <- er * (cw - h * sw / ws)
-    a1 <- er * sw / ws
-    ic <- (er * (h * cw + w * sw) - h) / ms
-    is_ <- (er * (h * sw - w * cw) + w) / ms
-    J1 <- is_ / ws; J0 <- ic - (h / ws) * is_
+    omega <- sqrt(max(-s2, 0))
+    sc <- if (omega^2 < 1e-8) 1 - omega^2 / 6 else sin(omega) / omega
+    cc <- cos(omega)
   }
-  c(a0 * m + a1 * v + f * J1,
-    b1 * a1 * m + (a0 + b2 * a1) * v + f * (J0 + b2 * J1))
+
+  em <- exp(h)
+  a0 <- em * (cc - h * sc)
+  a1 <- em * dt * sc
+
+  # Forcing integral: J1 = (a0-1)/b1, Taylor at b1~0
+  if (abs(b1) > 1e-10) {
+    J1 <- (a0 - 1) / b1
+  } else {
+    x <- b2 * dt
+    J1 <- dt^2 * if (x^2 < 1e-8) 0.5 + x / 6 else (exp(x) - 1 - x) / x^2
+  }
+
+  c(
+    a0 * m + a1 * v + f * J1,
+    b1 * a1 * m + (a0 + b2 * a1) * v + f * a1
+  )
 }
 
 #' Predict marginal trajectories for all subjects at given times
 #' @noRd
 .predict_marginal_trajectories <- function(data_list, times, cf, configs, re) {
-  clamp_val <- configs$biomarker_clamp
   lc <- unname(cf$longitudinal)
 
   ids <- names(data_list)
@@ -372,30 +360,50 @@
     v <- cf$initial_state[2] + bi[2]
 
     # b1, b2 from longitudinal + RE
-    b1 <- 0; b2 <- 0; fi <- 1; ri <- 3
-    if (configs$biomarker$fixed)  { b1 <- lc[fi]; fi <- fi + 1 }
-    if (configs$biomarker$random) { b1 <- b1 + bi[ri]; ri <- ri + 1 }
-    if (configs$velocity$fixed)   { b2 <- lc[fi]; fi <- fi + 1 }
-    if (configs$velocity$random)  { b2 <- b2 + bi[ri]; ri <- ri + 1 }
-    ffs <- fi; rfs <- ri
+    b1 <- 0
+    b2 <- 0
+    fi <- 1
+    ri <- 3
+    if (configs$biomarker$fixed) {
+      b1 <- -exp(lc[fi])
+      fi <- fi + 1
+    }
+    if (configs$biomarker$random) {
+      b1 <- b1 * exp(bi[ri])
+      ri <- ri + 1
+    }
+    if (configs$velocity$fixed) {
+      b2 <- -exp(lc[fi])
+      fi <- fi + 1
+    }
+    if (configs$velocity$random) {
+      b2 <- b2 * exp(bi[ri])
+      ri <- ri + 1
+    }
+    ffs <- fi
+    rfs <- ri
 
     bio <- vel <- numeric(n_times)
     prev_t <- 0
 
     for (ti in seq_len(n_times)) {
-      tgt <- times[ti]; dt <- tgt - prev_t
+      tgt <- times[ti]
+      dt <- tgt - prev_t
       if (dt > 0 && length(obs_t) > 0) {
         ci <- findInterval(prev_t, obs_t)
         ci <- max(1, min(ci, nrow(fcov)))
         forcing <- sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci, ])
-        if (ncol(rcov) > 0)
+        if (ncol(rcov) > 0) {
           forcing <- forcing + sum(bi[rfs:(rfs + ncol(rcov) - 1)] * rcov[ci, ])
+        }
 
         mv <- .ode_step_r(m, v, b1, b2, forcing, dt)
-        m <- max(-clamp_val, min(clamp_val, mv[1]))
-        v <- max(-clamp_val, min(clamp_val, mv[2]))
+        m <- mv[1]
+        v <- mv[2]
       }
-      bio[ti] <- m; vel[ti] <- v; prev_t <- tgt
+      bio[ti] <- m
+      vel[ti] <- v
+      prev_t <- tgt
     }
     out[[i]] <- data.frame(
       id = ids[i], time = times,
@@ -411,16 +419,19 @@
 .eval_hazard_r <- function(m, v, t, baseline, hazard, surv_cov,
                            spline_config, gamma) {
   basis <- splines2::bSpline(
-    t, knots = spline_config$knots,
+    t,
+    knots = spline_config$knots,
     Boundary.knots = spline_config$boundary_knots,
     degree = spline_config$degree, intercept = TRUE
   )
   log_h <- sum(basis * baseline) + hazard[1] * m
-  if (gamma == 1) log_h <- log_h + hazard[2] * v
-  else if (gamma == 2) log_h <- log_h + hazard[2] * v^2
-  if (length(surv_cov) > 0)
+  if (gamma == 1) {
+    log_h <- log_h + hazard[2] * v
+  } else if (gamma == 2) log_h <- log_h + hazard[2] * v^2
+  if (length(surv_cov) > 0) {
     log_h <- log_h + sum(hazard[-(1:2)] * surv_cov)
-  exp(max(-20, min(20, log_h)))
+  }
+  exp(log_h)
 }
 
 #' Predict trajectories for all subjects at given times
@@ -429,7 +440,6 @@
   data_list, times, cf, configs, re, n_quad
 ) {
   n_quad <- max(n_quad %||% 1L, 1L)
-  clamp_val <- configs$biomarker_clamp
   bl <- unname(cf$baseline)
   hz <- unname(cf$hazard)
   lc <- unname(cf$longitudinal)
@@ -456,24 +466,43 @@
     v <- cf$initial_state[2] + bi[2]
 
     # b1, b2 from longitudinal + RE
-    b1 <- 0; b2 <- 0; fi <- 1; ri <- 3
-    if (configs$biomarker$fixed)  { b1 <- lc[fi]; fi <- fi + 1 }
-    if (configs$biomarker$random) { b1 <- b1 + bi[ri]; ri <- ri + 1 }
-    if (configs$velocity$fixed)   { b2 <- lc[fi]; fi <- fi + 1 }
-    if (configs$velocity$random)  { b2 <- b2 + bi[ri]; ri <- ri + 1 }
-    ffs <- fi; rfs <- ri
+    b1 <- 0
+    b2 <- 0
+    fi <- 1
+    ri <- 3
+    if (configs$biomarker$fixed) {
+      b1 <- -exp(lc[fi])
+      fi <- fi + 1
+    }
+    if (configs$biomarker$random) {
+      b1 <- b1 * exp(bi[ri])
+      ri <- ri + 1
+    }
+    if (configs$velocity$fixed) {
+      b2 <- -exp(lc[fi])
+      fi <- fi + 1
+    }
+    if (configs$velocity$random) {
+      b2 <- b2 * exp(bi[ri])
+      ri <- ri + 1
+    }
+    ffs <- fi
+    rfs <- ri
 
     bio <- vel <- cumhaz <- numeric(n_times)
-    ch <- 0; prev_t <- 0
+    ch <- 0
+    prev_t <- 0
 
     for (ti in seq_len(n_times)) {
-      tgt <- times[ti]; dt <- tgt - prev_t
+      tgt <- times[ti]
+      dt <- tgt - prev_t
       if (dt > 0 && length(obs_t) > 0) {
         ci <- findInterval(prev_t, obs_t)
         ci <- max(1, min(ci, nrow(fcov)))
         forcing <- sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci, ])
-        if (ncol(rcov) > 0)
+        if (ncol(rcov) > 0) {
           forcing <- forcing + sum(bi[rfs:(rfs + ncol(rcov) - 1)] * rcov[ci, ])
+        }
 
         sub_dt <- dt / n_quad
         hl <- .eval_hazard_r(m, v, prev_t, bl, hz, surv_cov, sbc, configs$gamma)
@@ -481,20 +510,24 @@
           ts <- prev_t + (q - 1) * sub_dt
           # Midpoint
           mv <- .ode_step_r(m, v, b1, b2, forcing, sub_dt / 2)
-          mm <- max(-clamp_val, min(clamp_val, mv[1]))
-          vv <- max(-clamp_val, min(clamp_val, mv[2]))
+          mm <- mv[1]
+          vv <- mv[2]
           hm <- .eval_hazard_r(mm, vv, ts + sub_dt / 2, bl, hz, surv_cov, sbc, configs$gamma)
           # Right
           mv <- .ode_step_r(mm, vv, b1, b2, forcing, sub_dt / 2)
-          mm <- max(-clamp_val, min(clamp_val, mv[1]))
-          vv <- max(-clamp_val, min(clamp_val, mv[2]))
+          mm <- mv[1]
+          vv <- mv[2]
           hr <- .eval_hazard_r(mm, vv, ts + sub_dt, bl, hz, surv_cov, sbc, configs$gamma)
           ch <- ch + (sub_dt / 6) * (hl + 4 * hm + hr)
-          m <- mm; v <- vv; hl <- hr
+          m <- mm
+          v <- vv
+          hl <- hr
         }
       }
-      bio[ti] <- m; vel[ti] <- v
-      cumhaz[ti] <- ch; prev_t <- tgt
+      bio[ti] <- m
+      vel[ti] <- v
+      cumhaz[ti] <- ch
+      prev_t <- tgt
     }
     out[[i]] <- data.frame(
       id = ids[i], time = times,

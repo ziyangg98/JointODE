@@ -4,85 +4,112 @@
 #define JOINTODE_UTILS_HPP
 
 // ============================================================================
-// Core math utilities
+// Smooth special functions for Cayley-Hamilton ODE solver.
+// Both branches of every CondExp produce finite values and gradients
+// for all inputs, so AD tape is never corrupted.
+//
+// Guard pattern: in the "direct" branch (large |x|), the denominator is
+// replaced by x_safe = CondExp(|x|<eps, 1, x).  When the Taylor branch
+// is selected, the direct branch still evaluates but divides by 1 instead
+// of 0, preventing 0/0 gradient leakage through the AD tape.
 // ============================================================================
 
-// Safe exp with linear extension beyond threshold to prevent overflow
+// sinhc(x) = sinh(x)/x, smooth at x=0 (limit = 1)
+// Direct branch guards denominator to avoid 0/0 AD gradient leak.
 template <class Type>
-Type safe_exp(Type x) {
-  Type threshold(500.0);
-  Type capped = CppAD::CondExpGt(x, threshold, threshold, x);
-  Type excess  = CppAD::CondExpGt(x, threshold, x - threshold, Type(0));
-  return exp(capped) * (Type(1) + excess);
+Type sinhc(Type x) {
+  Type x2 = x * x;
+  Type x_safe = CppAD::CondExpLt(x2, Type(1e-8), Type(1), x);
+  return CppAD::CondExpLt(x2, Type(1e-8),
+    Type(1) + x2 / Type(6) + x2 * x2 / Type(120),
+    sinh(x) / x_safe);
 }
 
-// AD-safe clamping
+// sinc(x) = sin(x)/x, smooth at x=0 (limit = 1)
 template <class Type>
-Type clamp(Type x, Type lower, Type upper) {
-  return CppAD::CondExpLt(x, lower, lower,
-           CppAD::CondExpGt(x, upper, upper, x));
+Type sinc(Type x) {
+  Type x2 = x * x;
+  Type x_safe = CppAD::CondExpLt(x2, Type(1e-8), Type(1), x);
+  return CppAD::CondExpLt(x2, Type(1e-8),
+    Type(1) - x2 / Type(6) + x2 * x2 / Type(120),
+    sin(x) / x_safe);
 }
 
-// AD-safe sqrt: returns sqrt(max(x, eps)) to avoid NaN on negative input
+// expm1c2(x) = (exp(x) - 1 - x) / x^2, smooth at x=0 (limit = 1/2)
+// Direct branch guards denominator to avoid 0/0 AD gradient leak.
 template <class Type>
-Type safe_sqrt(Type x) {
-  Type eps(1e-20);
-  return sqrt(CppAD::CondExpGt(x, eps, x, eps));
+Type expm1c2(Type x) {
+  Type x2 = x * x;
+  Type x2_safe = CppAD::CondExpLt(x2, Type(1e-8), Type(1), x2);
+  return CppAD::CondExpLt(x2, Type(1e-8),
+    Type(0.5) + x / Type(6) + x2 / Type(24),
+    (exp(x) - Type(1) - x) / x2_safe);
 }
 
 // ============================================================================
-// Matrix exponential ODE solver
-// Solves d²m/dt² = b1·m + b2·dm/dt + forcing exactly via Cayley-Hamilton
-// Uses CondExp to select between REAL (D>0) and COMPLEX (D<0) branches,
-// adapting to current parameter values during optimization.
+// Cayley-Hamilton ODE solver (sinhc/sinc formulation)
+// Solves d²m/dt² = b1·m + b2·dm/dt + forcing exactly.
+//
+// Transition coefficients expressed as:
+//   a0 = exp(m) * (C - m·Sc)     [state propagation]
+//   a1 = exp(m) * dt * Sc         [velocity-to-state coupling]
+// where m = b2·dt/2, and C/Sc = cosh/sinhc (D>=0) or cos/sinc (D<0).
+//
+// Near D=0, both branches share the same Taylor series in s2 = D·dt²/4
+// (because sinh(ix)/ix = sin(x)/x), so a single Taylor expansion
+// covers both cases with no branch needed.
+//
+// Three-way CondExp: Taylor (|s2|<eps) > real (s2>0) > complex (s2<0).
+// The Taylor branch bypasses sqrt entirely, avoiding d(sqrt)/dx = Inf
+// at s2=0.  In the trig/hyp branches, sqrt argument is clamped >= eps.
 // ============================================================================
 
 template <class Type>
 void ode_step(Type& biomarker, Type& velocity,
               Type b1, Type b2, Type forcing, Type dt) {
-  Type half_b2 = b2 * Type(0.5);
-  Type D = b2 * b2 + Type(4) * b1;  // discriminant
+  Type m = b2 * dt * Type(0.5);
+  Type D = b2 * b2 + Type(4) * b1;
+  Type s2 = D * dt * dt * Type(0.25);  // delta^2 or -omega^2
 
-  // --- REAL branch (D > 0): two distinct real roots ---
-  Type D_real = safe_sqrt(D);  // safe when D <= 0
-  Type root1 = half_b2 + D_real * Type(0.5);
-  Type root2 = half_b2 - D_real * Type(0.5);
-  // Guard roots near zero to avoid division by zero
-  Type root1_safe = CppAD::CondExpGt(root1 * root1, Type(1e-20), root1, Type(1e-10));
-  Type root2_safe = CppAD::CondExpGt(root2 * root2, Type(1e-20), root2, Type(-1e-10));
-  Type D_real_safe = CppAD::CondExpGt(D_real * D_real, Type(1e-20), D_real, Type(1e-10));
-  Type exp1 = safe_exp(root1 * dt), exp2 = safe_exp(root2 * dt);
-  Type a0_r = (root1 * exp2 - root2 * exp1) / D_real_safe;
-  Type a1_r = (exp1 - exp2) / D_real_safe;
-  Type int1 = (exp1 - Type(1)) / root1_safe;
-  Type int2 = (exp2 - Type(1)) / root2_safe;
-  Type J1_r = (int1 - int2) / D_real_safe;
-  Type J0_r = (root1 * int2 - root2 * int1) / D_real_safe;
+  // Taylor expansion in s2 (valid for both D>0 and D<0 near D=0)
+  Type s4 = s2 * s2;
+  Type sc_taylor = Type(1) + s2 / Type(6) + s4 / Type(120);
+  Type cc_taylor = Type(1) + s2 / Type(2) + s4 / Type(24);
 
-  // --- COMPLEX branch (D < 0): conjugate complex roots ---
-  Type omega = safe_sqrt(-D) * Type(0.5);  // safe when D >= 0
-  Type omega_safe = CppAD::CondExpGt(omega * omega, Type(1e-20), omega, Type(1e-10));
-  Type mod_sq = half_b2 * half_b2 + omega * omega;
-  Type mod_sq_safe = CppAD::CondExpGt(mod_sq, Type(1e-20), mod_sq, Type(1e-10));
-  Type exp_real = safe_exp(half_b2 * dt);
-  Type cos_w = cos(omega * dt), sin_w = sin(omega * dt);
-  Type a0_c = exp_real * (cos_w - half_b2 * sin_w / omega_safe);
-  Type a1_c = exp_real * sin_w / omega_safe;
-  Type int_cos = (exp_real * (half_b2 * cos_w + omega * sin_w) - half_b2) / mod_sq_safe;
-  Type int_sin = (exp_real * (half_b2 * sin_w - omega * cos_w) + omega) / mod_sq_safe;
-  Type J1_c = int_sin / omega_safe;
-  Type J0_c = int_cos - (half_b2 / omega_safe) * int_sin;
+  // For |s2| >= eps, compute via sqrt + trig/hyp
+  Type eps_s2(1e-6);
+  Type abs_s2 = CppAD::CondExpGt(s2, Type(0), s2, -s2);
+  Type safe_abs_s2 = CppAD::CondExpGt(abs_s2, eps_s2, abs_s2, eps_s2);
+  Type r = sqrt(safe_abs_s2);  // sqrt is safe since safe_abs_s2 >= eps
 
-  // --- Select branch via CondExp based on discriminant sign ---
-  Type zero(0);
-  Type a0 = CppAD::CondExpGt(D, zero, a0_r, a0_c);
-  Type a1 = CppAD::CondExpGt(D, zero, a1_r, a1_c);
-  Type J0 = CppAD::CondExpGt(D, zero, J0_r, J0_c);
-  Type J1 = CppAD::CondExpGt(D, zero, J1_r, J1_c);
+  // Real branch: sinhc(r), cosh(r)
+  Type sc_real = sinhc(r);
+  Type cc_real = cosh(r);
+  // Complex branch: sinc(r), cos(r) — note r = sqrt(-s2) = omega
+  Type sc_comp = sinc(r);
+  Type cc_comp = cos(r);
 
+  // Three-way selection: Taylor (|s2|<eps) > real (s2>0) > complex (s2<0)
+  Type sc_rc = CppAD::CondExpGt(s2, Type(0), sc_real, sc_comp);
+  Type cc_rc = CppAD::CondExpGt(s2, Type(0), cc_real, cc_comp);
+  Type sc = CppAD::CondExpLt(abs_s2, eps_s2, sc_taylor, sc_rc);
+  Type cc = CppAD::CondExpLt(abs_s2, eps_s2, cc_taylor, cc_rc);
+
+  Type em = exp(m);
+  Type a0 = em * (cc - m * sc);
+  Type a1 = em * dt * sc;
+
+  // Forcing integral for m: J1 = (a0 - 1) / b1
+  // Removable singularity at b1=0: limit = dt^2 * expm1c2(b2*dt)
+  Type b1_safe = CppAD::CondExpGt(b1 * b1, Type(1e-20), b1, Type(1));
+  Type J1_direct = (a0 - Type(1)) / b1_safe;
+  Type J1_taylor = dt * dt * expm1c2(b2 * dt);
+  Type J1 = CppAD::CondExpGt(b1 * b1, Type(1e-20), J1_direct, J1_taylor);
+
+  // Update: v_forcing = f*a1 (exact, from augmented 3x3 Cayley-Hamilton)
   Type new_m = a0 * biomarker + a1 * velocity + forcing * J1;
   Type new_v = b1 * a1 * biomarker + (a0 + b2 * a1) * velocity +
-               forcing * (J0 + b2 * J1);
+               forcing * a1;
   biomarker = new_m;
   velocity = new_v;
 }
@@ -144,7 +171,7 @@ vector<double> bspline_basis(double t, int degree,
 // ============================================================================
 // Log-linear hazard evaluation
 // log h(t) = B(t)·baseline + alpha_m·m + alpha_v·g(v) + W·beta_surv
-// Returns exp(clamped log-hazard) for Simpson integration
+// Returns exp(log-hazard) for Simpson integration
 // ============================================================================
 
 template <class Type>
@@ -164,7 +191,7 @@ Type eval_hazard(Type biomarker, Type velocity, double t,
   else if (gamma_power == 2) log_h += hazard_coefs(1) * velocity * velocity;
   for (size_t k = 0; k < (size_t)survival_covariates.size(); k++)
     log_h += hazard_coefs(k + 2) * Type(survival_covariates(k));
-  return safe_exp(clamp(log_h, Type(-20.0), Type(20.0)));
+  return exp(log_h);
 }
 
 // ============================================================================

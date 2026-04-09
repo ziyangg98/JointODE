@@ -165,7 +165,6 @@ JointODE <- function(
   ))
 
   parameters$configurations$baseline <- model_config$spline_baseline_config
-  parameters$configurations$biomarker_clamp <- max(abs(all_y)) * 5
   parameters$configurations$hazard_quadrature <- control$hazard_quadrature
   parameters$configurations$gamma <- gamma
 
@@ -193,7 +192,8 @@ JointODE <- function(
   n_re <- ncol(model_config$random_effects)
   if (is.null(parameters$random_effects_init)) {
     parameters$random_effects_init <- matrix(
-      0, nrow = length(data_list), ncol = n_re
+      0,
+      nrow = length(data_list), ncol = n_re
     )
   }
 
@@ -230,8 +230,17 @@ JointODE <- function(
   )
 
   # Extract results
-  results <- .finalize_joint(obj, opt, parameters, coef_names,
-                                  data_list, tmb_data$n_random_effects, control)
+  results <- .finalize_joint(
+    obj, opt, parameters, coef_names,
+    data_list, tmb_data$n_random_effects, control
+  )
+  re_nms <- model_config$re_names
+  sigma_b <- results$parameters$coefficients$random_effect_sigma
+  dimnames(sigma_b) <- list(re_nms, re_nms)
+  results$parameters$coefficients$random_effect_sigma <- sigma_b
+  sigma_b_se <- results$parameters$coefficients$random_effect_sigma_se
+  dimnames(sigma_b_se) <- list(re_nms, re_nms)
+  results$parameters$coefficients$random_effect_sigma_se <- sigma_b_se
 
   structure(c(results, list(
     data = data_list, control = control, call = cl,
@@ -287,41 +296,32 @@ summary.JointODE <- function(object, ...) {
     "initial state:", "", rownames(coef_initial)
   )
 
-  # Delta method for derived parameters (period and xi)
+  # Derived ODE physical parameters
   derived_params <- NULL
   if (!is.null(object$vcov) && n_longitudinal >= 2) {
-    value_coef <- coefs[idx_longitudinal[1]]
-    slope_coef <- coefs[idx_longitudinal[2]]
-    var_value <- object$vcov[idx_longitudinal[1], idx_longitudinal[1]]
-    var_slope <- object$vcov[idx_longitudinal[2], idx_longitudinal[2]]
-    cov_value_slope <- object$vcov[idx_longitudinal[1], idx_longitudinal[2]]
+    raw_b1 <- coefs[idx_longitudinal[1]]
+    raw_b2 <- coefs[idx_longitudinal[2]]
+    var_b1 <- object$vcov[idx_longitudinal[1], idx_longitudinal[1]]
+    var_b2 <- object$vcov[idx_longitudinal[2], idx_longitudinal[2]]
+    cov_b12 <- object$vcov[idx_longitudinal[1], idx_longitudinal[2]]
 
-    if (value_coef < 0) {
-      omega_est <- sqrt(-value_coef)
-      period_est <- 2 * pi / omega_est
-      xi_est <- -slope_coef / (2 * omega_est)
+    omega_est <- exp(raw_b1 / 2)
+    xi_est <- exp(raw_b2 - raw_b1 / 2) / 2
 
-      grad_period_value <- pi / ((-value_coef)^(3 / 2))
-      var_period <- grad_period_value^2 * var_value
-      se_period <- sqrt(var_period)
+    se_omega <- sqrt((omega_est / 2)^2 * var_b1)
+    var_xi <- (xi_est / 2)^2 * var_b1 + xi_est^2 * var_b2 -
+      xi_est^2 * cov_b12
+    se_xi <- sqrt(var_xi)
 
-      grad_xi_value <- -slope_coef / (4 * (-value_coef)^(3 / 2))
-      grad_xi_slope <- -1 / (2 * sqrt(-value_coef))
-      var_xi <- grad_xi_value^2 * var_value +
-        grad_xi_slope^2 * var_slope +
-        2 * grad_xi_value * grad_xi_slope * cov_value_slope
-      se_xi <- sqrt(var_xi)
-
-      derived_params <- cbind(
-        Estimate = c(period_est, xi_est),
-        `Std. Error` = c(se_period, se_xi),
-        `z value` = c(period_est / se_period, xi_est / se_xi),
-        `Pr(>|z|)` = 2 * pnorm(-abs(c(
-          period_est / se_period, xi_est / se_xi
-        )))
-      )
-      rownames(derived_params) <- c("T (period)", "xi (damping ratio)")
-    }
+    derived_params <- cbind(
+      Estimate = c(omega_est, xi_est),
+      `Std. Error` = c(se_omega, se_xi),
+      `z value` = c(omega_est / se_omega, xi_est / se_xi),
+      `Pr(>|z|)` = 2 * pnorm(-abs(c(
+        omega_est / se_omega, xi_est / se_xi
+      )))
+    )
+    rownames(derived_params) <- c("omega (natural frequency)", "xi (damping ratio)")
   }
 
   n_subjects <- length(object$data)
@@ -382,40 +382,56 @@ print.summary.JointODE <- function(
 
   cat("Longitudinal Process: Second-Order ODE Model\n")
   if (!is.null(x$coef_longitudinal)) {
-    .print_coefmat(x$coef_longitudinal, digits = digits,
-                   signif.stars = signif.stars, ...)
+    .print_coefmat(x$coef_longitudinal,
+      digits = digits,
+      signif.stars = signif.stars, ...
+    )
   }
 
   if (!is.null(x$derived_params)) {
     cat("\nODE System Characteristics:\n")
-    .print_coefmat(x$derived_params, digits = digits,
-                   signif.stars = signif.stars, ...)
+    .print_coefmat(x$derived_params,
+      digits = digits,
+      signif.stars = signif.stars, ...
+    )
   }
 
   cat("\nSurvival Process: Proportional Hazards Model\n")
   if (!is.null(x$coef_survival)) {
-    .print_coefmat(x$coef_survival, digits = digits,
-                   signif.stars = signif.stars, ...)
+    .print_coefmat(x$coef_survival,
+      digits = digits,
+      signif.stars = signif.stars, ...
+    )
   }
 
   if (!is.null(x$coef_baseline)) {
-    cat("\nBaseline Hazard: B-spline with", nrow(x$coef_baseline),
-        "basis functions\n")
-    cat("(Coefficients range:",
-        sprintf("[%.3f, %.3f]",
-                min(x$coef_baseline[, "Estimate"]),
-                max(x$coef_baseline[, "Estimate"])), ")\n")
+    cat(
+      "\nBaseline Hazard: B-spline with", nrow(x$coef_baseline),
+      "basis functions\n"
+    )
+    cat(
+      "(Coefficients range:",
+      sprintf(
+        "[%.3f, %.3f]",
+        min(x$coef_baseline[, "Estimate"]),
+        max(x$coef_baseline[, "Estimate"])
+      ), ")\n"
+    )
   }
 
   if (!is.null(x$coef_initial)) {
     cat("\nInitial State: Population Mean\n")
-    .print_coefmat(x$coef_initial, digits = digits,
-                   signif.stars = signif.stars, ...)
+    .print_coefmat(x$coef_initial,
+      digits = digits,
+      signif.stars = signif.stars, ...
+    )
   }
 
   cat("\nVariance Components:\n")
-  cat(sprintf("Measurement Error SD: %.6f (SE: %.6f)\n",
-              x$sigma["sigma_e"], x$sigma_se["sigma_e"]))
+  cat(sprintf(
+    "Measurement Error SD: %.6f (SE: %.6f)\n",
+    x$sigma["sigma_e"], x$sigma_se["sigma_e"]
+  ))
   if (!is.null(x$sigma_b_matrix)) {
     cat("Random Effect Covariance Matrix:\n")
     print(x$sigma_b_matrix, digits = 4)
@@ -441,8 +457,10 @@ coef.JointODE <- function(object, ...) {
   cf <- object$parameters$coefficients
   coefs <- c(cf$baseline, cf$hazard, cf$longitudinal, cf$initial_state)
   names(coefs) <- .prefixed_coef_names(lapply(
-    list(baseline = cf$baseline, hazard = cf$hazard,
-         longitudinal = cf$longitudinal, initial_state = cf$initial_state),
+    list(
+      baseline = cf$baseline, hazard = cf$hazard,
+      longitudinal = cf$longitudinal, initial_state = cf$initial_state
+    ),
     names
   ))
   coefs
@@ -496,8 +514,10 @@ print.JointODE <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
     format(x$logLik, digits = digits),
     "on", n_params, "degrees of freedom\n"
   )
-  cat("AIC:", format(x$AIC, digits = digits),
-      "  BIC:", format(x$BIC, digits = digits), "\n")
+  cat(
+    "AIC:", format(x$AIC, digits = digits),
+    "  BIC:", format(x$BIC, digits = digits), "\n"
+  )
   invisible(x)
 }
 
@@ -526,7 +546,7 @@ predict.JointODE <- function(object, newdata = NULL, times = NULL, ...) {
 
   if (!is.null(newdata)) {
     if (!is.list(newdata) || is.null(newdata$longitudinal_data) ||
-        is.null(newdata$survival_data)) {
+      is.null(newdata$survival_data)) {
       stop("newdata must be a list with $longitudinal_data and $survival_data")
     }
     data_list <- .process_joint(

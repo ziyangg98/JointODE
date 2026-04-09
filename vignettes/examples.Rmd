@@ -15,11 +15,16 @@ knitr::opts_chunk$set(
 )
 ```
 
-JointODE models biomarker trajectories with a second-order ODE and links
-them to survival. This vignette walks through a practical model building
-workflow using PBC serum albumin data.
+This vignette demonstrates a complete JointODE workflow using PBC
+(Primary Biliary Cirrhosis) serum albumin data from the JMbayes2
+package. The workflow has four steps:
 
-# Data Preparation
+1. Prepare and standardize data
+2. Select random effects structure via `MarginalODE`
+3. Fit the joint model via `JointODE`
+4. Interpret and compare results
+
+# Step 1: Data Preparation
 
 ```{r data-prep}
 library(JointODE)
@@ -40,7 +45,7 @@ longitudinal_data <- pbc2 |>
   transmute(id = as.integer(id), time = year, observed = log(albumin)) |>
   left_join(survival_data |> select(id, drug, age, sex), by = "id")
 
-# Standardize --- ODE parameters scale with the response
+# Standardize: ODE parameters scale with the response
 alb_mean <- mean(longitudinal_data$observed)
 alb_sd <- sd(longitudinal_data$observed)
 longitudinal_data$observed <- (longitudinal_data$observed - alb_mean) / alb_sd
@@ -70,129 +75,127 @@ longitudinal_data |>
   theme_minimal(base_size = 12)
 ```
 
-# Random Effects Selection
+# Step 2: Random Effects Selection with MarginalODE
 
-The ODE is $m''(t) = b_1 m(t) + b_2 m'(t) + f(t)$, where $b_1$
-controls natural frequency, $b_2$ controls damping, and $f(t)$ is
-covariate-driven forcing. Initial state RE $(m_{0,i}, v_{0,i})$ are
-always included. We use `MarginalODE` to determine which additional RE
-are needed.
+The ODE is $m''(t) + 2\xi\omega\, m'(t) + \omega^2 m(t) = f(t)$,
+with initial conditions $m(0) = m_0$, $m'(0) = v_0$. The formula uses
+two reserved keywords:
 
-## Three Levels of Complexity
+- `biomarker`: frequency parameter ($\omega^2$, estimated as
+  `log_omega2`)
+- `velocity`: damping parameter ($2\xi\omega$, estimated as
+  `log_2xi_omega`)
+
+Random effects on initial states $(m_{0,i}, v_{0,i})$ are always
+included. We fit models at increasing complexity to find the right
+RE structure.
 
 ```{r marginal-fits}
-# Level 0: Fixed dynamics, random initial state only
+ctrl <- list(parallel = TRUE, verbose = 1)
+
+# Level 0: fixed dynamics, random initial state only
 mfit0 <- MarginalODE(
   observed ~ biomarker + velocity + drug,
   longitudinal_data,
-  control = list(parallel = TRUE, verbose = 1)
+  control = ctrl
 )
 
-# Level 1: + random forcing intercept (individual equilibrium levels)
+# Level 1: + random forcing intercept
 mfit1 <- MarginalODE(
   observed ~ biomarker + velocity + drug + (1 | id),
   longitudinal_data,
-  control = list(parallel = TRUE, verbose = 1)
+  control = ctrl
 )
 
-# Level 2a: + random frequency only
+# Level 2a: + random frequency
 mfit2a <- MarginalODE(
   observed ~ biomarker + velocity + drug + (biomarker | id),
   longitudinal_data,
-  control = list(parallel = TRUE, verbose = 1)
+  control = ctrl
 )
 
-# Level 2b: + random damping only
+# Level 2b: + random damping
 mfit2b <- MarginalODE(
   observed ~ biomarker + velocity + drug + (velocity | id),
   longitudinal_data,
-  control = list(parallel = TRUE, verbose = 1)
+  control = ctrl
 )
 
 # Level 2c: + random frequency & damping
 mfit2c <- MarginalODE(
   observed ~ biomarker + velocity + drug + (biomarker + velocity | id),
   longitudinal_data,
-  control = list(parallel = TRUE, verbose = 1)
+  control = ctrl
 )
 ```
 
 ```{r compare-marginal}
+fits <- list(mfit0, mfit1, mfit2a, mfit2b, mfit2c)
 knitr::kable(data.frame(
-  Model = c("Level 0: fixed dynamics",
-            "Level 1: random forcing",
-            "Level 2a: random frequency",
-            "Level 2b: random damping",
-            "Level 2c: random freq + damp"),
-  RE = c("(none)", "(1|id)", "(biomarker|id)",
-         "(velocity|id)", "(biomarker+velocity|id)"),
-  n_RE = c(2, 3, 3, 3, 4),
-  logLik = c(mfit0$logLik, mfit1$logLik, mfit2a$logLik,
-             mfit2b$logLik, mfit2c$logLik),
-  AIC = c(mfit0$AIC, mfit1$AIC, mfit2a$AIC,
-          mfit2b$AIC, mfit2c$AIC),
-  Converged = c(mfit0$convergence$converged,
-                mfit1$convergence$converged,
-                mfit2a$convergence$converged,
-                mfit2b$convergence$converged,
-                mfit2c$convergence$converged)
+  Model = c(
+    "Level 0: fixed dynamics",
+    "Level 1: + random forcing",
+    "Level 2a: + random frequency",
+    "Level 2b: + random damping",
+    "Level 2c: + random freq & damp"
+  ),
+  RE = c(
+    "(none)", "(1|id)", "(biomarker|id)",
+    "(velocity|id)", "(biomarker+velocity|id)"
+  ),
+  n_RE = sapply(fits, function(f) ncol(f$random_effects)),
+  logLik = sapply(fits, `[[`, "logLik"),
+  AIC = sapply(fits, `[[`, "AIC"),
+  Converged = sapply(fits, function(f) f$convergence$converged)
 ), digits = 1, caption = "MarginalODE model comparison")
 ```
 
-## Diagnosing Level 2
-
-When Level 2 converges, check the dynamics RE variances. Values near
-zero indicate the data does not support that RE.
-
-```{r re-variance}
-re_sd <- sqrt(diag(mfit2c$random_effect_sigma))
-names(re_sd) <- c("init_biomarker", "init_velocity",
-                   "dyn_biomarker", "dyn_velocity")
-knitr::kable(
-  data.frame(RE = names(re_sd), SD = round(re_sd, 4)),
-  caption = "Random effect standard deviations (Level 2)"
-)
-```
-
-## Model Selection
+## Selecting the Best Model
 
 ```{r decision}
-# Collect all candidates
-candidates <- list(
-  list(name = "Level 0", fit = mfit0,
-       formula = observed ~ biomarker + velocity + drug),
-  list(name = "Level 1", fit = mfit1,
-       formula = observed ~ biomarker + velocity + drug + (1 | id)),
-  list(name = "Level 2a", fit = mfit2a,
-       formula = observed ~ biomarker + velocity + drug + (biomarker | id)),
-  list(name = "Level 2b", fit = mfit2b,
-       formula = observed ~ biomarker + velocity + drug + (velocity | id)),
-  list(name = "Level 2c", fit = mfit2c,
-       formula = observed ~ biomarker + velocity + drug +
-         (biomarker + velocity | id))
-)
-
-# Select: best AIC among converged models
-converged <- Filter(function(x) x$fit$convergence$converged, candidates)
-if (length(converged) == 0) {
-  # Fallback: use Level 1 even if not converged
-  best <- candidates[[2]]
-} else {
-  aics <- sapply(converged, function(x) x$fit$AIC)
-  best <- converged[[which.min(aics)]]
-}
-cat(sprintf("Selected: %s (AIC = %.1f)\n", best$name, best$fit$AIC))
-selected_formula <- best$formula
+converged_idx <- which(sapply(fits, function(f) f$convergence$converged))
+aics <- sapply(fits[converged_idx], `[[`, "AIC")
+best_idx <- converged_idx[which.min(aics)]
+best_marginal <- fits[[best_idx]]
+cat(sprintf(
+  "Selected: Level %s (AIC = %.1f)\n",
+  c("0", "1", "2a", "2b", "2c")[best_idx], best_marginal$AIC
+))
 ```
 
-Non-convergence at Level 2 is not a software failure; it signals that
-the data cannot identify subject-specific dynamics. For PBC albumin,
-trajectories are mostly monotone with little curvature variation across
-patients, so a simpler model is the appropriate choice.
+```{r best-summary}
+summary(best_marginal)
+```
 
-# Joint Model
+The best model (Level 2b) adds random damping. The large damping
+ratio ($\xi \gg 1$) indicates overdamped dynamics: albumin declines
+monotonically rather than oscillating, consistent with PBC biology.
+
+## RE Variance Diagnostics
+
+```{r re-variance}
+re_sigma <- best_marginal$random_effect_sigma
+knitr::kable(
+  data.frame(RE = rownames(re_sigma), SD = round(sqrt(diag(re_sigma)), 4)),
+  caption = "Random effect standard deviations"
+)
+```
+
+# Step 3: Joint Model
+
+We now link the longitudinal trajectories to survival using `JointODE`.
+The `init = "marginal"` option warm-starts from the MarginalODE fit.
 
 ```{r fit-joint}
+# Use the formula from the best marginal model
+selected_formula <- list(
+  observed ~ biomarker + velocity + drug,
+  observed ~ biomarker + velocity + drug + (1 | id),
+  observed ~ biomarker + velocity + drug + (biomarker | id),
+  observed ~ biomarker + velocity + drug + (velocity | id),
+  observed ~ biomarker + velocity + drug + (biomarker + velocity | id)
+)[[best_idx]]
+
 fit <- JointODE(
   longitudinal_formula = selected_formula,
   survival_formula = Surv(time, status) ~ drug + age + sex,
@@ -204,126 +207,27 @@ fit <- JointODE(
 summary(fit)
 ```
 
-## Interpreting ODE Parameters
+# Step 4: Interpretation
+
+## ODE Dynamics
+
+The summary reports $\omega$ (natural frequency) and $\xi$ (damping
+ratio) with delta-method standard errors:
 
 ```{r ode-interpretation}
-cf <- coef(fit)
-b1 <- cf["longitudinal:biomarker"]
-b2 <- cf["longitudinal:velocity"]
-
-if (b1 < 0) {
-  omega <- sqrt(-b1)
-  xi <- -b2 / (2 * omega)
-  cat(sprintf("Period: %.1f years | Damping ratio: %.3f\n",
-              2 * pi / omega, xi))
-  cat(if (xi > 1) "Overdamped: monotonic decay.\n"
-      else if (xi > 0) "Underdamped: damped oscillation.\n"
-      else "Unstable: negative damping.\n")
-}
+summary(fit)$derived_params
 ```
-
-A period much longer than follow-up (here ~28 years vs. ~15 years of
-follow-up) means the ODE effectively describes exponential decay rather
-than oscillation. This is consistent with the biology of albumin
-decline in PBC.
 
 ## Survival Association
 
-The hazard links both biomarker level and velocity to risk:
+The hazard model links biomarker value and velocity to event risk:
 
-$$\log h_i(t) = \alpha_1 m_i(t) + \alpha_2 m_i'(t) + W_i'\beta + \text{baseline}$$
+$$\log h_i(t) = \alpha_\text{value}\, m_i(t) + \alpha_\text{velocity}\, m_i'(t) + W_i'\beta + \text{baseline}$$
 
-Unlike standard joint models where `slope()` must be explicitly
-specified, JointODE derives velocity naturally from the ODE solution.
+JointODE provides both associations by construction, without needing
+to specify `slope()` as in JMbayes2.
 
-# Comparison with Alternative Approaches
-
-## Extended Cox Model
-
-A time-dependent Cox model treats the biomarker as a step-function
-covariate updated at each observation time. This is a common baseline
-that ignores measurement error and interpolation.
-
-```{r fit-cox-td}
-# Build counting-process dataset via tmerge
-base <- survival_data |> select(id, time, status, drug, age, sex)
-td <- tmerge(base, base, id = id, event = event(time, status))
-td <- tmerge(td, longitudinal_data, id = id,
-             observed = tdc(time, observed))
-
-cox_td <- coxph(
-  Surv(tstart, tstop, event) ~ observed + drug + age + sex,
-  data = td
-)
-```
-
-## JMbayes2
-
-```{r fit-jmbayes2}
-cox_fit <- coxph(
-  Surv(time, status) ~ drug + age + sex,
-  data = survival_data, x = TRUE
-)
-lme_fit <- lme(
-  observed ~ ns(time, 3) * drug,
-  random = ~ time | id,
-  data = longitudinal_data
-)
-
-jm_val <- jm(cox_fit, lme_fit, time_var = "time",
-             functional_forms = list("observed" = ~ value(observed)))
-jm_both <- jm(cox_fit, lme_fit, time_var = "time",
-              functional_forms = list(
-                "observed" = ~ value(observed) + slope(observed)
-              ))
-```
-
-## Hazard Coefficient Comparison
-
-```{r comparison-table}
-ode_cf <- coef(fit)
-ode_se <- sqrt(diag(vcov(fit)))
-cox_s <- summary(cox_td)$coefficients
-jv <- summary(jm_val)$Survival
-jb <- summary(jm_both)$Survival
-
-f <- function(est, se) sprintf("%.3f (%.3f)", est, se)
-
-knitr::kable(data.frame(
-  Parameter = c("Biomarker level", "Biomarker velocity",
-                "Drug", "Age", "Sex"),
-  JointODE = c(
-    f(ode_cf["hazard:alpha_1"], ode_se["hazard:alpha_1"]),
-    f(ode_cf["hazard:alpha_2"], ode_se["hazard:alpha_2"]),
-    f(ode_cf["hazard:drug"], ode_se["hazard:drug"]),
-    f(ode_cf["hazard:age"], ode_se["hazard:age"]),
-    f(ode_cf["hazard:sex"], ode_se["hazard:sex"])),
-  Ext.Cox = c(
-    f(cox_s["observed", 1], cox_s["observed", 3]), "--",
-    f(cox_s["drug", 1], cox_s["drug", 3]),
-    f(cox_s["age", 1], cox_s["age", 3]),
-    f(cox_s["sex", 1], cox_s["sex", 3])),
-  JM.value = c(
-    f(jv["value(observed)", 1], jv["value(observed)", 2]), "--",
-    f(jv["drug", 1], jv["drug", 2]),
-    f(jv["age", 1], jv["age", 2]),
-    f(jv["sex", 1], jv["sex", 2])),
-  JM.value.slope = c(
-    f(jb["value(observed)", 1], jb["value(observed)", 2]),
-    f(jb["slope(observed)", 1], jb["slope(observed)", 2]),
-    f(jb["drug", 1], jb["drug", 2]),
-    f(jb["age", 1], jb["age", 2]),
-    f(jb["sex", 1], jb["sex", 2]))
-), align = c("l", "r", "r", "r", "r"),
-caption = "Hazard coefficients: estimate (SE)")
-```
-
-The extended Cox model cannot estimate a velocity effect and is
-susceptible to bias from measurement error. JMbayes2 requires
-explicitly specifying `slope()` as a functional form, while JointODE
-provides both value and velocity associations by construction.
-
-# Diagnostics
+## Predicted Trajectories
 
 ```{r predicted-trajectories, fig.height=6}
 pred <- predict(fit)
@@ -347,13 +251,102 @@ pred |>
 cat(sprintf("C-index: %.3f\n", fit$cindex))
 ```
 
-# Workflow Summary
+# Comparison with Alternative Approaches
 
-1. **Standardize** the response
-2. **Fit MarginalODE** at increasing complexity (Level 0 / 1 / 2)
-3. **Select RE** based on convergence, AIC, and RE variance diagnostics
-4. **Fit JointODE** with `init = "marginal"`
-5. **Compare** with standard approaches (JMbayes2)
+## Extended Cox Model
+
+```{r fit-cox-td}
+base <- survival_data |> select(id, time, status, drug, age, sex)
+td <- tmerge(base, base, id = id, event = event(time, status))
+td <- tmerge(td, longitudinal_data,
+  id = id,
+  observed = tdc(time, observed)
+)
+
+cox_td <- coxph(
+  Surv(tstart, tstop, event) ~ observed + drug + age + sex,
+  data = td
+)
+```
+
+## JMbayes2
+
+```{r fit-jmbayes2}
+cox_fit <- coxph(
+  Surv(time, status) ~ drug + age + sex,
+  data = survival_data, x = TRUE
+)
+lme_fit <- lme(
+  observed ~ ns(time, 3) * drug,
+  random = ~ time | id,
+  data = longitudinal_data
+)
+
+jm_val <- jm(cox_fit, lme_fit,
+  time_var = "time",
+  functional_forms = list("observed" = ~ value(observed))
+)
+jm_both <- jm(cox_fit, lme_fit,
+  time_var = "time",
+  functional_forms = list(
+    "observed" = ~ value(observed) + slope(observed)
+  )
+)
+```
+
+## Hazard Coefficient Comparison
+
+```{r comparison-table}
+ode_cf <- coef(fit)
+ode_se <- sqrt(diag(vcov(fit)))
+cox_s <- summary(cox_td)$coefficients
+jv <- summary(jm_val)$Survival
+jb <- summary(jm_both)$Survival
+
+f <- function(est, se) sprintf("%.3f (%.3f)", est, se)
+
+knitr::kable(
+  data.frame(
+    Parameter = c(
+      "Biomarker level", "Biomarker velocity",
+      "Drug", "Age", "Sex"
+    ),
+    JointODE = c(
+      f(ode_cf["hazard:value"], ode_se["hazard:value"]),
+      f(ode_cf["hazard:velocity"], ode_se["hazard:velocity"]),
+      f(ode_cf["hazard:drug"], ode_se["hazard:drug"]),
+      f(ode_cf["hazard:age"], ode_se["hazard:age"]),
+      f(ode_cf["hazard:sex"], ode_se["hazard:sex"])
+    ),
+    Ext.Cox = c(
+      f(cox_s["observed", 1], cox_s["observed", 3]), "--",
+      f(cox_s["drug", 1], cox_s["drug", 3]),
+      f(cox_s["age", 1], cox_s["age", 3]),
+      f(cox_s["sex", 1], cox_s["sex", 3])
+    ),
+    JM.value = c(
+      f(jv["value(observed)", 1], jv["value(observed)", 2]), "--",
+      f(jv["drug", 1], jv["drug", 2]),
+      f(jv["age", 1], jv["age", 2]),
+      f(jv["sex", 1], jv["sex", 2])
+    ),
+    JM.value.slope = c(
+      f(jb["value(observed)", 1], jb["value(observed)", 2]),
+      f(jb["slope(observed)", 1], jb["slope(observed)", 2]),
+      f(jb["drug", 1], jb["drug", 2]),
+      f(jb["age", 1], jb["age", 2]),
+      f(jb["sex", 1], jb["sex", 2])
+    )
+  ),
+  align = c("l", "r", "r", "r", "r"),
+  caption = "Hazard coefficients: estimate (SE)"
+)
+```
+
+The extended Cox model cannot estimate a velocity effect and is
+susceptible to bias from measurement error. JMbayes2 requires
+explicitly specifying `slope()` as a functional form, while JointODE
+provides both associations by construction.
 
 ```{r session-info}
 sessionInfo()

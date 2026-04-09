@@ -29,9 +29,7 @@ test_that("summary.JointODE returns correct structure", {
 
 test_that("summary.JointODE includes derived params", {
   s <- summary(mock)
-  if (mock$parameters$coefficients$longitudinal[1] < 0) {
-    expect_equal(nrow(s$derived_params), 2)
-  }
+  expect_equal(nrow(s$derived_params), 2)
 })
 
 test_that("print.summary.JointODE works", {
@@ -76,13 +74,13 @@ test_that("logLik.JointODE returns logLik class", {
 # ==============================================================================
 
 ld <- sim$data$longitudinal_data[, c("id", "time", "observed", "x1", "x2")]
-ids10 <- unique(ld$id)[1:10]
+ids30 <- unique(ld$id)[1:30]
 fit_plot <- JointODE(
   observed ~ biomarker + velocity + x1 + x2 + (biomarker + velocity | id),
   Surv(time, status) ~ w1 + w2,
-  ld[ld$id %in% ids10, ],
-  sim$data$survival_data[sim$data$survival_data$id %in% ids10, ],
-  init = sim$init, control = list(maxit = 5, verbose = 0)
+  ld[ld$id %in% ids30, ],
+  sim$data$survival_data[sim$data$survival_data$id %in% ids30, ],
+  init = sim$init, control = list(maxit = 10, verbose = 0)
 )
 
 test_that("predict returns expected columns", {

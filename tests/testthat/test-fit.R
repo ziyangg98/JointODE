@@ -6,7 +6,7 @@ test_that("MarginalODE basic fit converges", {
   fit <- MarginalODE(
     formula = observed ~ x1 + x2,
     data = sim$data$longitudinal_data,
-    control = list(maxit = 50, verbose = 0)
+    control = list(maxit = 100, verbose = 0)
   )
   expect_true(fit$convergence$converged)
   expect_true(is.finite(fit$logLik))

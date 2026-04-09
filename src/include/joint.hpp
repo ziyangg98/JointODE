@@ -23,7 +23,6 @@ Type joint_ode_nll(objective_function<Type>* obj) {
   DATA_VECTOR(long_random_covariates);
   DATA_VECTOR(surv_covariates);
   DATA_INTEGER(n_surv_covariates);
-  DATA_SCALAR(clamp_value);
   DATA_INTEGER(hazard_quadrature);
   DATA_SCALAR(velocity_power);
   DATA_INTEGER(baseline_degree);
@@ -36,7 +35,6 @@ Type joint_ode_nll(objective_function<Type>* obj) {
 
   // Convert DATA_SCALAR/VECTOR to double for non-AD helper functions
   double velocity_power_val = asDouble(velocity_power);
-  double clamp_val = asDouble(clamp_value);
   int n_quadrature = std::max(hazard_quadrature, 1);
   vector<double> knots_d(baseline_knots.size()), boundary_d(baseline_boundary.size());
   for (size_t i = 0; i < (size_t)knots_d.size(); i++) knots_d(i) = asDouble(baseline_knots(i));
@@ -69,7 +67,6 @@ Type joint_ode_nll(objective_function<Type>* obj) {
   using namespace density;
   UNSTRUCTURED_CORR_t<Type> corr_structure(corr_par);
   Type sigma_e = exp(log_sigma_e);
-  Type BC = Type(clamp_val);
 
   // Output vectors for REPORT (filled per-subject, safe for parallel)
   int n_total_obs = obs_times.size();
@@ -120,10 +117,10 @@ Type joint_ode_nll(objective_function<Type>* obj) {
     // b1, b2 are constant across time steps (depend on fixed + RE only)
     Type b1(0), b2(0);
     int fixed_idx = 0, re_idx = 2;
-    if (biomarker_fixed)  b1  = longitudinal(fixed_idx++);
-    if (biomarker_random) b1 += bi(re_idx++);
-    if (velocity_fixed)   b2  = longitudinal(fixed_idx++);
-    if (velocity_random)  b2 += bi(re_idx++);
+    if (biomarker_fixed)  b1  = -exp(longitudinal(fixed_idx++));
+    if (biomarker_random) b1 *= exp(bi(re_idx++));
+    if (velocity_fixed)   b2  = -exp(longitudinal(fixed_idx++));
+    if (velocity_random)  b2 *= exp(bi(re_idx++));
     int forcing_fixed_start = fixed_idx;
     int forcing_re_start = re_idx;
 
@@ -148,15 +145,11 @@ Type joint_ode_nll(objective_function<Type>* obj) {
         // Midpoint
         Type m_mid = m, v_mid = v;
         ode_step(m_mid, v_mid, b1, b2, forcing, Type(sub_dt * 0.5));
-        m_mid = clamp(m_mid, -BC, BC);
-        v_mid = clamp(v_mid, -BC, BC);
         Type h_mid = eval_hazard(m_mid, v_mid, t_start + sub_dt * 0.5,
                                  baseline_degree, full_knots,
                                  baseline, hazard, surv_cov_i, velocity_power_val);
         // Right endpoint
         ode_step(m_mid, v_mid, b1, b2, forcing, Type(sub_dt * 0.5));
-        m_mid = clamp(m_mid, -BC, BC);
-        v_mid = clamp(v_mid, -BC, BC);
         Type h_right = eval_hazard(m_mid, v_mid, t_start + sub_dt,
                                    baseline_degree, full_knots,
                                    baseline, hazard, surv_cov_i, velocity_power_val);

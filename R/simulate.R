@@ -353,10 +353,10 @@ simulate <- function(
     "longitudinal$initial must be a list" = is.list(longitudinal$initial),
     "initial$biomarker must have mean and sd" =
       length(longitudinal$initial$biomarker) == 2 &&
-      all(c("mean", "sd") %in% names(longitudinal$initial$biomarker)),
+        all(c("mean", "sd") %in% names(longitudinal$initial$biomarker)),
     "initial$velocity must have mean and sd" =
       length(longitudinal$initial$velocity) == 2 &&
-      all(c("mean", "sd") %in% names(longitudinal$initial$velocity)),
+        all(c("mean", "sd") %in% names(longitudinal$initial$velocity)),
     "initial$biomarker sd must be non-negative" =
       longitudinal$initial$biomarker["sd"] >= 0,
     "initial$velocity sd must be non-negative" =
@@ -481,10 +481,8 @@ simulate <- function(
   names(surv_data)[names(surv_data) == "eventtime"] <- "time"
 
   mu <- attr(dynamics, "mu")
-  # Dynamics random effects: deviations from population mean
-  dyn_re <- dynamics[, c("dyn_biomarker", "dyn_velocity"), drop = FALSE]
-  dyn_re <- sweep(dyn_re, 2, mu[c("dyn_biomarker", "dyn_velocity")], "-")
-  dyn_re <- as.matrix(dyn_re)
+  dyn_vals <- as.matrix(dynamics[, c("dyn_biomarker", "dyn_velocity")])
+  dyn_re <- sweep(log(-dyn_vals), 2, log(-mu[c("dyn_biomarker", "dyn_velocity")]))
 
   # Initial state random effects: deviations from mean
   init_final <- as.matrix(init[, c("biomarker", "velocity")])
@@ -555,6 +553,7 @@ simulate <- function(
     long_params$excitation
   )
   longitudinal_coef <- dynamics_params$mu
+  longitudinal_coef[1:2] <- dynamics_params$mu_tmb
   random_effect_sigma <- dynamics_params$sigma
 
   hazard_coef <- c(
@@ -653,33 +652,31 @@ simulate <- function(
   }
   names(mu) <- c("dyn_biomarker", "dyn_velocity", "dyn_offset", cov_names)
 
-  jacobian <- matrix(0, nrow = 2, ncol = 2)
-  jacobian[1, 1] <- -2 * mu_omega
-  jacobian[2, 1] <- -2 * mu_xi
-  jacobian[2, 2] <- -2 * mu_omega
+  mu_tmb <- c(log(mu_omega^2), log(2 * mu_xi * mu_omega))
+
+  # Jacobian of (log(-b1), log(-b2)) w.r.t. (omega, xi)
+  jacobian <- matrix(c(2 / mu_omega, 1 / mu_omega, 0, 1 / mu_xi), 2, 2)
 
   sigma_orig <- diag(c(sigma_omega^2, sigma_xi^2))
   sigma <- jacobian %*% sigma_orig %*% t(jacobian)
 
-  list(mu = mu, sigma = sigma)
+  list(mu = mu, mu_tmb = mu_tmb, sigma = sigma)
 }
 
 .generate_patient_dynamics <- function(n_subjects, xi, period, excitation) {
   params <- .compute_dynamics_parameters(xi, period, excitation)
 
-  dyn_samples <- MASS::mvrnorm(
+  # Sample (log(-b1), b2) jointly, convert b1 to natural
+  samples <- MASS::mvrnorm(
     n_subjects,
-    mu = params$mu[1:2],
+    mu = params$mu_tmb,
     Sigma = params$sigma
   )
-
-  if (n_subjects == 1) {
-    dyn_samples <- matrix(dyn_samples, nrow = 1)
-  }
+  if (n_subjects == 1) samples <- matrix(samples, nrow = 1)
 
   n_coefs <- length(params$mu)
   random_effects <- matrix(0, nrow = n_subjects, ncol = n_coefs)
-  random_effects[, 1:2] <- dyn_samples
+  random_effects[, 1:2] <- -exp(samples)
   random_effects[, 3:n_coefs] <- matrix(
     rep(params$mu[3:n_coefs], each = n_subjects),
     nrow = n_subjects,
@@ -689,6 +686,7 @@ simulate <- function(
 
   dynamics <- data.frame(id = seq_len(n_subjects), random_effects)
   attr(dynamics, "mu") <- params$mu
+  attr(dynamics, "mu_tmb") <- params$mu_tmb
   attr(dynamics, "sigma") <- params$sigma
   dynamics
 }

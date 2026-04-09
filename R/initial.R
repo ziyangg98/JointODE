@@ -72,7 +72,8 @@
   if (!is.null(marginal_re) && nrow(marginal_re) > 1) {
     n_shared <- min(ncol(marginal_re), n_re)
     re_cov <- cov(marginal_re[, seq_len(n_shared), drop = FALSE],
-                  use = "complete.obs")
+      use = "complete.obs"
+    )
     re_cov[is.na(re_cov)] <- 1e-2
     diag(re_cov) <- pmax(diag(re_cov), 1e-4)
     sigma[seq_len(n_shared), seq_len(n_shared)] <- re_cov
@@ -144,16 +145,22 @@
     cli::cli_h3("Initialized parameters")
     cat("Longitudinal:\n")
     cat("  Coefficients:", vfmt(cf$longitudinal), "\n")
-    cat("  Initial state:",
-        vfmt(cf$initial_state), "\n")
+    cat(
+      "  Initial state:",
+      vfmt(cf$initial_state), "\n"
+    )
     cat("Survival:\n")
     cat("  Hazard:      ", vfmt(cf$hazard), "\n")
     cat("  Baseline:    ", vfmt(cf$baseline), "\n")
     cat("Variance:\n")
-    cat("  sigma_e:     ",
-        format(cf$measurement_error_sd, digits = 4), "\n")
-    cat("  Random SD:   ",
-        vfmt(sqrt(diag(cf$random_effect_sigma))), "\n")
+    cat(
+      "  sigma_e:     ",
+      format(cf$measurement_error_sd, digits = 4), "\n"
+    )
+    cat(
+      "  Random SD:   ",
+      vfmt(sqrt(diag(cf$random_effect_sigma))), "\n"
+    )
   }
 
   params
@@ -174,23 +181,26 @@
     parsed_long$fixed_terms
   )
   reduced_formula <- .build_formula(
-    fixed_terms, response = parsed_long$response
+    fixed_terms,
+    response = parsed_long$response
   )
 
-  if (control$verbose > 0)
+  if (control$verbose > 0) {
     cli::cli_alert_info(
       "Phase 1: fitting reduced model (no dynamics RE)"
     )
+  }
 
   fit0 <- MarginalODE(
     formula = reduced_formula, data = data,
     time = time, id = id, control = control
   )
 
-  if (control$verbose > 0)
+  if (control$verbose > 0) {
     cli::cli_alert_success(sprintf(
       "Phase 1 done (logLik: %.2f)", fit0$logLik
     ))
+  }
 
   list(
     longitudinal = unname(fit0$parameters[
