@@ -7,7 +7,14 @@ X\beta\\
 ## Usage
 
 ``` r
-MarginalODE(formula, data, time = "time", id = "id", control = list())
+MarginalODE(
+  formula,
+  data,
+  time = "time",
+  id = "id",
+  residual = c("gaussian", "student_t"),
+  control = list()
+)
 ```
 
 ## Arguments
@@ -27,6 +34,11 @@ MarginalODE(formula, data, time = "time", id = "id", control = list())
 - id:
 
   Subject identifier name (default: `"id"`)
+
+- residual:
+
+  Residual distribution, either `"gaussian"` or `"student_t"`.
+  Student-t residuals estimate the degrees of freedom.
 
 - control:
 

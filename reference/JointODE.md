@@ -16,6 +16,7 @@ JointODE(
   longitudinal_data,
   survival_data,
   gamma = 1,
+  residual = c("gaussian", "student_t"),
   spline_baseline = list(degree = 2, n_knots = 1, knot_placement = "equal",
     boundary_knots = NULL),
   init = "default",
@@ -57,6 +58,11 @@ JointODE(
   in the hazard function. When `gamma = 0`, velocity has no effect;
   `gamma = 1` uses linear velocity; `gamma = 2` uses squared velocity.
   Default is 1 (default: 1).
+
+- residual:
+
+  Residual distribution, either `"gaussian"` or `"student_t"`.
+  Student-t residuals estimate the degrees of freedom.
 
 - spline_baseline:
 
