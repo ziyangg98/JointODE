@@ -10,6 +10,7 @@ JointODE(
   longitudinal_data,
   survival_data,
   gamma = 1,
+  residual = c("gaussian", "student_t"),
   spline_baseline = list(degree = 2, n_knots = 1, knot_placement = "equal",
     boundary_knots = NULL),
   init = "default",
@@ -42,6 +43,9 @@ and baseline covariates.}
 effect in the hazard function. When \code{gamma = 0}, velocity has no
 effect; \code{gamma = 1} uses linear velocity; \code{gamma = 2} uses
 squared velocity. Default is 1 (default: 1).}
+
+\item{residual}{Residual distribution, either \code{"gaussian"} or
+\code{"student_t"}. Student-t residuals estimate the degrees of freedom.}
 
 \item{spline_baseline}{A list controlling the B-spline representation of the
 baseline hazard function with the following components:

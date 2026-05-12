@@ -28,6 +28,8 @@
 #'   effect in the hazard function. When \code{gamma = 0}, velocity has no
 #'   effect; \code{gamma = 1} uses linear velocity; \code{gamma = 2} uses
 #'   squared velocity. Default is 1 (default: 1).
+#' @param residual Residual distribution, either \code{"gaussian"} or
+#'   \code{"student_t"}. Student-t residuals estimate the degrees of freedom.
 #' @param spline_baseline A list controlling the B-spline representation of the
 #'   baseline hazard function with the following components:
 #'   \describe{
@@ -85,6 +87,7 @@ JointODE <- function(
   longitudinal_data,
   survival_data,
   gamma = 1,
+  residual = c("gaussian", "student_t"),
   spline_baseline = list(
     degree = 2,
     n_knots = 1,
@@ -96,6 +99,7 @@ JointODE <- function(
   ...
 ) {
   cl <- match.call()
+  residual <- match.arg(residual)
 
   # Parse formulas and config once
   parsed_long <- .parse_longitudinal_formula(longitudinal_formula)
@@ -149,14 +153,14 @@ JointODE <- function(
   if (is.character(init) && init == "marginal") {
     parameters <- .initialize_from_marginal(
       longitudinal_formula, longitudinal_data, survival_data,
-      gamma, control, parsed_long, parsed_surv, model_config
+      gamma, residual, control, parsed_long, parsed_surv, model_config
     )
   } else if (is.list(init)) {
     parameters <- init
   } else {
     parameters <- .default_parameters(
       model_config$dims, gamma, parsed_long,
-      model_config$spline_baseline_config
+      model_config$spline_baseline_config, residual
     )
   }
 
@@ -167,6 +171,7 @@ JointODE <- function(
   parameters$configurations$baseline <- model_config$spline_baseline_config
   parameters$configurations$hazard_quadrature <- control$hazard_quadrature
   parameters$configurations$gamma <- gamma
+  parameters$configurations$residual <- residual
 
   # Data-driven defaults for initial state and sigma_e
   # (prevents inner Newton divergence when init = "default")
@@ -321,7 +326,9 @@ summary.JointODE <- function(object, ...) {
         omega_est / se_omega, xi_est / se_xi
       )))
     )
-    rownames(derived_params) <- c("omega (natural frequency)", "xi (damping ratio)")
+    rownames(derived_params) <- c(
+      "omega (natural frequency)", "xi (damping ratio)"
+    )
   }
 
   n_subjects <- length(object$data)
@@ -337,8 +344,7 @@ summary.JointODE <- function(object, ...) {
       coef_longitudinal = coef_longitudinal,
       coef_initial = coef_initial,
       derived_params = derived_params,
-      sigma = c(sigma_e = object$parameters$coefficients$measurement_error_sd),
-      sigma_se = c(sigma_e = object$parameters$coefficients$measurement_error_sd_se),
+      residual = object$residual,
       sigma_b_matrix = object$parameters$coefficients$random_effect_sigma,
       sigma_b_matrix_se = object$parameters$coefficients$random_effect_sigma_se,
       logLik = object$logLik,
@@ -374,6 +380,7 @@ print.summary.JointODE <- function(
     x$n_observations, x$n_events, x$event_rate * 100
   ))
   cat(sprintf("Number of Subjects: %d\n", x$nobs))
+  cat(sprintf("Residual: %s\n", x$residual$family))
 
   cat(sprintf("\n%10s %10s %10s\n", "AIC", "BIC", "logLik"))
   cat(sprintf("%10.3f %10.3f %10.3f\n", x$AIC, x$BIC, x$logLik))
@@ -430,8 +437,14 @@ print.summary.JointODE <- function(
   cat("\nVariance Components:\n")
   cat(sprintf(
     "Measurement Error SD: %.6f (SE: %.6f)\n",
-    x$sigma["sigma_e"], x$sigma_se["sigma_e"]
+    x$residual$sigma, x$residual$sigma_se
   ))
+  if (x$residual$family == "student_t") {
+    cat(sprintf(
+      "Student-t df (nu): %.6f (SE: %.6f)\n",
+      x$residual$nu, x$residual$nu_se
+    ))
+  }
   if (!is.null(x$sigma_b_matrix)) {
     cat("Random Effect Covariance Matrix:\n")
     print(x$sigma_b_matrix, digits = 4)
@@ -505,6 +518,7 @@ logLik.JointODE <- function(object, ...) {
 #' @export
 print.JointODE <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
   cat("\nJoint ODE Model (TMB)\n")
+  cat("Residual:", x$residual$family, "\n")
   cat("Call: ")
   print(x$call)
 
@@ -563,7 +577,9 @@ predict.JointODE <- function(object, newdata = NULL, times = NULL, ...) {
     re_new <- matrix(0, nrow = length(new_ids), ncol = n_re)
     matched <- match(new_ids, orig_ids)
     has_match <- !is.na(matched)
-    if (any(has_match)) re_new[has_match, ] <- re[matched[has_match], , drop = FALSE]
+    if (any(has_match)) {
+      re_new[has_match, ] <- re[matched[has_match], , drop = FALSE]
+    }
     re <- re_new
   } else {
     data_list <- object$data

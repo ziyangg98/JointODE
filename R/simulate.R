@@ -482,7 +482,9 @@ simulate <- function(
 
   mu <- attr(dynamics, "mu")
   dyn_vals <- as.matrix(dynamics[, c("dyn_biomarker", "dyn_velocity")])
-  dyn_re <- sweep(log(-dyn_vals), 2, log(-mu[c("dyn_biomarker", "dyn_velocity")]))
+  dyn_re <- sweep(
+    log(-dyn_vals), 2, log(-mu[c("dyn_biomarker", "dyn_velocity")])
+  )
 
   # Initial state random effects: deviations from mean
   init_final <- as.matrix(init[, c("biomarker", "velocity")])

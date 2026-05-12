@@ -65,6 +65,18 @@ Type expm1c2(Type x) {
 // ============================================================================
 
 template <class Type>
+Type observation_logdensity(Type y, Type mean, Type sigma,
+                            int residual_family, Type nu) {
+  if (residual_family == 0) return dnorm(y, mean, sigma, true);
+  Type r = (y - mean) / sigma;
+  return lgamma((nu + Type(1)) / Type(2)) -
+         lgamma(nu / Type(2)) -
+         Type(0.5) * (log(nu) + log(Type(3.14159265358979323846))) -
+         log(sigma) -
+         ((nu + Type(1)) / Type(2)) * log(Type(1) + r * r / nu);
+}
+
+template <class Type>
 void ode_step(Type& biomarker, Type& velocity,
               Type b1, Type b2, Type forcing, Type dt) {
   Type m = b2 * dt * Type(0.5);

@@ -189,6 +189,7 @@
     n_random_covariates = as.integer(n_random_covariates),
     long_fixed_covariates = flatten_design("fixed"),
     long_random_covariates = flatten_design("random"),
+    residual_family = as.integer(configs$residual == "student_t"),
     surv_covariates = surv_covariates,
     n_surv_covariates = as.integer(n_surv_covariates),
     hazard_quadrature = as.integer(control$hazard_quadrature),
@@ -220,6 +221,11 @@
     longitudinal = coefs$longitudinal,
     initial_state = coefs$initial_state,
     log_sigma_e = log(coefs$measurement_error_sd),
+    residual_params = if (parameters$configurations$residual == "student_t") {
+      log(3)
+    } else {
+      numeric(0)
+    },
     log_sd_re = corr$log_sd_re,
     corr_par = corr$corr_par,
     random_effects = parameters$random_effects_init
@@ -294,7 +300,7 @@
 
 #' Pack marginal data into flat TMB input
 #' @noRd
-.pack_marginal_data <- function(data_list, parsed_long, n_re) {
+.pack_marginal_data <- function(data_list, parsed_long, n_re, residual) {
   n_subjects <- length(data_list)
 
   n_observations <- vapply(data_list, function(d) {
@@ -302,7 +308,9 @@
   }, integer(1))
 
   obs_times <- unlist(lapply(data_list, function(d) d$longitudinal$times))
-  obs_values <- unlist(lapply(data_list, function(d) d$longitudinal$measurements))
+  obs_values <- unlist(lapply(data_list, function(d) {
+    d$longitudinal$measurements
+  }))
 
   n_fixed_covariates <- ncol(data_list[[1]]$longitudinal$covariates$fixed)
   n_random_covariates <- ncol(data_list[[1]]$longitudinal$covariates$random)
@@ -325,6 +333,7 @@
     n_random_covariates = as.integer(n_random_covariates),
     long_fixed_covariates = flatten_design("fixed"),
     long_random_covariates = flatten_design("random"),
+    residual_family = as.integer(residual == "student_t"),
     biomarker_fixed = as.integer(parsed_long$biomarker$fixed),
     biomarker_random = as.integer(parsed_long$biomarker$random),
     velocity_fixed = as.integer(parsed_long$velocity$fixed),
@@ -357,7 +366,7 @@
 
 #' Convert marginal parameters to TMB parameterization
 #' @noRd
-.pack_marginal_params <- function(parameters) {
+.pack_marginal_params <- function(parameters, residual) {
   coefs <- parameters$coefficients
   n_re <- ncol(parameters$random_effects_init)
   corr <- .pack_correlation_theta(coefs$random_effect_sigma, n_re)
@@ -366,6 +375,7 @@
     longitudinal = coefs$longitudinal,
     initial_state = coefs$initial_state,
     log_sigma_e = log(coefs$measurement_error_sd),
+    residual_params = if (residual == "student_t") log(3) else numeric(0),
     log_sd_re = corr$log_sd_re,
     corr_par = corr$corr_par,
     random_effects = parameters$random_effects_init

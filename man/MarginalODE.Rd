@@ -4,7 +4,14 @@
 \alias{MarginalODE}
 \title{Marginal Second-Order ODE Parameter Estimation}
 \usage{
-MarginalODE(formula, data, time = "time", id = "id", control = list())
+MarginalODE(
+  formula,
+  data,
+  time = "time",
+  id = "id",
+  residual = c("gaussian", "student_t"),
+  control = list()
+)
 }
 \arguments{
 \item{formula}{Response and covariates
@@ -15,6 +22,9 @@ MarginalODE(formula, data, time = "time", id = "id", control = list())
 \item{time}{Time variable name (default: \code{"time"})}
 
 \item{id}{Subject identifier name (default: \code{"id"})}
+
+\item{residual}{Residual distribution, either \code{"gaussian"} or
+\code{"student_t"}. Student-t residuals estimate the degrees of freedom.}
 
 \item{control}{List of control parameters.
 See \code{\link{MarginalODE.control}}.}

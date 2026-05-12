@@ -97,7 +97,7 @@ fit <- JointODE(
   init = "marginal"
 )
 cat(sprintf("Elapsed: %.1f s\n", (proc.time() - t0)["elapsed"]))
-#> Elapsed: 145.7 s
+#> Elapsed: 457.1 s
 ```
 
 ``` r
@@ -114,6 +114,7 @@ summary(fit)
 #> Longitudinal Process            Survival Process
 #> Number of Observations: 17319   Number of Events: 58 (29%)
 #> Number of Subjects: 200
+#> Residual: gaussian
 #>
 #>        AIC        BIC     logLik
 #> -28945.644 -28859.887  14498.822

@@ -20,6 +20,7 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
   DATA_INTEGER(n_random_covariates);
   DATA_VECTOR(long_fixed_covariates);
   DATA_VECTOR(long_random_covariates);
+  DATA_INTEGER(residual_family);
   DATA_INTEGER(biomarker_fixed);
   DATA_INTEGER(biomarker_random);
   DATA_INTEGER(velocity_fixed);
@@ -40,6 +41,7 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
   PARAMETER_VECTOR(longitudinal);
   PARAMETER_VECTOR(initial_state);
   PARAMETER(log_sigma_e);
+  PARAMETER_VECTOR(residual_params);
   PARAMETER_VECTOR(log_sd_re);
   PARAMETER_VECTOR(corr_par);
   PARAMETER_MATRIX(random_effects);  // n_subjects x n_re
@@ -47,6 +49,8 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
   using namespace density;
   UNSTRUCTURED_CORR_t<Type> corr_structure(corr_par);
   Type sigma_e = exp(log_sigma_e);
+  Type student_t_nu = Type(0);
+  if (residual_family == 1) student_t_nu = Type(2) + exp(residual_params(0));
 
   int n_total_obs = obs_times.size();
   vector<Type> fitted_biomarker(n_total_obs), fitted_velocity(n_total_obs);
@@ -111,11 +115,14 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
       sol_m(ti) = m;  sol_v(ti) = v;
     }
 
-    // Gaussian likelihood
+    // Observation likelihood
     for (int j = 0; j < ni; j++) {
       int time_idx = find_time_index(time_pts, obs_t(j));
       if (time_idx >= 0) {
-        nll -= dnorm(Type(obs_y(j)), sol_m(time_idx), sigma_e, true);
+        nll -= observation_logdensity(
+          Type(obs_y(j)), sol_m(time_idx), sigma_e,
+          residual_family, student_t_nu
+        );
         fitted_biomarker(oi + j) = sol_m(time_idx);
         fitted_velocity(oi + j) = sol_v(time_idx);
       }
@@ -134,6 +141,7 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
   REPORT(Sigma_b);
   ADREPORT(Sigma_b);
   ADREPORT(sigma_e);
+  if (residual_family == 1) ADREPORT(student_t_nu);
 
 #undef TMB_OBJECTIVE_PTR
 #define TMB_OBJECTIVE_PTR this

@@ -38,6 +38,7 @@ data("sim", package = "JointODE", envir = environment())
 .create_mock_jointode <- function(n_subjects = 10L) {
   td <- .make_test_data(n_subjects)
   parameters <- td$parameters
+  parameters$configurations$residual <- "gaussian"
 
   parameters$coefficients$baseline <- setNames(
     parameters$coefficients$baseline,
@@ -65,6 +66,13 @@ data("sim", package = "JointODE", envir = environment())
       AIC = 1000.0 + 2 * n_params,
       BIC = 1000.0 + n_params * log(n_subjects),
       cindex = 0.65,
+      residual = list(
+        family = "gaussian",
+        sigma = parameters$coefficients$measurement_error_sd,
+        sigma_se = NA_real_,
+        nu = NA_real_,
+        nu_se = NA_real_
+      ),
       convergence = list(
         converged = TRUE, iterations = 10,
         message = "Converged after 10 iterations"

@@ -2,7 +2,8 @@
 
 #' Extract results from fitted MarginalODE TMB object
 #' @noRd
-.finalize_marginal <- function(obj, opt, coef_names, n_re, n_subjects) {
+.finalize_marginal <- function(obj, opt, coef_names, n_re, n_subjects,
+                               residual = "gaussian") {
   sdr <- TMB::sdreport(obj)
   reported <- obj$report()
   par <- obj$env$last.par.best
@@ -32,6 +33,17 @@
   sigma_b_se <- matrix(
     sdr_report[sdr_names == "Sigma_b", "Std. Error"], n_re, n_re
   )
+  is_student_t <- identical(residual, "student_t")
+  nu <- if (is_student_t) {
+    as.numeric(sdr_report[sdr_names == "student_t_nu", "Estimate"])
+  } else {
+    NA_real_
+  }
+  nu_se <- if (is_student_t) {
+    as.numeric(sdr_report[sdr_names == "student_t_nu", "Std. Error"])
+  } else {
+    NA_real_
+  }
 
   # Random effects posterior modes
   random_effects <- matrix(par[pn == "random_effects"],
@@ -39,18 +51,24 @@
   )
 
   loglik <- -opt$objective
-  n_total_params <- n_fixed + 1 # +1 for sigma_e
+  n_total_params <- n_fixed + 1 + as.integer(is_student_t)
   converged <- opt$convergence == 0
 
   list(
     parameters = parameters,
-    measurement_error_sd = sigma_e,
-    measurement_error_sd_se = sigma_e_se,
+    residual = list(
+      family = residual,
+      sigma = sigma_e,
+      sigma_se = sigma_e_se,
+      nu = nu,
+      nu_se = nu_se
+    ),
     random_effect_sigma = sigma_b,
     random_effect_sigma_se = sigma_b_se,
     logLik = loglik,
     AIC = -2 * loglik + 2 * n_total_params,
     BIC = -2 * loglik + n_total_params * log(n_subjects),
+    n_params = n_total_params,
     vcov = vcov_matrix,
     random_effects = random_effects,
     convergence = list(
@@ -87,6 +105,18 @@
   cf$measurement_error_sd_se <- as.numeric(
     sdr_report[sdr_names == "sigma_e", "Std. Error"]
   )
+  residual <- parameters$configurations$residual
+  is_student_t <- identical(residual, "student_t")
+  nu <- if (is_student_t) {
+    as.numeric(sdr_report[sdr_names == "student_t_nu", "Estimate"])
+  } else {
+    NA_real_
+  }
+  nu_se <- if (is_student_t) {
+    as.numeric(sdr_report[sdr_names == "student_t_nu", "Std. Error"])
+  } else {
+    NA_real_
+  }
   cf$random_effect_sigma_se <- matrix(
     sdr_report[sdr_names == "Sigma_b", "Std. Error"], n_re, n_re
   )
@@ -134,6 +164,13 @@
     AIC = -2 * loglik + 2 * n_params,
     BIC = -2 * loglik + n_params * log(n_subjects),
     cindex = cindex,
+    residual = list(
+      family = residual,
+      sigma = cf$measurement_error_sd,
+      sigma_se = cf$measurement_error_sd_se,
+      nu = nu,
+      nu_se = nu_se
+    ),
     convergence = list(
       converged = converged,
       iterations = opt$iterations,
@@ -142,7 +179,9 @@
         if (converged) "Converged" else "Did not converge", opt$message
       )
     ),
-    random_effects = matrix(par[pn == "random_effects"], nrow = n_subjects, ncol = n_re),
+    random_effects = matrix(
+      par[pn == "random_effects"], nrow = n_subjects, ncol = n_re
+    ),
     vcov = vcov_matrix,
     tmb_report = reported
   )

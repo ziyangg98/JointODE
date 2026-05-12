@@ -322,19 +322,25 @@ test_that("JointODE.control passes through extra params", {
 # --- .count_params ---
 
 test_that(".count_params counts correctly", {
-  params <- list(coefficients = list(
-    baseline = c(0.1, 0.2, 0.3), hazard = c(0.5, -0.3),
-    longitudinal = c(-0.01, 0.02, 0.1), initial_state = c(0, 0),
-    measurement_error_sd = 0.5, random_effect_sigma = diag(2)
-  ))
+  params <- list(
+    coefficients = list(
+      baseline = c(0.1, 0.2, 0.3), hazard = c(0.5, -0.3),
+      longitudinal = c(-0.01, 0.02, 0.1), initial_state = c(0, 0),
+      measurement_error_sd = 0.5, random_effect_sigma = diag(2)
+    ),
+    configurations = list(residual = "gaussian")
+  )
   expect_equal(.count_params(params), 14)
 
-  params2 <- list(coefficients = list(
-    baseline = numeric(5), hazard = numeric(3),
-    longitudinal = numeric(4), initial_state = c(0, 0),
-    measurement_error_sd = 0.1, random_effect_sigma = diag(3)
-  ))
-  expect_equal(.count_params(params2), 21)
+  params2 <- list(
+    coefficients = list(
+      baseline = numeric(5), hazard = numeric(3),
+      longitudinal = numeric(4), initial_state = c(0, 0),
+      measurement_error_sd = 0.1, random_effect_sigma = diag(3)
+    ),
+    configurations = list(residual = "student_t")
+  )
+  expect_equal(.count_params(params2), 22)
 })
 
 # --- .coef_table ---

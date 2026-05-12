@@ -2,7 +2,7 @@
 
 #' @noRd
 .default_parameters <- function(
-  dims, gamma, parsed_long, spline_baseline_config
+  dims, gamma, parsed_long, spline_baseline_config, residual
 ) {
   list(
     coefficients = list(
@@ -16,6 +16,7 @@
     configurations = list(
       baseline = spline_baseline_config,
       gamma = gamma,
+      residual = residual,
       biomarker = list(
         fixed = parsed_long$biomarker$fixed,
         random = parsed_long$biomarker$random
@@ -32,7 +33,7 @@
 #' @noRd
 .initialize_from_marginal <- function(
   longitudinal_formula, longitudinal_data, survival_data,
-  gamma, control, parsed_long, parsed_surv, model_config
+  gamma, residual, control, parsed_long, parsed_surv, model_config
 ) {
   verbose <- control$verbose
   dims <- model_config$dims
@@ -41,7 +42,7 @@
   time <- parsed_surv$time_var
   surv_vars <- c(parsed_surv$time_var, parsed_surv$status_var)
 
-  params <- .default_parameters(dims, gamma, parsed_long, sbc)
+  params <- .default_parameters(dims, gamma, parsed_long, sbc, residual)
 
   if (verbose > 0) cli::cli_alert_info("Initializing with MarginalODE...")
 
@@ -50,10 +51,13 @@
     control = MarginalODE.control(
       maxit = 200, verbose = max(0, verbose - 1),
       parallel = control$parallel, n_cores = control$n_cores
-    )
+    ),
+    residual = residual
   )
   if (!marginal_fit$convergence$converged && verbose > 0) {
-    cli::cli_alert_warning("MarginalODE did not fully converge; using current estimates")
+    cli::cli_alert_warning(
+      "MarginalODE did not fully converge; using current estimates"
+    )
   }
 
   # Transfer longitudinal coefficients
@@ -63,7 +67,7 @@
   ]
   params$coefficients$initial_state <- unname(mpar[.init_state_names])
   params$coefficients$measurement_error_sd <-
-    marginal_fit$measurement_error_sd
+    marginal_fit$residual$sigma
 
   # Random effect covariance from marginal RE posterior
   n_re <- dims$n_random_effects
@@ -172,7 +176,7 @@
 #' parameters suitable as starting values for the full model.
 #' @noRd
 .warm_start_marginal <- function(
-  formula, data, time, id, parsed_long, control
+  formula, data, time, id, parsed_long, residual, control
 ) {
   # Build reduced formula: keep fixed effects, drop dynamics RE
   fixed_terms <- c(
@@ -193,7 +197,7 @@
 
   fit0 <- MarginalODE(
     formula = reduced_formula, data = data,
-    time = time, id = id, control = control
+    time = time, id = id, residual = residual, control = control
   )
 
   if (control$verbose > 0) {
@@ -207,7 +211,7 @@
       !names(fit0$parameters) %in% .init_state_names
     ]),
     initial_state = unname(fit0$parameters[.init_state_names]),
-    measurement_error_sd = fit0$measurement_error_sd,
+    residual = fit0$residual,
     random_effects = fit0$random_effects
   )
 }

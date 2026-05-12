@@ -29,6 +29,41 @@ test_that("MarginalODE with dynamics RE converges", {
   expect_length(coef(fit), 7L)
 })
 
+test_that("MarginalODE estimates Student-t residual df", {
+  ids10 <- unique(sim$data$longitudinal_data$id)[1:10]
+  sub_data <- sim$data$longitudinal_data[
+    sim$data$longitudinal_data$id %in% ids10,
+  ]
+  fit <- MarginalODE(
+    formula = observed ~ x1 + x2,
+    data = sub_data,
+    residual = "student_t",
+    control = list(maxit = 100, verbose = 0)
+  )
+  expect_true(is.finite(fit$logLik))
+  expect_equal(fit$residual$family, "student_t")
+  expect_true(is.finite(fit$residual$nu))
+  expect_gt(fit$residual$nu, 2)
+  expect_true(is.finite(summary(fit)$residual$nu))
+})
+
+test_that("MarginalODE Student-t works with dynamics RE warm start", {
+  ids8 <- unique(sim$data$longitudinal_data$id)[1:8]
+  sub_data <- sim$data$longitudinal_data[
+    sim$data$longitudinal_data$id %in% ids8,
+  ]
+  fit <- MarginalODE(
+    formula = observed ~ biomarker + velocity + x1 + x2 + (biomarker | id),
+    data = sub_data,
+    residual = "student_t",
+    control = list(maxit = 50, verbose = 0)
+  )
+  expect_true(is.finite(fit$logLik))
+  expect_equal(fit$residual$family, "student_t")
+  expect_true(is.finite(fit$residual$nu))
+  expect_gt(attr(logLik(fit), "df"), length(fit$parameters))
+})
+
 test_that("JointODE with sim$init converges", {
   ld <- sim$data$longitudinal_data[
     , c("id", "time", "observed", "x1", "x2")
@@ -47,6 +82,29 @@ test_that("JointODE with sim$init converges", {
   )
   expect_true(is.finite(fit$logLik))
   expect_true(fit$cindex > 0.4)
+})
+
+test_that("JointODE estimates Student-t residual df", {
+  ld <- sim$data$longitudinal_data[
+    , c("id", "time", "observed", "x1", "x2")
+  ]
+  ids <- unique(ld$id)[1:50]
+  fit <- JointODE(
+    longitudinal_formula = observed ~ biomarker + velocity +
+      x1 + x2 + (biomarker | id),
+    survival_formula = Surv(time, status) ~ w1 + w2,
+    longitudinal_data = ld[ld$id %in% ids, ],
+    survival_data = sim$data$survival_data[
+      sim$data$survival_data$id %in% ids,
+    ],
+    init = "marginal",
+    residual = "student_t",
+    control = list(maxit = 20, verbose = 0)
+  )
+  expect_true(is.finite(fit$logLik))
+  expect_equal(fit$residual$family, "student_t")
+  expect_true(is.finite(fit$residual$nu))
+  expect_gt(fit$residual$nu, 2)
 })
 
 test_that("coef returns named vector with correct length", {

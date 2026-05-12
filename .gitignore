@@ -28,4 +28,5 @@ src/*.so
 src/*.dll
 src/*.o.tmp
 Rplots.pdf
+vignettes/*.pdf
 .claude/

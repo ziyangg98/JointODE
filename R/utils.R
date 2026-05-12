@@ -29,7 +29,11 @@
 #' @noRd
 .setup_openmp <- function(control) {
   if (control$parallel) {
-    n_cores <- if (control$n_cores > 0) control$n_cores else parallel::detectCores()
+    n_cores <- if (control$n_cores > 0) {
+      control$n_cores
+    } else {
+      parallel::detectCores()
+    }
     TMB::openmp(n_cores)
   }
 }
@@ -283,7 +287,7 @@
   )
 }
 
-# Parameter Helpers =============================================================
+# Parameter Helpers ============================================================
 
 #' @noRd
 .prefixed_coef_names <- function(coef_names) {
@@ -300,7 +304,8 @@
   cf <- parameters$coefficients
   p <- nrow(cf$random_effect_sigma)
   length(cf$baseline) + length(cf$hazard) + length(cf$longitudinal) +
-    length(cf$initial_state) + 1 + p * (p + 1) / 2
+    length(cf$initial_state) + 1 + p * (p + 1) / 2 +
+    as.integer(parameters$configurations$residual == "student_t")
 }
 
 # Prediction Utilities =========================================================
@@ -512,12 +517,16 @@
           mv <- .ode_step_r(m, v, b1, b2, forcing, sub_dt / 2)
           mm <- mv[1]
           vv <- mv[2]
-          hm <- .eval_hazard_r(mm, vv, ts + sub_dt / 2, bl, hz, surv_cov, sbc, configs$gamma)
+          hm <- .eval_hazard_r(
+            mm, vv, ts + sub_dt / 2, bl, hz, surv_cov, sbc, configs$gamma
+          )
           # Right
           mv <- .ode_step_r(mm, vv, b1, b2, forcing, sub_dt / 2)
           mm <- mv[1]
           vv <- mv[2]
-          hr <- .eval_hazard_r(mm, vv, ts + sub_dt, bl, hz, surv_cov, sbc, configs$gamma)
+          hr <- .eval_hazard_r(
+            mm, vv, ts + sub_dt, bl, hz, surv_cov, sbc, configs$gamma
+          )
           ch <- ch + (sub_dt / 6) * (hl + 4 * hm + hr)
           m <- mm
           v <- vv

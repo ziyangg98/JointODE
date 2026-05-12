@@ -101,11 +101,13 @@ utils::globalVariables(c(
 #' slope) relate to hazard ratios.
 #'
 #' @importFrom ggplot2 ggplot aes geom_line geom_point geom_smooth
-#'   geom_ribbon geom_abline geom_hline facet_wrap scale_color_manual
-#'   scale_fill_manual scale_color_viridis_c theme_bw theme element_text
-#'   element_blank element_rect labs coord_cartesian xlim ylim stat_qq
-#'   stat_qq_line geom_density alpha geom_path geom_contour_filled
-#'   guides guide_legend
+#' @importFrom ggplot2 geom_ribbon geom_abline geom_hline facet_wrap
+#' @importFrom ggplot2 scale_color_manual scale_fill_manual
+#' @importFrom ggplot2 scale_color_viridis_c theme_bw theme element_text
+#' @importFrom ggplot2 element_blank element_rect labs coord_cartesian xlim
+#' @importFrom ggplot2 ylim stat_qq stat_qq_line geom_density alpha geom_path
+#' @importFrom ggplot2 geom_contour_filled
+#' @importFrom ggplot2 guides guide_legend
 #' @importFrom patchwork wrap_plots plot_layout
 #' @importFrom dplyr group_by summarise mutate filter ungroup .data left_join
 #' @importFrom tidyr pivot_longer

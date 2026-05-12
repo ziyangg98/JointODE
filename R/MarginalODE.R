@@ -13,6 +13,8 @@ NULL
 #' @param data Data frame with longitudinal measurements
 #' @param time Time variable name (default: \code{"time"})
 #' @param id Subject identifier name (default: \code{"id"})
+#' @param residual Residual distribution, either \code{"gaussian"} or
+#'   \code{"student_t"}. Student-t residuals estimate the degrees of freedom.
 #' @param control List of control parameters.
 #'   See \code{\link{MarginalODE.control}}.
 #'
@@ -32,9 +34,11 @@ NULL
 MarginalODE <- function(
   formula, data,
   time = "time", id = "id",
+  residual = c("gaussian", "student_t"),
   control = list()
 ) {
   cl <- match.call()
+  residual <- match.arg(residual)
   .validate_marginal(formula, data, time, id)
 
   if (is.null(control)) {
@@ -67,11 +71,11 @@ MarginalODE <- function(
 
   if (has_dynamics_re) {
     ws <- .warm_start_marginal(
-      formula, data, time, id, parsed_long, control
+      formula, data, time, id, parsed_long, residual, control
     )
     parameters$coefficients$longitudinal <- ws$longitudinal
     parameters$coefficients$initial_state <- ws$initial_state
-    parameters$coefficients$measurement_error_sd <- ws$measurement_error_sd
+    parameters$coefficients$measurement_error_sd <- ws$residual$sigma
     random_effects_init <- matrix(0, n_subjects, n_re)
     random_effects_init[, 1:2] <- ws$random_effects
   } else {
@@ -87,8 +91,8 @@ MarginalODE <- function(
   parameters$random_effects_init <- random_effects_init
 
   # Pack TMB inputs
-  tmb_data <- .pack_marginal_data(data_list, parsed_long, n_re)
-  tmb_params <- .pack_marginal_params(parameters)
+  tmb_data <- .pack_marginal_data(data_list, parsed_long, n_re, residual)
+  tmb_params <- .pack_marginal_params(parameters, residual)
 
   .setup_openmp(control)
 
@@ -117,7 +121,9 @@ MarginalODE <- function(
     )
   )
 
-  results <- .finalize_marginal(obj, opt, coef_names, n_re, n_subjects)
+  results <- .finalize_marginal(
+    obj, opt, coef_names, n_re, n_subjects, residual
+  )
   re_nms <- model_config$re_names
   dimnames(results$random_effect_sigma) <- list(re_nms, re_nms)
   dimnames(results$random_effect_sigma_se) <- list(re_nms, re_nms)
@@ -177,11 +183,12 @@ print.MarginalODE <- function(
   x, digits = max(3L, getOption("digits") - 3L), ...
 ) {
   cat("\nMarginal Second-Order ODE Model\n")
+  cat("Residual:", x$residual$family, "\n")
   cat("Call: ")
   print(x$call)
   cat(
     "\nLog-likelihood:", format(x$logLik, digits = digits),
-    "on", length(x$parameters), "degrees of freedom\n"
+    "on", x$n_params, "degrees of freedom\n"
   )
   cat(
     "AIC:", format(x$AIC, digits = digits),
@@ -221,7 +228,7 @@ vcov.MarginalODE <- function(object, ...) object$vcov
 logLik.MarginalODE <- function(object, ...) {
   structure(
     object$logLik,
-    df = length(object$parameters),
+    df = object$n_params,
     nobs = .n_obs(object$data),
     class = "logLik"
   )
@@ -281,11 +288,11 @@ summary.MarginalODE <- function(object, ...) {
       call = object$call,
       coefficients = .coef_table(object$parameters, se),
       derived_params = derived_params,
-      sigma = c(sigma_e = object$measurement_error_sd),
       nobs = length(object$data),
       n_observations = .n_obs(object$data),
       AIC = object$AIC, BIC = object$BIC,
       logLik = object$logLik,
+      residual = object$residual,
       convergence = object$convergence
     ),
     class = "summary.MarginalODE"
@@ -311,6 +318,7 @@ print.summary.MarginalODE <- function(
   cat("\nData Descriptives:\n")
   cat(sprintf("Number of Observations: %d\n", x$n_observations))
   cat(sprintf("Number of Subjects: %d\n", x$nobs))
+  cat(sprintf("Residual: %s\n", x$residual$family))
 
   cat(sprintf("\n%10s %10s %10s\n", "AIC", "BIC", "logLik"))
   cat(sprintf("%10.3f %10.3f %10.3f\n", x$AIC, x$BIC, x$logLik))
@@ -328,8 +336,11 @@ print.summary.MarginalODE <- function(
     )
   }
   cat(sprintf(
-    "\nMeasurement Error SD: %.6f\n", x$sigma["sigma_e"]
+    "\nMeasurement Error SD: %.6f\n", x$residual$sigma
   ))
+  if (x$residual$family == "student_t") {
+    cat(sprintf("Student-t df (nu): %.6f\n", x$residual$nu))
+  }
   cat(sprintf("Convergence: %s\n", x$convergence$message))
   invisible(x)
 }

@@ -17,6 +17,9 @@
 ^\.Rhistory$
 ^vignettes/\.gitignore$
 ^vignettes/.*\.html$
+^vignettes/.*\.pdf$
+^tests/testthat/Rplots\.pdf$
+^src/.*\.(o|so|dll|dylib)$
 ^\.pre-commit-config\.yaml$
 ^\.vscode$
 ^\.covrignore$
