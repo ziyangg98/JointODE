@@ -130,7 +130,7 @@ Type joint_ode_nll(objective_function<Type>* obj) {
       double sub_dt = dt / n_quadrature;
       int cov_idx = covariate_index_at(t0, obs_t);
 
-      // Forcing varies with covariates at t0
+      // Forcing varies with covariates at t0.
       Type forcing(0);
       for (int k = 0; k < n_fixed_covariates; k++)
         forcing += longitudinal(forcing_fixed_start + k) * Type(long_fixed_covariates_i(cov_idx, k));

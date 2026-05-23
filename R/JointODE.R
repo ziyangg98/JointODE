@@ -134,6 +134,8 @@ JointODE <- function(
     parsed_long = parsed_long,
     parsed_surv = parsed_surv
   )
+  scales <- list(time = .estimate_time_scale(data_list))
+  data_fit <- .scale_data_time(data_list, scales$time)
 
   # Initialize parameters
   model_config <- .setup_model(
@@ -196,6 +198,9 @@ JointODE <- function(
       nrow = length(data_list), ncol = n_re
     )
   }
+  parameters_fit <- .prepare_joint_time_scale(
+    parameters, parsed_long, scales$time, gamma
+  )
 
   if (control$verbose > 0) {
     cli::cli_h2("Joint ODE Model Estimation (TMB)")
@@ -204,49 +209,40 @@ JointODE <- function(
   .setup_openmp(control)
 
   # Build TMB data and parameter lists
-  tmb_data <- .pack_joint_data(data_list, parameters, control)
-  tmb_params <- .pack_joint_params(parameters)
+  tmb_data <- .pack_joint_data(data_fit, parameters_fit, control)
+  tmb_params <- .pack_joint_params(parameters_fit)
 
-  obj <- TMB::MakeADFun(
-    data = tmb_data,
-    parameters = tmb_params,
-    random = "random_effects",
-    DLL = "JointODE",
-    silent = control$verbose < 3,
-    normalize = TRUE,
-    inner.control = list(ustep = 1)
+  fit <- .fit_variance_tmb(
+    tmb_data = tmb_data,
+    tmb_params = tmb_params,
+    control = control,
+    fixed = c(
+      "baseline", "hazard", "longitudinal", "initial_state"
+    ),
+    eval_factor = 10
   )
-
-  opt <- stats::nlminb(
-    start = obj$par,
-    objective = obj$fn,
-    gradient = obj$gr,
-    control = list(
-      iter.max = control$maxit,
-      eval.max = control$maxit * 10,
-      rel.tol = control$tol,
-      trace = as.integer(control$verbose >= 2)
-    )
-  )
+  obj <- fit$obj
+  opt <- fit$opt
 
   # Extract results
   results <- .finalize_joint(
-    obj, opt, parameters, coef_names,
+    obj, opt, parameters_fit, coef_names,
     data_list, tmb_data$n_random_effects, control
   )
   re_nms <- model_config$re_names
   sigma_b <- results$parameters$coefficients$random_effect_sigma
   dimnames(sigma_b) <- list(re_nms, re_nms)
   results$parameters$coefficients$random_effect_sigma <- sigma_b
-  sigma_b_se <- results$parameters$coefficients$random_effect_sigma_se
-  dimnames(sigma_b_se) <- list(re_nms, re_nms)
-  results$parameters$coefficients$random_effect_sigma_se <- sigma_b_se
+  colnames(results$random_effects) <- re_nms
+  results <- .restore_joint_time_scale(
+    results, parsed_long, scales$time, gamma
+  )
 
   structure(c(results, list(
     data = data_list, control = control, call = cl,
     tmb_obj = obj, tmb_opt = opt,
     parsed_long = parsed_long, parsed_surv = parsed_surv,
-    survival_formula = survival_formula
+    survival_formula = survival_formula, scales = scales
   )), class = "JointODE")
 }
 
@@ -338,9 +334,7 @@ summary.JointODE <- function(object, ...) {
       coef_initial = coef_initial,
       derived_params = derived_params,
       sigma = c(sigma_e = object$parameters$coefficients$measurement_error_sd),
-      sigma_se = c(sigma_e = object$parameters$coefficients$measurement_error_sd_se),
       sigma_b_matrix = object$parameters$coefficients$random_effect_sigma,
-      sigma_b_matrix_se = object$parameters$coefficients$random_effect_sigma_se,
       logLik = object$logLik,
       AIC = object$AIC,
       BIC = object$BIC,
@@ -429,8 +423,8 @@ print.summary.JointODE <- function(
 
   cat("\nVariance Components:\n")
   cat(sprintf(
-    "Measurement Error SD: %.6f (SE: %.6f)\n",
-    x$sigma["sigma_e"], x$sigma_se["sigma_e"]
+    "Measurement Error SD: %.6f\n",
+    x$sigma["sigma_e"]
   ))
   if (!is.null(x$sigma_b_matrix)) {
     cat("Random Effect Covariance Matrix:\n")

@@ -25,6 +25,8 @@
 ^cran-comments\.md$
 ^scripts$
 ^src/symbols\.rds$
+^src/.*\.(o|so|dll)$
+^src/.*\.tmp$
 ^CLAUDE\.md$
 ^\.Rprofile$
 ^\.Rhistory$

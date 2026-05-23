@@ -51,6 +51,8 @@ MarginalODE <- function(
 
   # Process data
   data_list <- .process_marginal(formula, data, time, id, parsed_long)
+  scales <- list(time = .estimate_time_scale(data_list))
+  data_fit <- .scale_data_time(data_list, scales$time)
   n_subjects <- length(data_list)
 
   # Model setup
@@ -62,65 +64,44 @@ MarginalODE <- function(
   parameters <- .default_marginal_parameters(model_config, parsed_long)
   all_y <- unlist(lapply(data_list, function(d) d$longitudinal$measurements))
   mean_y <- mean(all_y)
-  has_dynamics_re <- parsed_long$biomarker$random ||
-    parsed_long$velocity$random
-
-  if (has_dynamics_re) {
-    ws <- .warm_start_marginal(
-      formula, data, time, id, parsed_long, control
-    )
-    parameters$coefficients$longitudinal <- ws$longitudinal
-    parameters$coefficients$initial_state <- ws$initial_state
-    parameters$coefficients$measurement_error_sd <- ws$measurement_error_sd
-    random_effects_init <- matrix(0, n_subjects, n_re)
-    random_effects_init[, 1:2] <- ws$random_effects
-  } else {
-    parameters$coefficients$initial_state <- c(mean_y, 0)
-    parameters$coefficients$measurement_error_sd <- sd(all_y)
-    random_effects_init <- .init_re_from_observations(
-      data_list, mean_y, 0, n_re
-    )
-  }
+  parameters$coefficients$initial_state <- c(mean_y, 0)
+  parameters$coefficients$measurement_error_sd <- sd(all_y)
+  random_effects_init <- .init_re_from_observations(
+    data_list, mean_y, 0, n_re
+  )
 
   re_sds <- pmax(apply(random_effects_init, 2, sd), sd(all_y) * 0.1)
   parameters$coefficients$random_effect_sigma <- diag(re_sds^2, n_re)
   parameters$random_effects_init <- random_effects_init
+  parameters_fit <- .prepare_marginal_time_scale(
+    parameters, parsed_long, scales$time
+  )
 
   # Pack TMB inputs
-  tmb_data <- .pack_marginal_data(data_list, parsed_long, n_re)
-  tmb_params <- .pack_marginal_params(parameters)
+  tmb_data <- .pack_marginal_data(data_fit, parsed_long, n_re)
+  tmb_params <- .pack_marginal_params(parameters_fit)
 
   .setup_openmp(control)
 
   if (control$verbose > 0) {
-    phase_label <- if (has_dynamics_re) "Phase 2: " else ""
-    cli::cli_h2(paste0(phase_label, "Marginal ODE Model Estimation (TMB)"))
+    cli::cli_h2("Marginal ODE Model Estimation (TMB)")
   }
 
-  obj <- TMB::MakeADFun(
-    data = tmb_data, parameters = tmb_params,
-    random = "random_effects",
-    DLL = "JointODE",
-    silent = control$verbose < 3,
-    normalize = TRUE,
-    inner.control = list(ustep = 1)
+  fit <- .fit_variance_tmb(
+    tmb_data = tmb_data,
+    tmb_params = tmb_params,
+    control = control,
+    fixed = c("longitudinal", "initial_state"),
+    eval_factor = 2
   )
-
-  opt <- stats::nlminb(
-    start = obj$par,
-    objective = obj$fn,
-    gradient = obj$gr,
-    control = list(
-      iter.max = control$maxit, eval.max = control$maxit * 2,
-      rel.tol = control$tol,
-      trace = as.integer(control$verbose >= 2)
-    )
-  )
+  obj <- fit$obj
+  opt <- fit$opt
 
   results <- .finalize_marginal(obj, opt, coef_names, n_re, n_subjects)
   re_nms <- model_config$re_names
   dimnames(results$random_effect_sigma) <- list(re_nms, re_nms)
-  dimnames(results$random_effect_sigma_se) <- list(re_nms, re_nms)
+  colnames(results$random_effects) <- re_nms
+  results <- .restore_marginal_time_scale(results, parsed_long, scales$time)
 
   if (control$verbose > 0) {
     if (results$convergence$converged) {
@@ -143,24 +124,14 @@ MarginalODE <- function(
     )
   )
   coefs <- list(
-    longitudinal = setNames(
-      as.numeric(obj$env$last.par.best[
-        names(obj$env$last.par.best) == "longitudinal"
-      ]),
-      coef_names$longitudinal
-    ),
-    initial_state = setNames(
-      as.numeric(obj$env$last.par.best[
-        names(obj$env$last.par.best) == "initial_state"
-      ]),
-      coef_names$initial_state
-    )
+    longitudinal = results$parameters[coef_names$longitudinal],
+    initial_state = results$parameters[coef_names$initial_state]
   )
 
   structure(c(results, list(
     data = data_list, control = control, call = cl,
     tmb_obj = obj, tmb_opt = opt,
-    configs = configs, coefs = coefs
+    configs = configs, coefs = coefs, scales = scales
   )), class = "MarginalODE")
 }
 

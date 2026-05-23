@@ -29,11 +29,11 @@ capture the dynamic behavior of biomarker trajectories.
 **Longitudinal Model:** Biomarker trajectories evolve according to a
 second-order ODE:
 
-$$\ddot{m}_i(t) + 2 \xi_i \omega_i \dot{m}_i(t) + \omega_i^2 m_i(t) = k \omega_i^2 \mu_i(t)$$
+$$\ddot{m}_i(t) + 2 \xi_i \omega_i \dot{m}_i(t) + \omega_i^2 m_i(t) = f_i(t)$$
 
 with initial conditions $m_i(0) = m_{0,i}$ and $\dot{m}_i(0) = v_{0,i}$,
 where $\omega_i$ is the natural frequency, $\xi_i$ is the damping ratio,
-and $\mu_i(t)$ is covariate-driven forcing. Stability ($\omega > 0$,
+and $f_i(t)$ is covariate-driven forcing. Stability ($\omega > 0$,
 $\xi > 0$) is enforced by estimating $\log(\omega^2)$ and
 $\log(2\xi\omega)$. Individual heterogeneity is captured through random
 effects on initial states $(m_{0,i}, v_{0,i})$ and multiplicative random

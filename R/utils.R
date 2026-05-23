@@ -34,6 +34,303 @@
   }
 }
 
+#' @noRd
+.fit_variance_tmb <- function(tmb_data, tmb_params, control, fixed,
+                              eval_factor = 2) {
+  variance_map <- list(
+    log_sd_re = factor(rep(NA, length(tmb_params$log_sd_re))),
+    corr_par = factor(rep(NA, length(tmb_params$corr_par)))
+  )
+  opt_control <- list(
+    iter.max = control$maxit,
+    eval.max = control$maxit * eval_factor,
+    rel.tol = control$tol,
+    trace = as.integer(control$verbose >= 2)
+  )
+
+  outer_delta <- Inf
+  outer_converged <- FALSE
+  final_params <- tmb_params
+  last_opt <- NULL
+  last_message <- NULL
+
+  for (i in seq_len(control$maxit)) {
+    if (control$verbose > 0) {
+      cli::cli_alert_info(sprintf("Variance update iteration %d", i))
+    }
+
+    obj <- TMB::MakeADFun(
+      data = tmb_data,
+      parameters = tmb_params,
+      random = "random_effects",
+      map = variance_map,
+      DLL = "JointODE",
+      silent = control$verbose < 3
+    )
+    opt <- stats::nlminb(obj$par, obj$fn, obj$gr, control = opt_control)
+    last_opt <- opt
+    last_message <- opt$message
+
+    if (control$verbose > 0) {
+      msg <- sprintf(
+        "M-step %d: convergence = %d; objective = %.4f; %s",
+        i, opt$convergence, opt$objective, opt$message
+      )
+      if (opt$convergence == 0) {
+        cli::cli_alert_success(msg)
+      } else {
+        cli::cli_alert_warning(msg)
+      }
+    }
+
+    if (!is.finite(opt$objective) || any(!is.finite(opt$par))) {
+      last_message <- "M-step produced non-finite objective or parameters"
+      break
+    }
+
+    best <- obj$env$parList(opt$par)
+    fixed_delta <- max(abs(c(
+      unlist(best[fixed]) - unlist(tmb_params[fixed]),
+      best$log_sigma_e - tmb_params$log_sigma_e
+    )))
+    next_params <- .update_variance_parameters(tmb_data, obj, opt$par)
+    variance_delta <- max(abs(c(
+      next_params$log_sd_re - tmb_params$log_sd_re,
+      next_params$corr_par - tmb_params$corr_par
+    )))
+    outer_delta <- max(fixed_delta, variance_delta)
+    final_params <- next_params
+
+    if (control$verbose > 0) {
+      cli::cli_alert_info(sprintf(
+        "sigma_e = %.4g; fixed change = %.3g; variance change = %.3g",
+        exp(next_params$log_sigma_e), fixed_delta, variance_delta
+      ))
+      cli::cli_alert_info(sprintf("outer change = %.3g", outer_delta))
+    }
+
+    if (outer_delta < control$tol) {
+      outer_converged <- TRUE
+      break
+    }
+    tmb_params <- next_params
+  }
+
+  obj <- TMB::MakeADFun(
+    data = tmb_data,
+    parameters = final_params,
+    random = "random_effects",
+    map = variance_map,
+    DLL = "JointODE",
+    silent = control$verbose < 3
+  )
+  opt <- last_opt
+  opt$par <- obj$par
+  opt$objective <- obj$fn(obj$par)
+  opt$gradient <- obj$gr(obj$par)
+  opt$outer_delta <- outer_delta
+  opt$m_step_convergence <- last_opt$convergence
+  opt$m_step_message <- last_message
+  opt$convergence <- if (outer_converged) 0L else 1L
+  opt$message <- sprintf(
+    "%s; last M-step: %s",
+    if (outer_converged) {
+      "outer parameter convergence"
+    } else {
+      "outer iterations stopped before EM convergence"
+    },
+    last_message
+  )
+
+  list(obj = obj, opt = opt)
+}
+
+#' @noRd
+.update_variance_parameters <- function(tmb_data, obj, par) {
+  obj$fn(par)
+  p <- obj$env$parList(par)
+  b <- as.matrix(p$random_effects)
+  n_subjects <- tmb_data$n_subjects
+  n_re <- tmb_data$n_random_effects
+  h <- obj$env$spHess(random = TRUE)
+
+  sigma <- crossprod(b)
+  for (i in seq_len(n_subjects)) {
+    idx <- i + (seq_len(n_re) - 1L) * n_subjects
+    hi <- as.matrix(h[idx, idx, drop = FALSE])
+    vi <- tryCatch(
+      solve(hi),
+      error = function(e) MASS::ginv(hi)
+    )
+    sigma <- sigma + vi
+  }
+  sigma <- (sigma + t(sigma)) / (2 * n_subjects)
+
+  ev <- eigen(sigma, symmetric = TRUE, only.values = TRUE)$values
+  if (min(ev) <= 0) {
+    sigma <- sigma + diag(abs(min(ev)) + 1e-8, n_re)
+  }
+
+  re <- .pack_correlation_theta(sigma, n_re)
+  p$log_sd_re <- re$log_sd_re
+  p$corr_par <- re$corr_par
+  p
+}
+
+#' @noRd
+.estimate_time_scale <- function(data_list) {
+  y <- unlist(lapply(data_list, function(d) d$longitudinal$measurements))
+  slopes <- unlist(lapply(data_list, function(d) {
+    tt <- d$longitudinal$times
+    yy <- d$longitudinal$measurements
+    if (length(tt) < 2) return(numeric(0))
+    dt <- diff(tt)
+    dy <- diff(yy)
+    dy[dt > 0] / dt[dt > 0]
+  }))
+  slope <- median(abs(slopes[is.finite(slopes) & slopes != 0]), na.rm = TRUE)
+  scale <- stats::sd(y, na.rm = TRUE) / slope
+  if (is.finite(scale) && scale > 0) scale else 1
+}
+
+#' @noRd
+.scale_data_time <- function(data_list, scale) {
+  if (!is.finite(scale) || scale <= 0 || scale == 1) return(data_list)
+  lapply(data_list, function(d) {
+    d$longitudinal$times <- d$longitudinal$times / scale
+    if (!is.null(d$time)) d$time <- d$time / scale
+    d
+  })
+}
+
+#' @noRd
+.adjust_longitudinal_time_scale <- function(x, parsed_long, scale, to_internal) {
+  if (!is.finite(scale) || scale <= 0 || scale == 1) return(x)
+  direction <- if (to_internal) 1 else -1
+  idx <- 1L
+  if (parsed_long$biomarker$fixed) {
+    x[idx] <- x[idx] + direction * 2 * log(scale)
+    idx <- idx + 1L
+  }
+  if (parsed_long$velocity$fixed) {
+    x[idx] <- x[idx] + direction * log(scale)
+    idx <- idx + 1L
+  }
+  x
+}
+
+#' @noRd
+.random_effect_time_scale <- function(parsed_long, n_re, scale, to_internal) {
+  mult <- rep(1, n_re)
+  if (n_re >= 2) mult[2] <- scale
+  if (to_internal) mult else 1 / mult
+}
+
+#' @noRd
+.longitudinal_vcov_time_scale <- function(parsed_long, n_long, scale) {
+  rep(1, n_long)
+}
+
+#' @noRd
+.prepare_marginal_time_scale <- function(parameters, parsed_long, scale) {
+  if (!is.finite(scale) || scale <= 0 || scale == 1) return(parameters)
+  parameters$coefficients$longitudinal <- .adjust_longitudinal_time_scale(
+    parameters$coefficients$longitudinal, parsed_long, scale, TRUE
+  )
+  parameters$coefficients$initial_state[2] <-
+    parameters$coefficients$initial_state[2] * scale
+
+  re_mult <- .random_effect_time_scale(
+    parsed_long, ncol(parameters$random_effects_init), scale, TRUE
+  )
+  parameters$random_effects_init <- sweep(
+    parameters$random_effects_init, 2, re_mult, `*`
+  )
+  parameters$coefficients$random_effect_sigma <-
+    parameters$coefficients$random_effect_sigma * outer(re_mult, re_mult)
+  parameters
+}
+
+#' @noRd
+.restore_marginal_time_scale <- function(results, parsed_long, scale) {
+  if (!is.finite(scale) || scale <= 0 || scale == 1) return(results)
+  n_long <- length(results$parameters) - 2L
+  long_idx <- seq_len(n_long)
+  init_idx <- n_long + seq_len(2L)
+
+  results$parameters[long_idx] <- .adjust_longitudinal_time_scale(
+    results$parameters[long_idx], parsed_long, scale, FALSE
+  )
+  results$parameters[init_idx[2]] <- results$parameters[init_idx[2]] / scale
+
+  vscale <- c(
+    .longitudinal_vcov_time_scale(parsed_long, n_long, scale),
+    1, 1 / scale
+  )
+  results$vcov <- results$vcov * outer(vscale, vscale)
+
+  re_mult <- .random_effect_time_scale(
+    parsed_long, ncol(results$random_effects), scale, FALSE
+  )
+  results$random_effects <- sweep(results$random_effects, 2, re_mult, `*`)
+  results$random_effect_sigma <-
+    results$random_effect_sigma * outer(re_mult, re_mult)
+  results
+}
+
+#' @noRd
+.prepare_joint_time_scale <- function(parameters, parsed_long, scale, gamma) {
+  parameters <- .prepare_marginal_time_scale(parameters, parsed_long, scale)
+  if (!is.finite(scale) || scale <= 0 || scale == 1) return(parameters)
+  parameters$coefficients$baseline <-
+    parameters$coefficients$baseline + log(scale)
+  if (length(parameters$coefficients$hazard) >= 2) {
+    parameters$coefficients$hazard[2] <-
+      parameters$coefficients$hazard[2] / scale^gamma
+  }
+  bc <- parameters$configurations$baseline
+  bc$knots <- bc$knots / scale
+  bc$boundary_knots <- bc$boundary_knots / scale
+  parameters$configurations$baseline <- bc
+  parameters
+}
+
+#' @noRd
+.restore_joint_time_scale <- function(results, parsed_long, scale, gamma) {
+  if (!is.finite(scale) || scale <= 0 || scale == 1) return(results)
+  cf <- results$parameters$coefficients
+  cf$baseline <- cf$baseline - log(scale)
+  if (length(cf$hazard) >= 2) cf$hazard[2] <- cf$hazard[2] * scale^gamma
+  cf$longitudinal <- .adjust_longitudinal_time_scale(
+    cf$longitudinal, parsed_long, scale, FALSE
+  )
+  cf$initial_state[2] <- cf$initial_state[2] / scale
+
+  re_mult <- .random_effect_time_scale(
+    parsed_long, ncol(results$random_effects), scale, FALSE
+  )
+  cf$random_effect_sigma <- cf$random_effect_sigma * outer(re_mult, re_mult)
+  results$random_effects <- sweep(results$random_effects, 2, re_mult, `*`)
+
+  bc <- results$parameters$configurations$baseline
+  bc$knots <- bc$knots * scale
+  bc$boundary_knots <- bc$boundary_knots * scale
+  results$parameters$configurations$baseline <- bc
+
+  n_baseline <- length(cf$baseline)
+  n_hazard <- length(cf$hazard)
+  n_long <- length(cf$longitudinal)
+  vscale <- c(
+    rep(1, n_baseline),
+    c(1, scale^gamma, rep(1, max(0, n_hazard - 2L))),
+    .longitudinal_vcov_time_scale(parsed_long, n_long, scale),
+    1, 1 / scale
+  )
+  results$vcov <- results$vcov * outer(vscale, vscale)
+  results$parameters$coefficients <- cf
+  results
+}
+
 #' Initialize RE columns 1-2 from first observations
 #' @noRd
 .init_re_from_observations <- function(data_list, m0, v0 = 0, n_re = 2L) {

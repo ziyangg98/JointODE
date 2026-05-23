@@ -3,16 +3,16 @@
 #' Extract results from fitted MarginalODE TMB object
 #' @noRd
 .finalize_marginal <- function(obj, opt, coef_names, n_re, n_subjects) {
-  sdr <- TMB::sdreport(obj)
+  obj$fn(opt$par)
+  sdr <- TMB::sdreport(obj, par.fixed = opt$par)
   reported <- obj$report()
-  par <- obj$env$last.par.best
-  pn <- names(par)
+  par <- obj$env$parList()
 
-  longitudinal <- as.numeric(par[pn == "longitudinal"])
+  longitudinal <- as.numeric(par$longitudinal)
   names(longitudinal) <- coef_names$longitudinal
-  initial_state <- as.numeric(par[pn == "initial_state"])
+  initial_state <- as.numeric(par$initial_state)
   names(initial_state) <- coef_names$initial_state
-  sigma_e <- unname(exp(par[pn == "log_sigma_e"]))
+  sigma_e <- unname(exp(par$log_sigma_e))
 
   parameters <- c(longitudinal, initial_state)
   n_fixed <- length(parameters)
@@ -25,18 +25,10 @@
   }
   dimnames(vcov_matrix) <- list(names(parameters), names(parameters))
 
-  sdr_report <- summary(sdr, "report")
-  sdr_names <- rownames(sdr_report)
-  sigma_e_se <- as.numeric(sdr_report[sdr_names == "sigma_e", "Std. Error"])
   sigma_b <- as.matrix(reported$Sigma_b)
-  sigma_b_se <- matrix(
-    sdr_report[sdr_names == "Sigma_b", "Std. Error"], n_re, n_re
-  )
 
   # Random effects posterior modes
-  random_effects <- matrix(par[pn == "random_effects"],
-    nrow = n_subjects, ncol = n_re
-  )
+  random_effects <- matrix(par$random_effects, nrow = n_subjects, ncol = n_re)
 
   loglik <- -opt$objective
   n_total_params <- n_fixed + 1 # +1 for sigma_e
@@ -45,9 +37,7 @@
   list(
     parameters = parameters,
     measurement_error_sd = sigma_e,
-    measurement_error_sd_se = sigma_e_se,
     random_effect_sigma = sigma_b,
-    random_effect_sigma_se = sigma_b_se,
     logLik = loglik,
     AIC = -2 * loglik + 2 * n_total_params,
     BIC = -2 * loglik + n_total_params * log(n_subjects),
@@ -68,28 +58,18 @@
 #' @noRd
 .finalize_joint <- function(obj, opt, parameters, coef_names,
                             data_list, n_re, control) {
-  sdr <- TMB::sdreport(obj)
+  obj$fn(opt$par)
+  sdr <- TMB::sdreport(obj, par.fixed = opt$par)
   reported <- obj$report()
-  par <- obj$env$last.par.best
-  pn <- names(par)
+  par <- obj$env$parList()
 
   # Fixed effects
   cf <- parameters$coefficients
   for (nm in c("baseline", "hazard", "longitudinal", "initial_state")) {
-    cf[[nm]] <- setNames(as.numeric(par[pn == nm]), coef_names[[nm]])
+    cf[[nm]] <- setNames(as.numeric(par[[nm]]), coef_names[[nm]])
   }
-  cf$measurement_error_sd <- unname(exp(par[pn == "log_sigma_e"]))
+  cf$measurement_error_sd <- unname(exp(par$log_sigma_e))
   cf$random_effect_sigma <- as.matrix(reported$Sigma_b)
-
-  # Variance component SEs (delta method via ADREPORT)
-  sdr_report <- summary(sdr, "report")
-  sdr_names <- rownames(sdr_report)
-  cf$measurement_error_sd_se <- as.numeric(
-    sdr_report[sdr_names == "sigma_e", "Std. Error"]
-  )
-  cf$random_effect_sigma_se <- matrix(
-    sdr_report[sdr_names == "Sigma_b", "Std. Error"], n_re, n_re
-  )
 
   coef_names_exp <- .prefixed_coef_names(coef_names)
   n_fixed <- length(coef_names_exp)
@@ -142,7 +122,7 @@
         if (converged) "Converged" else "Did not converge", opt$message
       )
     ),
-    random_effects = matrix(par[pn == "random_effects"], nrow = n_subjects, ncol = n_re),
+    random_effects = matrix(par$random_effects, nrow = n_subjects, ncol = n_re),
     vcov = vcov_matrix,
     tmb_report = reported
   )
