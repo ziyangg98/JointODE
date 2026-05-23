@@ -4,7 +4,6 @@
 #' @noRd
 .finalize_marginal <- function(obj, opt, coef_names, n_re, n_subjects) {
   obj$fn(opt$par)
-  sdr <- TMB::sdreport(obj, par.fixed = opt$par)
   reported <- obj$report()
   par <- obj$env$parList()
 
@@ -16,14 +15,7 @@
 
   parameters <- c(longitudinal, initial_state)
   n_fixed <- length(parameters)
-  vcov_matrix <- if (
-    !is.null(sdr$cov.fixed) && nrow(sdr$cov.fixed) >= n_fixed
-  ) {
-    sdr$cov.fixed[seq_len(n_fixed), seq_len(n_fixed), drop = FALSE]
-  } else {
-    matrix(NA, n_fixed, n_fixed)
-  }
-  dimnames(vcov_matrix) <- list(names(parameters), names(parameters))
+  vcov_matrix <- .fixed_vcov(obj, opt$par, n_fixed, names(parameters))
 
   sigma_b <- as.matrix(reported$Sigma_b)
 
@@ -56,10 +48,39 @@
 
 
 #' @noRd
+.fixed_vcov <- function(obj, par, n_fixed, parameter_names) {
+  p <- obj$env$parList(par)
+  # Fixed-effect information conditional on variance parameters.
+  reduced <- TMB::MakeADFun(
+    data = obj$env$data,
+    parameters = p,
+    random = "random_effects",
+    map = list(
+      log_sigma_e = factor(NA),
+      log_sd_re = factor(rep(NA, length(p$log_sd_re))),
+      corr_par = factor(rep(NA, length(p$corr_par)))
+    ),
+    DLL = obj$env$DLL,
+    silent = TRUE
+  )
+  sdr <- TMB::sdreport(reduced, par.fixed = reduced$par)
+  vc <- sdr$cov.fixed[seq_len(n_fixed), seq_len(n_fixed), drop = FALSE]
+  if (any(!is.finite(vc))) {
+    stop("Unable to compute a finite fixed-effect covariance matrix.",
+      call. = FALSE
+    )
+  }
+  vc <- (vc + t(vc)) / 2
+  dimnames(vc) <- list(parameter_names, parameter_names)
+  attr(vc, "method") <- "conditional fixed-effect information"
+  vc
+}
+
+
+#' @noRd
 .finalize_joint <- function(obj, opt, parameters, coef_names,
                             data_list, n_re, control) {
   obj$fn(opt$par)
-  sdr <- TMB::sdreport(obj, par.fixed = opt$par)
   reported <- obj$report()
   par <- obj$env$parList()
 
@@ -73,14 +94,7 @@
 
   coef_names_exp <- .prefixed_coef_names(coef_names)
   n_fixed <- length(coef_names_exp)
-  vcov_matrix <- if (
-    !is.null(sdr$cov.fixed) && nrow(sdr$cov.fixed) >= n_fixed
-  ) {
-    sdr$cov.fixed[seq_len(n_fixed), seq_len(n_fixed), drop = FALSE]
-  } else {
-    matrix(NA, n_fixed, n_fixed)
-  }
-  dimnames(vcov_matrix) <- list(coef_names_exp, coef_names_exp)
+  vcov_matrix <- .fixed_vcov(obj, opt$par, n_fixed, coef_names_exp)
 
   parameters$coefficients <- cf
   parameters$random_effects_init <- NULL

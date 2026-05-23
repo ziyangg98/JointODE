@@ -92,7 +92,8 @@ MarginalODE <- function(
     tmb_params = tmb_params,
     control = control,
     fixed = c("longitudinal", "initial_state"),
-    eval_factor = 2
+    eval_factor = 2,
+    direct_trust = TRUE
   )
   obj <- fit$obj
   opt <- fit$opt

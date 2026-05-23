@@ -36,16 +36,172 @@
 
 #' @noRd
 .fit_variance_tmb <- function(tmb_data, tmb_params, control, fixed,
-                              eval_factor = 2) {
+                              eval_factor = 2, direct_trust = FALSE) {
+  mstep_maxit <- min(control$maxit, 50L)
+  opt_control <- list(
+    iter.max = mstep_maxit,
+    eval.max = mstep_maxit * eval_factor,
+    rel.tol = control$tol,
+    trace = as.integer(control$verbose >= 3)
+  )
+
+  if (isTRUE(direct_trust)) {
+    obj <- TMB::MakeADFun(
+      data = tmb_data,
+      parameters = tmb_params,
+      random = "random_effects",
+      DLL = "JointODE",
+      silent = control$verbose < 3
+    )
+
+    par <- obj$par
+    objective <- obj$fn(par)
+    step_norm <- Inf
+    objective_change <- Inf
+    converged <- FALSE
+    last_opt <- NULL
+    last_message <- NULL
+    trust_radius <- 1
+    opt_control$iter.max <- min(mstep_maxit, 20L)
+    opt_control$eval.max <- opt_control$iter.max * eval_factor
+
+    for (i in seq_len(control$maxit)) {
+      if (control$verbose > 0) {
+        cli::cli_alert_info(sprintf("Trust-region iteration %d", i))
+      }
+
+      grad0 <- tryCatch(obj$gr(par), error = function(e) NA_real_)
+      grad0_max <- if (all(is.finite(grad0))) max(abs(grad0)) else Inf
+      par_scale <- rep(1, length(par))
+      if (is.finite(grad0_max) && grad0_max > 1000) {
+        par_scale <- 1 / sqrt(pmax(abs(grad0), 1))
+        par_scale <- pmin(1, pmax(1e-3, par_scale))
+      }
+      fn_scaled <- function(delta) obj$fn(par + par_scale * delta)
+      gr_scaled <- function(delta) obj$gr(par + par_scale * delta) * par_scale
+
+      opt <- tryCatch(
+        stats::nlminb(
+          rep(0, length(par)), fn_scaled, gr_scaled,
+          control = c(opt_control, list(step.max = trust_radius))
+        ),
+        error = function(e) {
+          list(
+            par = rep(0, length(par)), objective = Inf, convergence = 1L,
+            iterations = 0L, message = conditionMessage(e)
+          )
+        }
+      )
+      last_opt <- opt
+      last_message <- opt$message
+
+      if (any(!is.finite(opt$par))) {
+        last_message <- "optimizer proposed non-finite parameters"
+        break
+      }
+
+      step <- par_scale * opt$par
+      alpha <- 1
+      accepted <- FALSE
+      trial_objective <- Inf
+      objective_tol <- 1e-8 * max(1, abs(objective))
+      while (alpha >= 1e-6) {
+        trial_par <- par + alpha * step
+        trial_objective <- tryCatch(
+          obj$fn(trial_par),
+          error = function(e) Inf
+        )
+        trial_grad <- tryCatch(obj$gr(trial_par), error = function(e) NA_real_)
+        trial_grad_max <- if (all(is.finite(trial_grad))) {
+          max(abs(trial_grad))
+        } else {
+          Inf
+        }
+        grad_limit <- if (is.finite(grad0_max)) {
+          max(1000, 25 * grad0_max)
+        } else {
+          Inf
+        }
+        if (
+          is.finite(trial_objective) &&
+            trial_objective <= objective + objective_tol &&
+            trial_grad_max <= grad_limit
+        ) {
+          accepted <- TRUE
+          break
+        }
+        alpha <- alpha / 2
+      }
+
+      if (!accepted) {
+        last_message <- "trust-region step could not improve objective"
+        break
+      }
+
+      step_norm <- max(abs(alpha * step))
+      objective_change <- abs(objective - trial_objective)
+      par <- trial_par
+      objective <- trial_objective
+      trust_radius <- if (alpha == 1) {
+        min(2 * trust_radius, 10)
+      } else {
+        max(alpha * trust_radius, 1e-4)
+      }
+
+      if (control$verbose > 0) {
+        grad <- tryCatch(obj$gr(par), error = function(e) NA_real_)
+        grad_max <- if (all(is.finite(grad))) max(abs(grad)) else Inf
+        cli::cli_alert_info(sprintf(
+          paste0(
+            "convergence = %d; objective = %.4f; ",
+            "step = %.3g; alpha = %.3g; trust radius = %.3g; ",
+            "max gradient = %.3g"
+          ),
+          opt$convergence, objective, step_norm, alpha, trust_radius,
+          grad_max
+        ))
+      }
+
+      grad <- tryCatch(obj$gr(par), error = function(e) NA_real_)
+      grad_max <- if (all(is.finite(grad))) max(abs(grad)) else Inf
+      if (
+        step_norm < control$tol &&
+          objective_change < control$tol * max(1, abs(objective))
+      ) {
+        converged <- opt$convergence == 0 || grad_max < sqrt(control$tol)
+        if (!converged) {
+          last_message <- sprintf(
+            "trust-region no progress; max gradient %.3g; last optimizer: %s",
+            grad_max, opt$message
+          )
+        }
+        break
+      }
+    }
+
+    opt <- list(
+      par = par,
+      objective = objective,
+      convergence = if (converged) 0L else 1L,
+      iterations = if (is.null(last_opt)) 0L else last_opt$iterations,
+      message = sprintf(
+        "%s; last optimizer: %s",
+        if (converged) {
+          "trust-region convergence"
+        } else {
+          "trust-region iterations stopped before convergence"
+        },
+        last_message
+      ),
+      outer_delta = step_norm,
+      objective_change = objective_change
+    )
+    return(list(obj = obj, opt = opt))
+  }
+
   variance_map <- list(
     log_sd_re = factor(rep(NA, length(tmb_params$log_sd_re))),
     corr_par = factor(rep(NA, length(tmb_params$corr_par)))
-  )
-  opt_control <- list(
-    iter.max = control$maxit,
-    eval.max = control$maxit * eval_factor,
-    rel.tol = control$tol,
-    trace = as.integer(control$verbose >= 2)
   )
 
   outer_delta <- Inf
@@ -53,6 +209,8 @@
   final_params <- tmb_params
   last_opt <- NULL
   last_message <- NULL
+  previous_objective <- Inf
+  damped_em <- FALSE
 
   for (i in seq_len(control$maxit)) {
     if (control$verbose > 0) {
@@ -93,7 +251,13 @@
       unlist(best[fixed]) - unlist(tmb_params[fixed]),
       best$log_sigma_e - tmb_params$log_sigma_e
     )))
-    next_params <- .update_variance_parameters(tmb_data, obj, opt$par)
+    objective_tol <- 1e-6 * max(1, abs(previous_objective))
+    if (opt$objective > previous_objective + objective_tol) damped_em <- TRUE
+    damping_rho <- if (damped_em) 0.5 else 1
+    next_params <- .update_variance_parameters(
+      tmb_data, obj, opt$par, damping_rho
+    )
+    previous_objective <- opt$objective
     variance_delta <- max(abs(c(
       next_params$log_sd_re - tmb_params$log_sd_re,
       next_params$corr_par - tmb_params$corr_par
@@ -103,8 +267,12 @@
 
     if (control$verbose > 0) {
       cli::cli_alert_info(sprintf(
-        "sigma_e = %.4g; fixed change = %.3g; variance change = %.3g",
-        exp(next_params$log_sigma_e), fixed_delta, variance_delta
+        paste0(
+          "sigma_e = %.4g; fixed change = %.3g; ",
+          "variance change = %.3g; damping rho = %.2g"
+        ),
+        exp(next_params$log_sigma_e), fixed_delta, variance_delta,
+        damping_rho
       ))
       cli::cli_alert_info(sprintf("outer change = %.3g", outer_delta))
     }
@@ -124,10 +292,7 @@
     DLL = "JointODE",
     silent = control$verbose < 3
   )
-  opt <- last_opt
-  opt$par <- obj$par
-  opt$objective <- obj$fn(obj$par)
-  opt$gradient <- obj$gr(obj$par)
+  opt <- stats::nlminb(obj$par, obj$fn, obj$gr, control = opt_control)
   opt$outer_delta <- outer_delta
   opt$m_step_convergence <- last_opt$convergence
   opt$m_step_message <- last_message
@@ -146,7 +311,7 @@
 }
 
 #' @noRd
-.update_variance_parameters <- function(tmb_data, obj, par) {
+.update_variance_parameters <- function(tmb_data, obj, par, damping_rho = 1) {
   obj$fn(par)
   p <- obj$env$parList(par)
   b <- as.matrix(p$random_effects)
@@ -170,10 +335,15 @@
   if (min(ev) <= 0) {
     sigma <- sigma + diag(abs(min(ev)) + 1e-8, n_re)
   }
+  if (damping_rho < 1) {
+    old_sigma <- as.matrix(obj$report()$Sigma_b)
+    sigma <- (1 - damping_rho) * old_sigma + damping_rho * sigma
+  }
 
   re <- .pack_correlation_theta(sigma, n_re)
   p$log_sd_re <- re$log_sd_re
   p$corr_par <- re$corr_par
+  attr(p, "damping_rho") <- damping_rho
   p
 }
 
@@ -216,6 +386,10 @@
     x[idx] <- x[idx] + direction * log(scale)
     idx <- idx + 1L
   }
+  if (idx <= length(x)) {
+    x[idx:length(x)] <- x[idx:length(x)] *
+      if (to_internal) scale^2 else 1 / scale^2
+  }
   x
 }
 
@@ -223,12 +397,21 @@
 .random_effect_time_scale <- function(parsed_long, n_re, scale, to_internal) {
   mult <- rep(1, n_re)
   if (n_re >= 2) mult[2] <- scale
+  idx <- 3L
+  if (parsed_long$biomarker$random) idx <- idx + 1L
+  if (parsed_long$velocity$random) idx <- idx + 1L
+  if (idx <= n_re) mult[idx:n_re] <- scale^2
   if (to_internal) mult else 1 / mult
 }
 
 #' @noRd
 .longitudinal_vcov_time_scale <- function(parsed_long, n_long, scale) {
-  rep(1, n_long)
+  mult <- rep(1, n_long)
+  idx <- 1L
+  if (parsed_long$biomarker$fixed) idx <- idx + 1L
+  if (parsed_long$velocity$fixed) idx <- idx + 1L
+  if (idx <= n_long) mult[idx:n_long] <- 1 / scale^2
+  mult
 }
 
 #' @noRd

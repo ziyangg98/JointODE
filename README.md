@@ -74,10 +74,10 @@ Here’s a basic example using the included simulated dataset:
 
 ``` r
 library(JointODE)
-#>
+#> 
 #> Attaching package: 'JointODE'
 #> The following object is masked from 'package:stats':
-#>
+#> 
 #>     simulate
 
 # Load example dataset (200 subjects with longitudinal and survival data)
@@ -97,76 +97,76 @@ fit <- JointODE(
   init = "marginal"
 )
 cat(sprintf("Elapsed: %.1f s\n", (proc.time() - t0)["elapsed"]))
-#> Elapsed: 145.7 s
+#> Elapsed: 450.5 s
 ```
 
 ``` r
 # Model summary
 summary(fit)
-#>
+#> 
 #> Call:
-#> JointODE(longitudinal_formula = observed ~ biomarker + velocity +
-#>     x1 + x2 + (biomarker + velocity | id), survival_formula = Surv(time,
-#>     status) ~ w1 + w2, longitudinal_data = longitudinal_data,
+#> JointODE(longitudinal_formula = observed ~ biomarker + velocity + 
+#>     x1 + x2 + (biomarker + velocity | id), survival_formula = Surv(time, 
+#>     status) ~ w1 + w2, longitudinal_data = longitudinal_data, 
 #>     survival_data = sim$data$survival_data, init = "marginal")
-#>
+#> 
 #> Data Descriptives:
 #> Longitudinal Process            Survival Process
 #> Number of Observations: 17319   Number of Events: 58 (29%)
 #> Number of Subjects: 200
-#>
+#> 
 #>        AIC        BIC     logLik
-#> -28945.644 -28859.887  14498.822
-#>
+#> -28900.821 -28815.064  14476.410
+#> 
 #> Coefficients:
 #> Longitudinal Process: Second-Order ODE Model
-#>               Estimate Std. Error  z value Pr(>|z|)
-#> log_omega2      0.0867     0.0075   11.540   <2e-16 ***
-#> log_2xi_omega  -0.1915     0.0200   -9.564   <2e-16 ***
-#> (Intercept)    -0.0014     0.0015   -0.910    0.363
-#> x1              0.5475     0.0040  135.824   <2e-16 ***
-#> x2             -0.4908     0.0037 -131.456   <2e-16 ***
+#>               Estimate Std. Error  z value Pr(>|z|)    
+#> log_omega2      0.0872     0.0075   11.644   <2e-16 ***
+#> log_2xi_omega  -0.1907     0.0202   -9.450   <2e-16 ***
+#> (Intercept)    -0.0013     0.0015   -0.844    0.399    
+#> x1              0.5477     0.0040  136.034   <2e-16 ***
+#> x2             -0.4909     0.0037 -131.452   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#>
+#> 
 #> ODE System Characteristics:
-#>                           Estimate Std. Error z value Pr(>|z|)
-#> omega (natural frequency)   1.0443     0.0039  266.18   <2e-16 ***
-#> xi (damping ratio)          0.3953     0.0077   51.13   <2e-16 ***
+#>                           Estimate Std. Error z value Pr(>|z|)    
+#> omega (natural frequency)   1.0446     0.0039  267.04   <2e-16 ***
+#> xi (damping ratio)          0.3955     0.0078   50.67   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#>
+#> 
 #> Survival Process: Proportional Hazards Model
-#>          Estimate Std. Error z value Pr(>|z|)
-#> value      0.9348     0.2147   4.354 1.34e-05 ***
-#> velocity   2.1078     0.6317   3.337 0.000848 ***
-#> w1         0.6991     0.1359   5.144 2.69e-07 ***
-#> w2        -0.9099     0.2766  -3.289 0.001006 **
+#>          Estimate Std. Error z value Pr(>|z|)    
+#> value      0.9475     0.2138   4.432 9.35e-06 ***
+#> velocity   2.1034     0.6429   3.272 0.001070 ** 
+#> w1         0.7079     0.1358   5.211 1.88e-07 ***
+#> w2        -0.9126     0.2759  -3.308 0.000941 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#>
+#> 
 #> Baseline Hazard: B-spline with 4 basis functions
-#> (Coefficients range: [-4.635, -2.483] )
-#>
+#> (Coefficients range: [-4.705, -2.446] )
+#> 
 #> Initial State: Population Mean
-#>                   Estimate Std. Error z value Pr(>|z|)
-#> initial_biomarker  -0.4988     0.0073  -68.73   <2e-16 ***
-#> initial_velocity   -0.1002     0.0093  -10.77   <2e-16 ***
+#>                   Estimate Std. Error z value Pr(>|z|)    
+#> initial_biomarker  -0.4988     0.0073  -68.47   <2e-16 ***
+#> initial_velocity   -0.1012     0.0093  -10.90   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#>
+#> 
 #> Variance Components:
-#> Measurement Error SD: 0.099448 (SE: 0.000545)
+#> Measurement Error SD: 0.099369
 #> Random Effect Covariance Matrix:
 #>                   initial_biomarker initial_velocity log_omega2 log_2xi_omega
-#> initial_biomarker         0.0082210        0.0009966  0.0002002     0.0006619
-#> initial_velocity          0.0009966        0.0090838  0.0001854     0.0003816
-#> log_omega2                0.0002002        0.0001854  0.0016667    -0.0005260
-#> log_2xi_omega             0.0006619        0.0003816 -0.0005260     0.0499643
-#>
+#> initial_biomarker         0.0083456        0.0008110  0.0002327     0.0008118
+#> initial_velocity          0.0008110        0.0094564  0.0001412     0.0006467
+#> log_omega2                0.0002327        0.0001412  0.0017059    -0.0004349
+#> log_2xi_omega             0.0008118        0.0006467 -0.0004349     0.0514761
+#> 
 #> Model Diagnostics:
-#> C-index (Concordance): 0.622
-#> Convergence: Converged (relative convergence (4))
+#> C-index (Concordance): 0.616
+#> Convergence: Converged (outer parameter convergence; last M-step: relative convergence (4))
 
 # Plot results
 plot(fit)
