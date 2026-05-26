@@ -27,7 +27,7 @@
     0
   }
   n_re <- n_long_random + sum(
-    parsed_long$biomarker$random, parsed_long$velocity$random
+    parsed_long$lambda$random, parsed_long$tau$random
   )
 
   # Survival dimensions
@@ -51,10 +51,10 @@
   )
   sbc$boundary_knots[1] <- 0
 
-  # Longitudinal coefficient names (biomarker/velocity first)
+  # Longitudinal coefficient names (dynamic parameters first)
   long_names <- character(0)
-  if (parsed_long$biomarker$fixed) long_names <- c(long_names, "log_omega2")
-  if (parsed_long$velocity$fixed) long_names <- c(long_names, "log_2xi_omega")
+  if (parsed_long$lambda$fixed) long_names <- c(long_names, "lambda")
+  if (parsed_long$tau$fixed) long_names <- c(long_names, "tau")
   long_names <- c(long_names, long_fixed_names)
 
   # Random effects layout: [initial_biomarker, initial_velocity, dyn_coefs...]
@@ -62,8 +62,8 @@
   random_effects <- matrix(0, nrow(survival_data), n_re_total)
 
   re_names <- c("initial_biomarker", "initial_velocity")
-  if (parsed_long$biomarker$random) re_names <- c(re_names, "log_omega2")
-  if (parsed_long$velocity$random) re_names <- c(re_names, "log_2xi_omega")
+  if (parsed_long$lambda$random) re_names <- c(re_names, "lambda")
+  if (parsed_long$tau$random) re_names <- c(re_names, "tau")
   if (length(random_terms) > 0) {
     re_cov_names <- colnames(model.matrix(
       .build_formula(random_terms, is_random = TRUE), longitudinal_data
@@ -96,8 +96,8 @@
   ))
 
   long_names <- character(0)
-  if (parsed_long$biomarker$fixed) long_names <- c(long_names, "log_omega2")
-  if (parsed_long$velocity$fixed) long_names <- c(long_names, "log_2xi_omega")
+  if (parsed_long$lambda$fixed) long_names <- c(long_names, "lambda")
+  if (parsed_long$tau$fixed) long_names <- c(long_names, "tau")
   long_names <- c(long_names, fixed_names)
 
   # RE dimension
@@ -109,11 +109,11 @@
     0L
   }
   n_re <- 2L + n_long_random +
-    sum(parsed_long$biomarker$random, parsed_long$velocity$random)
+    sum(parsed_long$lambda$random, parsed_long$tau$random)
 
   re_names <- c("initial_biomarker", "initial_velocity")
-  if (parsed_long$biomarker$random) re_names <- c(re_names, "log_omega2")
-  if (parsed_long$velocity$random) re_names <- c(re_names, "log_2xi_omega")
+  if (parsed_long$lambda$random) re_names <- c(re_names, "lambda")
+  if (parsed_long$tau$random) re_names <- c(re_names, "tau")
   if (length(random_terms) > 0) {
     re_cov_names <- colnames(model.matrix(
       .build_formula(random_terms, is_random = TRUE), data

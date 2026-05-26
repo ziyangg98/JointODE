@@ -33,7 +33,7 @@ JointODE models biomarker evolution using **ordinary differential equations** (O
 
 $$\ddot{m}_i(t) + 2 \xi_i \omega_i \dot{m}_i(t) + \omega_i^2 m_i(t) = f_i(t)$$
 
-with initial conditions $m_i(0) = m_{0,i}$ and $\dot{m}_i(0) = v_{0,i}$, where $\omega_i$ is the natural frequency, $\xi_i$ is the damping ratio, and $f_i(t)$ is covariate-driven forcing. Stability ($\omega > 0$, $\xi > 0$) is enforced by estimating $\log(\omega^2)$ and $\log(2\xi\omega)$. Individual heterogeneity is captured through random effects on initial states $(m_{0,i}, v_{0,i})$ and multiplicative random effects on ODE parameters.
+with initial conditions $m_i(0) = m_{0,i}$ and $\dot{m}_i(0) = v_{0,i}$, where $\omega_i$ is the natural frequency, $\xi_i$ is the damping ratio, and $f_i(t)$ is covariate-driven forcing. The dynamic parameters are estimated on latent scales: `omega` is $\log \omega_i$ and `xi` is a Gaussian damping root with $\xi_i = \xi_{\mathrm{root},i}^2$. Individual heterogeneity is captured through random effects on initial states $(m_{0,i}, v_{0,i})$ and latent ODE parameters.
 
 **Survival Model:** The hazard function incorporates biomarker dynamics:
 
@@ -74,8 +74,8 @@ longitudinal_data <- sim$data$longitudinal_data[
 ]
 t0 <- proc.time()
 fit <- JointODE(
-  longitudinal_formula = observed ~ biomarker + velocity + x1 + x2 +
-    (biomarker + velocity | id),
+  longitudinal_formula = observed ~ omega + xi + x1 + x2 +
+    (omega + xi | id),
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = longitudinal_data,
   survival_data = sim$data$survival_data,
@@ -94,9 +94,9 @@ plot(fit)
 
 The formula uses two reserved keywords (not data columns):
 
-- **`biomarker`**: includes the frequency parameter $\omega^2$ in the ODE ($b_1 m(t)$ term)
-- **`velocity`**: includes the damping parameter $2\xi\omega$ in the ODE ($b_2 \dot{m}(t)$ term)
-- **`(biomarker + velocity | id)`**: adds subject-specific multiplicative random effects on these ODE parameters
+- **`omega`**: includes the latent log-frequency parameter; physical $\omega_i=\exp(\text{omega}_i)$
+- **`xi`**: includes the latent damping-root parameter; physical $\xi_i=\text{xi}_i^2$
+- **`(omega + xi | id)`**: adds subject-specific random effects on these latent ODE parameters
 - **`x1`, `x2`**: standard covariates driving the forcing function $f(t)$
 
 ## Learn More

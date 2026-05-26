@@ -5,9 +5,9 @@
 #' This function can be called with no arguments to get defaults, or can
 #' process a list to fill in missing values with defaults.
 #'
-#' @param maxit Maximum number of EM iterations (default: 200)
-#' @param tol Convergence tolerance on maximum absolute parameter
-#'   change: max|delta_theta| < tol (default: 1e-4)
+#' @param maxit Maximum number of \code{nlminb} iterations (default: 200)
+#' @param tol Relative convergence tolerance passed to \code{nlminb}
+#'   (default: 1e-4)
 #' @param verbose Numeric verbosity level: 0 = silent, 1 = progress,
 #'   2 = outer iterations, 3 = inner Newton detail (default: 0)
 #' @param parallel Logical; whether to use parallel computation (default: FALSE)
@@ -16,7 +16,6 @@
 #' @param hazard_quadrature Integer; number of Simpson sub-intervals per
 #'   observation interval for hazard integration (default: 1)
 #' @param .list Optional list of control parameters to process
-#' @param ... Additional control parameters
 #'
 #' @return A list of control parameters with all defaults filled in
 #'
@@ -50,8 +49,7 @@ JointODE.control <- function(
   parallel = FALSE,
   n_cores = 0,
   hazard_quadrature = 1,
-  .list = NULL,
-  ...
+  .list = NULL
 ) {
   defaults <- list(
     maxit = maxit, tol = tol, verbose = verbose,
@@ -61,14 +59,15 @@ JointODE.control <- function(
 
   if (!is.null(.list)) {
     if (!is.list(.list)) stop(".list must be a list or NULL")
+    unknown <- setdiff(names(.list), names(defaults))
+    if (length(unknown) > 0) {
+      stop("Unknown control parameter(s): ", paste(unknown, collapse = ", "))
+    }
     control <- defaults
     for (name in names(.list)) control[[name]] <- .list[[name]]
   } else {
     control <- defaults
   }
-
-  dots <- list(...)
-  for (name in names(dots)) control[[name]] <- dots[[name]]
 
   control$verbose <- as.numeric(control$verbose)
 
@@ -92,16 +91,14 @@ JointODE.control <- function(
 #' @description
 #' Construct control parameters for the MarginalODE optimization.
 #'
-#' @param maxit Maximum number of alternating optimization iterations
-#'   (default: 200)
-#' @param tol Convergence tolerance on max absolute parameter
-#'   change (default: 1e-4)
+#' @param maxit Maximum number of \code{nlminb} iterations (default: 200)
+#' @param tol Relative convergence tolerance passed to \code{nlminb}
+#'   (default: 1e-4)
 #' @param verbose Logical or numeric; FALSE/0 for silent, TRUE/1 for basic
 #'   progress, 2 for detailed output (default: FALSE)
 #' @param parallel Logical; whether to use parallel computation (default: FALSE)
 #' @param n_cores Integer; number of cores (0 = auto) (default: 0)
 #' @param .list Optional list of control parameters to process
-#' @param ... Additional control parameters
 #'
 #' @return A list of control parameters with all defaults filled in
 #'
@@ -121,8 +118,7 @@ MarginalODE.control <- function(
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,
-  .list = NULL,
-  ...
+  .list = NULL
 ) {
   defaults <- list(
     maxit = maxit, tol = tol, verbose = verbose,
@@ -131,14 +127,15 @@ MarginalODE.control <- function(
 
   if (!is.null(.list)) {
     if (!is.list(.list)) stop(".list must be a list or NULL")
+    unknown <- setdiff(names(.list), names(defaults))
+    if (length(unknown) > 0) {
+      stop("Unknown control parameter(s): ", paste(unknown, collapse = ", "))
+    }
     control <- defaults
     for (name in names(.list)) control[[name]] <- .list[[name]]
   } else {
     control <- defaults
   }
-
-  dots <- list(...)
-  for (name in names(dots)) control[[name]] <- dots[[name]]
 
   control$verbose <- as.numeric(control$verbose)
 

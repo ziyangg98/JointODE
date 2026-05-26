@@ -20,10 +20,11 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
   DATA_INTEGER(n_random_covariates);
   DATA_VECTOR(long_fixed_covariates);
   DATA_VECTOR(long_random_covariates);
-  DATA_INTEGER(biomarker_fixed);
-  DATA_INTEGER(biomarker_random);
-  DATA_INTEGER(velocity_fixed);
-  DATA_INTEGER(velocity_random);
+  DATA_INTEGER(lambda_fixed);
+  DATA_INTEGER(lambda_random);
+  DATA_INTEGER(tau_fixed);
+  DATA_INTEGER(tau_random);
+  DATA_INTEGER(diagonal_re);
 
   // Pre-compute per-subject offsets
   vector<int> obs_offset(n_subjects), fixed_offset(n_subjects);
@@ -61,8 +62,12 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
     vector<Type> bi = random_effects.row(i);
 
     // --- Random effect prior: MVN(0, Sigma_b) ---
-    nll += VECSCALE(corr_structure, exp(log_sd_re))(bi);
-
+    if (diagonal_re) {
+      for (int j = 0; j < n_random_effects; j++)
+        nll -= dnorm(bi(j), Type(0), exp(log_sd_re(j)), true);
+    } else {
+      nll += VECSCALE(corr_structure, exp(log_sd_re))(bi);
+    }
     // Unpack subject data as double
     vector<double> obs_t(ni), obs_y(ni);
     for (int j = 0; j < ni; j++) {
@@ -86,13 +91,21 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
     vector<Type> sol_m(n_times), sol_v(n_times);
     sol_m(0) = m;  sol_v(0) = v;
 
-    // b1, b2: constant across time steps
-    Type b1(0), b2(0);
+    // Dynamic parameters are constant across time steps.
+    Type log_lambda(0), log_tau(0);
     int fixed_idx = 0, re_idx = 2;
-    if (biomarker_fixed)  b1  = -exp(longitudinal(fixed_idx++));
-    if (biomarker_random) b1 *= exp(bi(re_idx++));
-    if (velocity_fixed)   b2  = -exp(longitudinal(fixed_idx++));
-    if (velocity_random)  b2 *= exp(bi(re_idx++));
+    if (lambda_fixed) log_lambda += longitudinal(fixed_idx++);
+    if (lambda_random) log_lambda += bi(re_idx++);
+    if (tau_fixed) log_tau += longitudinal(fixed_idx++);
+    if (tau_random) {
+      log_tau += bi(re_idx);
+      re_idx++;
+    }
+    Type lambda = exp(log_lambda);
+    Type tau = exp(log_tau);
+    Type inv_tau = Type(1) / tau;
+    Type b1 = -lambda * inv_tau;
+    Type b2 = -inv_tau;
     int forcing_fixed_start = fixed_idx;
     int forcing_re_start = re_idx;
 
@@ -101,13 +114,13 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
       Type dt = Type(time_pts(ti) - t0);
       int cov_idx = covariate_index_at(t0, obs_t);
 
-      Type forcing(0);
+      Type eta(0);
       for (int k = 0; k < n_fixed_covariates; k++)
-        forcing += longitudinal(forcing_fixed_start + k) * Type(long_fixed_covariates_i(cov_idx, k));
+        eta += longitudinal(forcing_fixed_start + k) * Type(long_fixed_covariates_i(cov_idx, k));
       for (int k = 0; k < n_random_covariates; k++)
-        forcing += bi(forcing_re_start + k) * Type(long_random_covariates_i(cov_idx, k));
+        eta += bi(forcing_re_start + k) * Type(long_random_covariates_i(cov_idx, k));
 
-      ode_step(m, v, b1, b2, forcing, dt);
+      ode_step(m, v, b1, b2, eta * inv_tau, dt);
       sol_m(ti) = m;  sol_v(ti) = v;
     }
 
@@ -126,10 +139,17 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
   REPORT(fitted_velocity);
 
   // Reconstruct Sigma_b for reporting
-  matrix<Type> Sigma_b = corr_structure.cov();
-  for (int i = 0; i < n_random_effects; i++)
-    for (int j = 0; j < n_random_effects; j++)
-      Sigma_b(i, j) *= exp(log_sd_re(i)) * exp(log_sd_re(j));
+  matrix<Type> Sigma_b(n_random_effects, n_random_effects);
+  Sigma_b.setZero();
+  if (diagonal_re) {
+    for (int i = 0; i < n_random_effects; i++)
+      Sigma_b(i, i) = exp(log_sd_re(i)) * exp(log_sd_re(i));
+  } else {
+    Sigma_b = corr_structure.cov();
+    for (int i = 0; i < n_random_effects; i++)
+      for (int j = 0; j < n_random_effects; j++)
+        Sigma_b(i, j) *= exp(log_sd_re(i)) * exp(log_sd_re(j));
+  }
 
   REPORT(Sigma_b);
   ADREPORT(Sigma_b);

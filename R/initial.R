@@ -4,11 +4,16 @@
 .default_parameters <- function(
   dims, gamma, parsed_long, spline_baseline_config
 ) {
+  longitudinal <- rep(0, dims$n_longitudinal_coef)
+  idx <- 1L
+  if (parsed_long$omega$fixed) idx <- idx + 1L
+  if (parsed_long$xi$fixed) longitudinal[idx] <- log(0.4)
+
   list(
     coefficients = list(
       baseline = rep(0, dims$n_spline_basis),
       hazard = rep(0, dims$n_survival_covariates + 2),
-      longitudinal = rep(0, dims$n_longitudinal_coef),
+      longitudinal = longitudinal,
       initial_state = NULL,
       measurement_error_sd = NULL,
       random_effect_sigma = diag(1, dims$n_random_effects)
@@ -16,13 +21,13 @@
     configurations = list(
       baseline = spline_baseline_config,
       gamma = gamma,
-      biomarker = list(
-        fixed = parsed_long$biomarker$fixed,
-        random = parsed_long$biomarker$random
+      omega = list(
+        fixed = parsed_long$omega$fixed,
+        random = parsed_long$omega$random
       ),
-      velocity = list(
-        fixed = parsed_long$velocity$fixed,
-        random = parsed_long$velocity$random
+      xi = list(
+        fixed = parsed_long$xi$fixed,
+        random = parsed_long$xi$random
       )
     )
   )

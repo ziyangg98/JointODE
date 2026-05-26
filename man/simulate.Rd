@@ -136,10 +136,10 @@ Baseline survival covariates (if specified)
 }
 \item{\code{random_effects}}{An \eqn{n \times 4} matrix of
 subject-specific random effects (centered at zero). Columns
-\code{init_biomarker} and \code{init_velocity} capture initial
-state variability; \code{dyn_biomarker} and \code{dyn_velocity}
-capture ODE coefficient variability corresponding to the formula
-term \code{(biomarker + velocity | id)}.}
+\code{initial_biomarker} and \code{initial_velocity} capture initial
+state variability; \code{omega} and \code{xi}
+capture latent ODE parameter variability corresponding to the formula
+term \code{(omega + xi | id)}.}
 }}
 \item{\code{init}}{A list of initial parameter values suitable for
 passing to \code{JointODE()}, containing \code{$coefficients} and

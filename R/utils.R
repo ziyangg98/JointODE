@@ -35,188 +35,58 @@
 }
 
 #' @noRd
-.fit_variance_tmb <- function(tmb_data, tmb_params, control, fixed,
-                              eval_factor = 2, direct_trust = FALSE) {
-  mstep_maxit <- min(control$maxit, 50L)
+.fit_tmb <- function(tmb_data, tmb_params, control, map = NULL) {
   opt_control <- list(
-    iter.max = mstep_maxit,
-    eval.max = mstep_maxit * eval_factor,
+    iter.max = control$maxit,
+    eval.max = control$maxit,
     rel.tol = control$tol,
-    trace = as.integer(control$verbose >= 3)
+    trace = as.integer(control$verbose >= 2)
   )
 
-  if (isTRUE(direct_trust)) {
-    obj <- TMB::MakeADFun(
-      data = tmb_data,
-      parameters = tmb_params,
-      random = "random_effects",
-      DLL = "JointODE",
-      silent = control$verbose < 3
-    )
-
-    par <- obj$par
-    objective <- obj$fn(par)
-    step_norm <- Inf
-    objective_change <- Inf
-    converged <- FALSE
-    last_opt <- NULL
-    last_message <- NULL
-    trust_radius <- 1
-    opt_control$iter.max <- min(mstep_maxit, 20L)
-    opt_control$eval.max <- opt_control$iter.max * eval_factor
-
-    for (i in seq_len(control$maxit)) {
-      if (control$verbose > 0) {
-        cli::cli_alert_info(sprintf("Trust-region iteration %d", i))
-      }
-
-      grad0 <- tryCatch(obj$gr(par), error = function(e) NA_real_)
-      grad0_max <- if (all(is.finite(grad0))) max(abs(grad0)) else Inf
-      par_scale <- rep(1, length(par))
-      if (is.finite(grad0_max) && grad0_max > 1000) {
-        par_scale <- 1 / sqrt(pmax(abs(grad0), 1))
-        par_scale <- pmin(1, pmax(1e-3, par_scale))
-      }
-      fn_scaled <- function(delta) obj$fn(par + par_scale * delta)
-      gr_scaled <- function(delta) obj$gr(par + par_scale * delta) * par_scale
-
-      opt <- tryCatch(
-        stats::nlminb(
-          rep(0, length(par)), fn_scaled, gr_scaled,
-          control = c(opt_control, list(step.max = trust_radius))
-        ),
-        error = function(e) {
-          list(
-            par = rep(0, length(par)), objective = Inf, convergence = 1L,
-            iterations = 0L, message = conditionMessage(e)
-          )
-        }
-      )
-      last_opt <- opt
-      last_message <- opt$message
-
-      if (any(!is.finite(opt$par))) {
-        last_message <- "optimizer proposed non-finite parameters"
-        break
-      }
-
-      step <- par_scale * opt$par
-      alpha <- 1
-      accepted <- FALSE
-      trial_objective <- Inf
-      objective_tol <- 1e-8 * max(1, abs(objective))
-      while (alpha >= 1e-6) {
-        trial_par <- par + alpha * step
-        trial_objective <- tryCatch(
-          obj$fn(trial_par),
-          error = function(e) Inf
-        )
-        trial_grad <- tryCatch(obj$gr(trial_par), error = function(e) NA_real_)
-        trial_grad_max <- if (all(is.finite(trial_grad))) {
-          max(abs(trial_grad))
-        } else {
-          Inf
-        }
-        grad_limit <- if (is.finite(grad0_max)) {
-          max(1000, 25 * grad0_max)
-        } else {
-          Inf
-        }
-        if (
-          is.finite(trial_objective) &&
-            trial_objective <= objective + objective_tol &&
-            trial_grad_max <= grad_limit
-        ) {
-          accepted <- TRUE
-          break
-        }
-        alpha <- alpha / 2
-      }
-
-      if (!accepted) {
-        last_message <- "trust-region step could not improve objective"
-        break
-      }
-
-      step_norm <- max(abs(alpha * step))
-      objective_change <- abs(objective - trial_objective)
-      par <- trial_par
-      objective <- trial_objective
-      trust_radius <- if (alpha == 1) {
-        min(2 * trust_radius, 10)
-      } else {
-        max(alpha * trust_radius, 1e-4)
-      }
-
-      if (control$verbose > 0) {
-        grad <- tryCatch(obj$gr(par), error = function(e) NA_real_)
-        grad_max <- if (all(is.finite(grad))) max(abs(grad)) else Inf
-        cli::cli_alert_info(sprintf(
-          paste0(
-            "convergence = %d; objective = %.4f; ",
-            "step = %.3g; alpha = %.3g; trust radius = %.3g; ",
-            "max gradient = %.3g"
-          ),
-          opt$convergence, objective, step_norm, alpha, trust_radius,
-          grad_max
-        ))
-      }
-
-      grad <- tryCatch(obj$gr(par), error = function(e) NA_real_)
-      grad_max <- if (all(is.finite(grad))) max(abs(grad)) else Inf
-      if (
-        step_norm < control$tol &&
-          objective_change < control$tol * max(1, abs(objective))
-      ) {
-        converged <- opt$convergence == 0 || grad_max < sqrt(control$tol)
-        if (!converged) {
-          last_message <- sprintf(
-            "trust-region no progress; max gradient %.3g; last optimizer: %s",
-            grad_max, opt$message
-          )
-        }
-        break
-      }
+  args <- list(
+    data = tmb_data,
+    parameters = tmb_params,
+    random = "random_effects",
+    DLL = "JointODE",
+    silent = control$verbose < 3
+  )
+  if (!is.null(map)) {
+    if (!is.null(map$corr_par)) {
+      tmb_params$corr_par[is.na(map$corr_par)] <- 0
+      args$parameters <- tmb_params
     }
-
-    opt <- list(
-      par = par,
-      objective = objective,
-      convergence = if (converged) 0L else 1L,
-      iterations = if (is.null(last_opt)) 0L else last_opt$iterations,
-      message = sprintf(
-        "%s; last optimizer: %s",
-        if (converged) {
-          "trust-region convergence"
-        } else {
-          "trust-region iterations stopped before convergence"
-        },
-        last_message
-      ),
-      outer_delta = step_norm,
-      objective_change = objective_change
-    )
-    return(list(obj = obj, opt = opt))
+    args$map <- map
   }
 
+  obj <- do.call(TMB::MakeADFun, args)
+  opt <- stats::nlminb(obj$par, obj$fn, obj$gr, control = opt_control)
+
+  list(obj = obj, opt = opt)
+}
+
+#' @noRd
+.fit_tmb_em <- function(tmb_data, tmb_params, control, map = NULL) {
+  opt_control <- list(
+    iter.max = control$maxit,
+    eval.max = control$maxit,
+    rel.tol = control$tol,
+    trace = as.integer(control$verbose >= 2)
+  )
   variance_map <- list(
     log_sd_re = factor(rep(NA, length(tmb_params$log_sd_re))),
     corr_par = factor(rep(NA, length(tmb_params$corr_par)))
   )
+  if (!is.null(map) && !is.null(map$corr_par)) {
+    tmb_params$corr_par[is.na(map$corr_par)] <- 0
+    variance_map$corr_par <- map$corr_par
+  }
 
-  outer_delta <- Inf
-  outer_converged <- FALSE
-  final_params <- tmb_params
-  last_opt <- NULL
-  last_message <- NULL
-  previous_objective <- Inf
-  damped_em <- FALSE
-
-  for (i in seq_len(control$maxit)) {
-    if (control$verbose > 0) {
-      cli::cli_alert_info(sprintf("Variance update iteration %d", i))
+  previous_fixed <- NULL
+  fixed_change <- Inf
+  for (iter in seq_len(control$maxit)) {
+    if (control$verbose >= 1) {
+      cli::cli_alert_info("Laplace-EM iteration {iter}")
     }
-
     obj <- TMB::MakeADFun(
       data = tmb_data,
       parameters = tmb_params,
@@ -226,125 +96,78 @@
       silent = control$verbose < 3
     )
     opt <- stats::nlminb(obj$par, obj$fn, obj$gr, control = opt_control)
-    last_opt <- opt
-    last_message <- opt$message
+    obj$fn(opt$par)
+    par <- obj$env$parList()
+    fixed <- c(par$longitudinal, par$initial_state, par$log_sigma_e)
 
-    if (control$verbose > 0) {
-      msg <- sprintf(
-        "M-step %d: convergence = %d; objective = %.4f; %s",
-        i, opt$convergence, opt$objective, opt$message
-      )
-      if (opt$convergence == 0) {
-        cli::cli_alert_success(msg)
-      } else {
-        cli::cli_alert_warning(msg)
-      }
-    }
-
-    if (!is.finite(opt$objective) || any(!is.finite(opt$par))) {
-      last_message <- "M-step produced non-finite objective or parameters"
-      break
-    }
-
-    best <- obj$env$parList(opt$par)
-    fixed_delta <- max(abs(c(
-      unlist(best[fixed]) - unlist(tmb_params[fixed]),
-      best$log_sigma_e - tmb_params$log_sigma_e
-    )))
-    objective_tol <- 1e-6 * max(1, abs(previous_objective))
-    if (opt$objective > previous_objective + objective_tol) damped_em <- TRUE
-    damping_rho <- if (damped_em) 0.5 else 1
-    next_params <- .update_variance_parameters(
-      tmb_data, obj, opt$par, damping_rho
+    random_effects <- matrix(
+      par$random_effects,
+      nrow = tmb_data$n_subjects,
+      ncol = tmb_data$n_random_effects
     )
-    previous_objective <- opt$objective
-    variance_delta <- max(abs(c(
-      next_params$log_sd_re - tmb_params$log_sd_re,
-      next_params$corr_par - tmb_params$corr_par
-    )))
-    outer_delta <- max(fixed_delta, variance_delta)
-    final_params <- next_params
+    sigma_b <- .em_random_effect_sigma(obj, random_effects, tmb_data$n_random_effects)
+    corr <- .pack_correlation_theta(sigma_b, tmb_data$n_random_effects)
 
-    if (control$verbose > 0) {
+    tmb_params$longitudinal <- par$longitudinal
+    tmb_params$initial_state <- par$initial_state
+    tmb_params$log_sigma_e <- par$log_sigma_e
+    tmb_params$random_effects <- random_effects
+    tmb_params$log_sd_re <- corr$log_sd_re
+    tmb_params$corr_par <- corr$corr_par
+    if (!is.null(map) && !is.null(map$corr_par)) {
+      tmb_params$corr_par[is.na(map$corr_par)] <- 0
+    }
+
+    fixed_change <- if (is.null(previous_fixed)) {
+      Inf
+    } else {
+      max(abs(fixed - previous_fixed))
+    }
+    if (control$verbose >= 1) {
       cli::cli_alert_info(sprintf(
-        paste0(
-          "sigma_e = %.4g; fixed change = %.3g; ",
-          "variance change = %.3g; damping rho = %.2g"
-        ),
-        exp(next_params$log_sigma_e), fixed_delta, variance_delta,
-        damping_rho
+        "objective = %.4f; fixed change = %.3g",
+        opt$objective, fixed_change
       ))
-      cli::cli_alert_info(sprintf("outer change = %.3g", outer_delta))
     }
-
-    if (outer_delta < control$tol) {
-      outer_converged <- TRUE
-      break
-    }
-    tmb_params <- next_params
+    if (is.finite(fixed_change) && fixed_change < control$tol) break
+    previous_fixed <- fixed
   }
 
-  obj <- TMB::MakeADFun(
-    data = tmb_data,
-    parameters = final_params,
-    random = "random_effects",
-    map = variance_map,
-    DLL = "JointODE",
-    silent = control$verbose < 3
-  )
-  opt <- stats::nlminb(obj$par, obj$fn, obj$gr, control = opt_control)
-  opt$outer_delta <- outer_delta
-  opt$m_step_convergence <- last_opt$convergence
-  opt$m_step_message <- last_message
-  opt$convergence <- if (outer_converged) 0L else 1L
-  opt$message <- sprintf(
-    "%s; last M-step: %s",
-    if (outer_converged) {
-      "outer parameter convergence"
-    } else {
-      "outer iterations stopped before EM convergence"
-    },
-    last_message
-  )
+  if (is.finite(fixed_change) && fixed_change < control$tol) {
+    opt$convergence <- 0L
+    opt$message <- "EM fixed parameters converged"
+  } else {
+    opt$convergence <- 1L
+    opt$message <- "EM reached the iteration limit"
+  }
 
   list(obj = obj, opt = opt)
 }
 
 #' @noRd
-.update_variance_parameters <- function(tmb_data, obj, par, damping_rho = 1) {
-  obj$fn(par)
-  p <- obj$env$parList(par)
-  b <- as.matrix(p$random_effects)
-  n_subjects <- tmb_data$n_subjects
-  n_re <- tmb_data$n_random_effects
-  h <- obj$env$spHess(random = TRUE)
-
-  sigma <- crossprod(b)
+.em_random_effect_sigma <- function(obj, random_effects, n_re) {
+  H <- obj$env$spHess(random = TRUE)
+  n_subjects <- nrow(random_effects)
+  sigma_b <- crossprod(random_effects)
   for (i in seq_len(n_subjects)) {
     idx <- i + (seq_len(n_re) - 1L) * n_subjects
-    hi <- as.matrix(h[idx, idx, drop = FALSE])
-    vi <- tryCatch(
-      solve(hi),
-      error = function(e) MASS::ginv(hi)
-    )
-    sigma <- sigma + vi
+    Hi <- as.matrix(H[idx, idx, drop = FALSE])
+    Hi <- (Hi + t(Hi)) / 2
+    sigma_b <- sigma_b + solve(Hi)
   }
-  sigma <- (sigma + t(sigma)) / (2 * n_subjects)
+  sigma_b <- sigma_b / n_subjects
+  sigma_b <- (sigma_b + t(sigma_b)) / 2
+  ev <- eigen(sigma_b, symmetric = TRUE, only.values = TRUE)$values
+  if (min(ev) <= 0 || any(!is.finite(ev))) {
+    sigma_b <- sigma_b + diag(abs(min(ev, na.rm = TRUE)) + 1e-6, n_re)
+  }
+  sigma_b
+}
 
-  ev <- eigen(sigma, symmetric = TRUE, only.values = TRUE)$values
-  if (min(ev) <= 0) {
-    sigma <- sigma + diag(abs(min(ev)) + 1e-8, n_re)
-  }
-  if (damping_rho < 1) {
-    old_sigma <- as.matrix(obj$report()$Sigma_b)
-    sigma <- (1 - damping_rho) * old_sigma + damping_rho * sigma
-  }
-
-  re <- .pack_correlation_theta(sigma, n_re)
-  p$log_sd_re <- re$log_sd_re
-  p$corr_par <- re$corr_par
-  attr(p, "damping_rho") <- damping_rho
-  p
+#' @noRd
+.correlation_map <- function(parsed_long, tmb_params) {
+  if (!isTRUE(parsed_long$diagonal)) return(NULL)
+  list(corr_par = factor(rep(NA, length(tmb_params$corr_par))))
 }
 
 #' @noRd
@@ -377,19 +200,17 @@
 .adjust_longitudinal_time_scale <- function(x, parsed_long, scale, to_internal) {
   if (!is.finite(scale) || scale <= 0 || scale == 1) return(x)
   direction <- if (to_internal) 1 else -1
+  forcing_mult <- if (to_internal) scale else 1 / scale
   idx <- 1L
-  if (parsed_long$biomarker$fixed) {
-    x[idx] <- x[idx] + direction * 2 * log(scale)
-    idx <- idx + 1L
-  }
-  if (parsed_long$velocity$fixed) {
+  if (parsed_long$lambda$fixed) {
     x[idx] <- x[idx] + direction * log(scale)
     idx <- idx + 1L
   }
-  if (idx <= length(x)) {
-    x[idx:length(x)] <- x[idx:length(x)] *
-      if (to_internal) scale^2 else 1 / scale^2
+  if (parsed_long$tau$fixed) {
+    x[idx] <- x[idx] - direction * log(scale)
+    idx <- idx + 1L
   }
+  if (idx <= length(x)) x[idx:length(x)] <- x[idx:length(x)] * forcing_mult
   x
 }
 
@@ -397,20 +218,24 @@
 .random_effect_time_scale <- function(parsed_long, n_re, scale, to_internal) {
   mult <- rep(1, n_re)
   if (n_re >= 2) mult[2] <- scale
-  idx <- 3L
-  if (parsed_long$biomarker$random) idx <- idx + 1L
-  if (parsed_long$velocity$random) idx <- idx + 1L
-  if (idx <= n_re) mult[idx:n_re] <- scale^2
+  forcing_start <- 3L + sum(parsed_long$lambda$random, parsed_long$tau$random)
+  if (forcing_start <= n_re) mult[forcing_start:n_re] <- scale
   if (to_internal) mult else 1 / mult
 }
 
 #' @noRd
 .longitudinal_vcov_time_scale <- function(parsed_long, n_long, scale) {
-  mult <- rep(1, n_long)
+  if (!is.finite(scale) || scale <= 0 || scale == 1) return(rep(1, n_long))
+  mult <- rep(1 / scale, n_long)
   idx <- 1L
-  if (parsed_long$biomarker$fixed) idx <- idx + 1L
-  if (parsed_long$velocity$fixed) idx <- idx + 1L
-  if (idx <= n_long) mult[idx:n_long] <- 1 / scale^2
+  if (parsed_long$lambda$fixed) {
+    mult[idx] <- 1
+    idx <- idx + 1L
+  }
+  if (parsed_long$tau$fixed) {
+    mult[idx] <- 1
+    idx <- idx + 1L
+  }
   mult
 }
 
@@ -572,7 +397,7 @@
   boundary_knots = NULL
 )
 
-.reserved_words <- c("biomarker", "velocity")
+.reserved_words <- c("lambda", "tau")
 
 .init_state_names <- c("initial_biomarker", "initial_velocity")
 
@@ -608,28 +433,28 @@
 #' @noRd
 .parse_longitudinal_formula <- function(formula) {
   formula_str <- paste(deparse(formula, width.cutoff = 500L), collapse = "")
-  re_pattern <- "\\(([^)]+\\|[^)]+)\\)"
+  re_pattern <- "\\(([^)]+\\|\\|?[^)]+)\\)"
   re_match <- regmatches(formula_str, regexpr(re_pattern, formula_str))
 
   if (length(re_match) == 0) {
     fixed_formula <- formula
     random_terms <- NULL
     grouping <- NULL
-    biomarker_random <- FALSE
-    velocity_random <- FALSE
+    lambda_random <- FALSE
+    tau_random <- FALSE
+    diagonal <- FALSE
   } else {
     inner <- substr(re_match, 2, nchar(re_match) - 1)
-    parts <- strsplit(inner, "\\|")[[1]]
+    diagonal <- grepl("\\|\\|", inner)
+    parts <- strsplit(inner, if (diagonal) "\\|\\|" else "\\|")[[1]]
     grouping <- trimws(parts[2])
     re_terms_str <- trimws(parts[1])
 
-    random_terms <- if (re_terms_str == "1") {
-      "(Intercept)"
-    } else {
-      terms <- trimws(strsplit(re_terms_str, "\\+")[[1]])
-      terms[terms == "1"] <- "(Intercept)"
-      terms
-    }
+    terms <- trimws(strsplit(re_terms_str, "\\+")[[1]])
+    no_intercept <- any(terms %in% c("0", "-1"))
+    has_intercept <- !no_intercept || any(terms == "1")
+    terms <- terms[!terms %in% c("0", "1", "-1")]
+    random_terms <- c(if (has_intercept) "(Intercept)", terms)
 
     fixed_str <- sub(re_match, "", formula_str, fixed = TRUE)
     fixed_str <- gsub("\\s+\\+\\s*$", "", fixed_str)
@@ -637,8 +462,8 @@
     fixed_str <- gsub("\\+\\s*\\+", "+", fixed_str)
     fixed_formula <- as.formula(fixed_str)
 
-    biomarker_random <- "biomarker" %in% random_terms
-    velocity_random <- "velocity" %in% random_terms
+    lambda_random <- "lambda" %in% random_terms
+    tau_random <- "tau" %in% random_terms
     random_terms <- setdiff(random_terms, .reserved_words)
     if (length(random_terms) == 0) random_terms <- NULL
   }
@@ -647,8 +472,8 @@
   fixed_terms_labels <- attr(fixed_terms_obj, "term.labels")
   has_intercept <- attr(fixed_terms_obj, "intercept") == 1
 
-  biomarker_in_fixed <- "biomarker" %in% fixed_terms_labels
-  velocity_in_fixed <- "velocity" %in% fixed_terms_labels
+  lambda_in_fixed <- "lambda" %in% fixed_terms_labels
+  tau_in_fixed <- "tau" %in% fixed_terms_labels
   fixed_covariates <- setdiff(fixed_terms_labels, .reserved_words)
 
   if (has_intercept) {
@@ -659,9 +484,12 @@
     response = as.character(formula[[2]]),
     fixed_terms = fixed_covariates,
     random_terms = random_terms,
-    biomarker = list(fixed = biomarker_in_fixed, random = biomarker_random),
-    velocity = list(fixed = velocity_in_fixed, random = velocity_random),
-    grouping = grouping
+    lambda = list(fixed = lambda_in_fixed, random = lambda_random),
+    tau = list(fixed = tau_in_fixed, random = tau_random),
+    omega = list(fixed = lambda_in_fixed, random = lambda_random),
+    xi = list(fixed = tau_in_fixed, random = tau_random),
+    grouping = grouping,
+    diagonal = diagonal
   )
 }
 
@@ -714,16 +542,12 @@
     length(parsed_surv$covariate_terms)
   }
 
-  n_biomarker_velocity_fixed <- sum(
-    parsed_long$biomarker$fixed, parsed_long$velocity$fixed
-  )
-  n_biomarker_velocity_random <- sum(
-    parsed_long$biomarker$random, parsed_long$velocity$random
-  )
+  n_ode_fixed <- sum(parsed_long$lambda$fixed, parsed_long$tau$fixed)
+  n_ode_random <- sum(parsed_long$lambda$random, parsed_long$tau$random)
 
   list(
-    n_longitudinal_coef = n_longitudinal_fixed + n_biomarker_velocity_fixed,
-    n_random_effects = n_longitudinal_random + n_biomarker_velocity_random + 2,
+    n_longitudinal_coef = n_longitudinal_fixed + n_ode_fixed,
+    n_random_effects = n_longitudinal_random + n_ode_random + 2,
     n_survival_covariates = n_survival_covariates,
     n_spline_basis = spline_config$degree + spline_config$n_knots + 1,
     spline_config = spline_config
@@ -839,27 +663,31 @@
     m <- cf$initial_state[1] + bi[1]
     v <- cf$initial_state[2] + bi[2]
 
-    # b1, b2 from longitudinal + RE
-    b1 <- 0
-    b2 <- 0
+    log_lambda <- 0
+    log_tau <- 0
     fi <- 1
     ri <- 3
-    if (configs$biomarker$fixed) {
-      b1 <- -exp(lc[fi])
+    if (configs$lambda$fixed) {
+      log_lambda <- log_lambda + lc[fi]
       fi <- fi + 1
     }
-    if (configs$biomarker$random) {
-      b1 <- b1 * exp(bi[ri])
+    if (configs$lambda$random) {
+      log_lambda <- log_lambda + bi[ri]
       ri <- ri + 1
     }
-    if (configs$velocity$fixed) {
-      b2 <- -exp(lc[fi])
+    if (configs$tau$fixed) {
+      log_tau <- log_tau + lc[fi]
       fi <- fi + 1
     }
-    if (configs$velocity$random) {
-      b2 <- b2 * exp(bi[ri])
+    if (configs$tau$random) {
+      log_tau <- log_tau + bi[ri]
       ri <- ri + 1
     }
+    lambda <- exp(log_lambda)
+    tau <- exp(log_tau)
+    inv_tau <- 1 / tau
+    b1 <- -lambda * inv_tau
+    b2 <- -inv_tau
     ffs <- fi
     rfs <- ri
 
@@ -872,11 +700,12 @@
       if (dt > 0 && length(obs_t) > 0) {
         ci <- findInterval(prev_t, obs_t)
         ci <- max(1, min(ci, nrow(fcov)))
-        forcing <- sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci, ])
+        eta <- sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci, ])
         if (ncol(rcov) > 0) {
-          forcing <- forcing + sum(bi[rfs:(rfs + ncol(rcov) - 1)] * rcov[ci, ])
+          eta <- eta + sum(bi[rfs:(rfs + ncol(rcov) - 1)] * rcov[ci, ])
         }
 
+        forcing <- eta * inv_tau
         mv <- .ode_step_r(m, v, b1, b2, forcing, dt)
         m <- mv[1]
         v <- mv[2]
@@ -945,26 +774,34 @@
     m <- cf$initial_state[1] + bi[1]
     v <- cf$initial_state[2] + bi[2]
 
-    # b1, b2 from longitudinal + RE
-    b1 <- 0
-    b2 <- 0
+    log_omega <- 0
+    log_xi <- 0
     fi <- 1
     ri <- 3
-    if (configs$biomarker$fixed) {
-      b1 <- -exp(lc[fi])
+    omega_active <- configs$omega$fixed || configs$omega$random
+    xi_active <- configs$xi$fixed || configs$xi$random
+    if (configs$omega$fixed) {
+      log_omega <- log_omega + lc[fi]
       fi <- fi + 1
     }
-    if (configs$biomarker$random) {
-      b1 <- b1 * exp(bi[ri])
+    if (configs$omega$random) {
+      log_omega <- log_omega + bi[ri]
       ri <- ri + 1
     }
-    if (configs$velocity$fixed) {
-      b2 <- -exp(lc[fi])
+    if (configs$xi$fixed) {
+      log_xi <- log_xi + lc[fi]
       fi <- fi + 1
     }
-    if (configs$velocity$random) {
-      b2 <- b2 * exp(bi[ri])
+    if (configs$xi$random) {
+      log_xi <- log_xi + bi[ri]
       ri <- ri + 1
+    }
+    omega2 <- if (omega_active) exp(2 * log_omega) else 0
+    b1 <- -omega2
+    b2 <- if (omega_active && xi_active) {
+      -2 * exp(log_xi) * exp(log_omega)
+    } else {
+      0
     }
     ffs <- fi
     rfs <- ri
@@ -979,11 +816,12 @@
       if (dt > 0 && length(obs_t) > 0) {
         ci <- findInterval(prev_t, obs_t)
         ci <- max(1, min(ci, nrow(fcov)))
-        forcing <- sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci, ])
+        mu <- sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci, ])
         if (ncol(rcov) > 0) {
-          forcing <- forcing + sum(bi[rfs:(rfs + ncol(rcov) - 1)] * rcov[ci, ])
+          mu <- mu + sum(bi[rfs:(rfs + ncol(rcov) - 1)] * rcov[ci, ])
         }
 
+        forcing <- omega2 * mu
         sub_dt <- dt / n_quad
         hl <- .eval_hazard_r(m, v, prev_t, bl, hz, surv_cov, sbc, configs$gamma)
         for (q in seq_len(n_quad)) {

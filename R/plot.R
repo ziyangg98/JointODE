@@ -121,8 +121,8 @@ utils::globalVariables(c(
 #'
 #' # Fit joint ODE model
 #' fit <- JointODE(
-#'   longitudinal_formula = observed ~ x1 + x2 +
-#'     (biomarker + velocity | id),
+#'   longitudinal_formula = observed ~ omega + xi + x1 + x2 +
+#'     (omega + xi | id),
 #'   survival_formula = Surv(time, status) ~ w1 + w2,
 #'   longitudinal_data = sim$data$longitudinal_data,
 #'   survival_data = sim$data$survival_data,

@@ -35,11 +35,15 @@ Rewriting as $\ddot{m}_i(t) = b_{1,i}\,m_i(t) + b_{2,i}\,\dot{m}_i(t) + f_i(t)$,
 
 $$b_{1,i} = -\omega_i^2, \quad b_{2,i} = -2\xi_i\omega_i$$
 
-Stability requires $b_{1,i} < 0$ and $b_{2,i} < 0$ (both eigenvalues of the characteristic equation have negative real parts). This is enforced through a log parameterization with multiplicative random effects:
+Stability is enforced by modeling $\log\omega_i$ and a latent damping root $\xi_{\mathrm{root},i}$ with Gaussian fixed and random effects:
 
-$$b_{1,i} = -\exp(\theta_1 + u_{1,i}), \quad b_{2,i} = -\exp(\theta_2 + u_{2,i})$$
+$$\omega_i = \exp(\ell_{\omega,i}), \quad \xi_i = \xi_{\mathrm{root},i}^2$$
 
-where $\theta_1 = \log(\omega^2)$ and $\theta_2 = \log(2\xi\omega)$ are population-level parameters, and $u_{1,i}, u_{2,i}$ are zero-mean random effects. Since $\exp(\cdot) > 0$, we have $b_{1,i} < 0$ and $b_{2,i} < 0$ for all subjects regardless of random effect values. The multiplicative structure preserves the sign while allowing subject-specific variation: $\omega_i^2 = \omega^2 e^{u_{1,i}}$.
+so the ODE coefficients are
+
+$$b_{1,i} = -\exp(2\ell_{\omega,i}), \quad b_{2,i} = -2\xi_{\mathrm{root},i}^2\exp(\ell_{\omega,i}).$$
+
+The formula keywords are `omega` for $\ell_{\omega,i}$ and `xi` for $\xi_{\mathrm{root},i}$.
 
 The complete random effects vector for subject $i$ is:
 
@@ -229,17 +233,17 @@ The natural period is $\hat{T} = 2\pi/\hat\omega$.
 
 ### 4.2 Standard Errors via Delta Method
 
-Let $\mathbf{V} = \text{Var}(\hat\theta_1, \hat\theta_2)$ be the estimated covariance from the information matrix.
+Let $\mathbf{V} = \text{Var}(\hat\ell_\omega, \hat\xi_{\mathrm{root}})$ be the estimated covariance from the information matrix.
 
 **Natural frequency:**
 
-$$\frac{\partial\omega}{\partial\theta_1} = \frac{\omega}{2}, \quad \text{SE}(\hat\omega) = \frac{\hat\omega}{2}\sqrt{V_{11}}$$
+$$\frac{\partial\omega}{\partial\ell_\omega} = \omega, \quad \text{SE}(\hat\omega) = \hat\omega\sqrt{V_{11}}$$
 
 **Damping ratio:**
 
-$$\frac{\partial\xi}{\partial\theta_1} = -\frac{\xi}{2}, \quad \frac{\partial\xi}{\partial\theta_2} = \xi$$
+$$\frac{\partial\xi}{\partial\xi_{\mathrm{root}}} = 2\xi_{\mathrm{root}}$$
 
-$$\text{Var}(\hat\xi) = \frac{\hat\xi^2}{4}V_{11} + \hat\xi^2 V_{22} - \hat\xi^2 V_{12}$$
+$$\text{Var}(\hat\xi) = 4\hat\xi_{\mathrm{root}}^2 V_{22}$$
 
 ## 5. Computational Details
 

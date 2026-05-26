@@ -118,8 +118,8 @@
 
   corr_theta <- numeric(n_re * (n_re - 1) / 2)
   idx <- 1L
-  for (col in seq_len(n_re - 1)) {
-    for (row in (col + 1):n_re) {
+  for (row in 2:n_re) {
+    for (col in seq_len(row - 1L)) {
       rho <- max(-0.99, min(0.99, corr_matrix[row, col]))
       corr_theta[idx] <- rho / sqrt(1 - rho^2)
       idx <- idx + 1L
@@ -200,10 +200,11 @@
       numeric(0)
     },
     baseline_boundary = baseline_config$boundary_knots,
-    biomarker_fixed = as.integer(configs$biomarker$fixed),
-    biomarker_random = as.integer(configs$biomarker$random),
-    velocity_fixed = as.integer(configs$velocity$fixed),
-    velocity_random = as.integer(configs$velocity$random)
+    omega_fixed = as.integer(configs$omega$fixed),
+    omega_random = as.integer(configs$omega$random),
+    xi_fixed = as.integer(configs$xi$fixed),
+    xi_random = as.integer(configs$xi$random),
+    diagonal_re = as.integer(isTRUE(configs$covariance == "diagonal"))
   )
 }
 
@@ -325,32 +326,42 @@
     n_random_covariates = as.integer(n_random_covariates),
     long_fixed_covariates = flatten_design("fixed"),
     long_random_covariates = flatten_design("random"),
-    biomarker_fixed = as.integer(parsed_long$biomarker$fixed),
-    biomarker_random = as.integer(parsed_long$biomarker$random),
-    velocity_fixed = as.integer(parsed_long$velocity$fixed),
-    velocity_random = as.integer(parsed_long$velocity$random)
+    lambda_fixed = as.integer(parsed_long$lambda$fixed),
+    lambda_random = as.integer(parsed_long$lambda$random),
+    tau_fixed = as.integer(parsed_long$tau$fixed),
+    tau_random = as.integer(parsed_long$tau$random),
+    diagonal_re = as.integer(isTRUE(parsed_long$diagonal))
   )
 }
 
 #' Default parameters for MarginalODE
 #' @noRd
 .default_marginal_parameters <- function(model_config, parsed_long) {
+  longitudinal <- rep(0, model_config$n_longitudinal_coef)
+  idx <- 1L
+  if (parsed_long$lambda$fixed) {
+    longitudinal[idx] <- log(0.05)
+    idx <- idx + 1L
+  }
+  if (parsed_long$tau$fixed) longitudinal[idx] <- log(5)
+
   list(
     coefficients = list(
-      longitudinal = rep(0, model_config$n_longitudinal_coef),
+      longitudinal = longitudinal,
       initial_state = c(0, 0),
       measurement_error_sd = 1,
       random_effect_sigma = diag(1, model_config$n_re)
     ),
     configurations = list(
-      biomarker = list(
-        fixed = parsed_long$biomarker$fixed,
-        random = parsed_long$biomarker$random
+      lambda = list(
+        fixed = parsed_long$lambda$fixed,
+        random = parsed_long$lambda$random
       ),
-      velocity = list(
-        fixed = parsed_long$velocity$fixed,
-        random = parsed_long$velocity$random
-      )
+      tau = list(
+        fixed = parsed_long$tau$fixed,
+        random = parsed_long$tau$random
+      ),
+      covariance = if (isTRUE(parsed_long$diagonal)) "diagonal" else "full"
     )
   )
 }

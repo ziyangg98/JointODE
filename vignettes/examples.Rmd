@@ -81,10 +81,8 @@ The ODE is $m''(t) + 2\xi\omega\, m'(t) + \omega^2 m(t) = f(t)$,
 with initial conditions $m(0) = m_0$, $m'(0) = v_0$. The formula uses
 two reserved keywords:
 
-- `biomarker`: frequency parameter ($\omega^2$, estimated as
-  `log_omega2`)
-- `velocity`: damping parameter ($2\xi\omega$, estimated as
-  `log_2xi_omega`)
+- `omega`: latent log-frequency parameter; physical $\omega_i=\exp(\text{omega}_i)$
+- `xi`: latent damping root; physical $\xi_i=\text{xi}_i^2$
 
 Random effects on initial states $(m_{0,i}, v_{0,i})$ are always
 included. We fit models at increasing complexity to find the right
@@ -95,35 +93,35 @@ ctrl <- list(parallel = TRUE, verbose = 1)
 
 # Level 0: fixed dynamics, random initial state only
 mfit0 <- MarginalODE(
-  observed ~ biomarker + velocity + drug,
+  observed ~ omega + xi + drug,
   longitudinal_data,
   control = ctrl
 )
 
 # Level 1: + random forcing intercept
 mfit1 <- MarginalODE(
-  observed ~ biomarker + velocity + drug + (1 | id),
+  observed ~ omega + xi + drug + (1 | id),
   longitudinal_data,
   control = ctrl
 )
 
 # Level 2a: + random frequency
 mfit2a <- MarginalODE(
-  observed ~ biomarker + velocity + drug + (biomarker | id),
+  observed ~ omega + xi + drug + (omega | id),
   longitudinal_data,
   control = ctrl
 )
 
 # Level 2b: + random damping
 mfit2b <- MarginalODE(
-  observed ~ biomarker + velocity + drug + (velocity | id),
+  observed ~ omega + xi + drug + (xi | id),
   longitudinal_data,
   control = ctrl
 )
 
 # Level 2c: + random frequency & damping
 mfit2c <- MarginalODE(
-  observed ~ biomarker + velocity + drug + (biomarker + velocity | id),
+  observed ~ omega + xi + drug + (omega + xi | id),
   longitudinal_data,
   control = ctrl
 )
@@ -189,11 +187,11 @@ The `init = "marginal"` option warm-starts from the MarginalODE fit.
 ```{r fit-joint}
 # Use the formula from the best marginal model
 selected_formula <- list(
-  observed ~ biomarker + velocity + drug,
-  observed ~ biomarker + velocity + drug + (1 | id),
-  observed ~ biomarker + velocity + drug + (biomarker | id),
-  observed ~ biomarker + velocity + drug + (velocity | id),
-  observed ~ biomarker + velocity + drug + (biomarker + velocity | id)
+  observed ~ omega + xi + drug,
+  observed ~ omega + xi + drug + (1 | id),
+  observed ~ omega + xi + drug + (omega | id),
+  observed ~ omega + xi + drug + (xi | id),
+  observed ~ omega + xi + drug + (omega + xi | id)
 )[[best_idx]]
 
 fit <- JointODE(

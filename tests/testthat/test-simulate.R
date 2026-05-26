@@ -14,9 +14,7 @@
 #      - Value ranges and reproducibility with seed
 #
 #   2. Mathematical Correctness
-#      - Parameter transformation: xi/period → dyn_biomarker/dyn_velocity
-#        * dyn_biomarker = -omega^2, omega = 2*pi/period
-#        * dyn_velocity = -2*xi*omega
+#      - Parameter transformation: xi/period → latent omega/xi roots
 #      - Covariance matrix: positive semi-definite and symmetric
 #      - Random effects: centered at zero (within 4 SE)
 #
@@ -39,7 +37,7 @@
 #      - .create_example_data(): generates example with true parameters
 #
 # Random Effects Structure:
-#   - Only dyn_biomarker and dyn_velocity have random effects (2×2 covariance)
+#   - Only omega and xi latent parameters have random effects (2×2 covariance)
 #   - Rationale: subject-specific frequency and damping
 #
 # Model Equations:
@@ -76,7 +74,7 @@ test_that("simulate generates valid output and respects parameters", {
   ))
   expect_equal(
     colnames(sim$random_effects),
-    c("init_biomarker", "init_velocity", "dyn_biomarker", "dyn_velocity")
+    c("initial_biomarker", "initial_velocity", "omega", "xi")
   )
 
   expect_equal(ncol(sim$random_effects), 4)
@@ -120,15 +118,9 @@ test_that("dynamics transformation and covariance are correct", {
     seed = 999
   )
 
-  # Recover physical params from population mean coefficients
-  omega_mean <- 2 * pi / period_mean
-  expected_dyn_biomarker <- -omega_mean^2
-  expected_dyn_velocity <- -2 * xi_mean * omega_mean
-
   re_means <- colMeans(sim$random_effects)
-  # dyn_biomarker/dyn_velocity RE should be centered near zero
-  expect_equal(as.numeric(re_means["dyn_biomarker"]), 0, tolerance = 0.1)
-  expect_equal(as.numeric(re_means["dyn_velocity"]), 0, tolerance = 0.2)
+  expect_equal(as.numeric(re_means["omega"]), 0, tolerance = 0.1)
+  expect_equal(as.numeric(re_means["xi"]), 0, tolerance = 0.2)
 })
 
 test_that("random_effects are properly centered", {
@@ -149,7 +141,7 @@ test_that("random_effects are properly centered", {
     seed = 777
   )
 
-  # dyn_biomarker and dyn_velocity RE should be approximately centered
+  # omega and xi latent RE should be approximately centered
   for (col_idx in 3:4) {
     col_sd <- sd(sim$random_effects[, col_idx])
     se <- col_sd / sqrt(n)
@@ -362,7 +354,7 @@ test_that("simulate handles covariates correctly", {
   expect_true(all(c("w1", "w2") %in% names(sim_with_cov$survival_data)))
   expect_equal(
     colnames(sim_with_cov$random_effects),
-    c("init_biomarker", "init_velocity", "dyn_biomarker", "dyn_velocity")
+    c("initial_biomarker", "initial_velocity", "omega", "xi")
   )
   expect_true(all(sim_with_cov$survival_data$w2 %in% c(0, 1)))
 

@@ -52,7 +52,6 @@
 #'   }
 #' @param control A list of control parameters for optimization, or output from
 #'   \code{\link{JointODE.control}}.
-#' @param ... Additional arguments passed to internal optimization routines.
 #'
 #' @return An S3 object of class \code{"JointODE"} containing fitted model
 #'   results.
@@ -67,7 +66,7 @@
 #' data(sim)
 #' fit <- JointODE(
 #'   longitudinal_formula = observed ~
-#'     biomarker + velocity + x1 + x2 + (biomarker + velocity | id),
+#'     omega + xi + x1 + x2 + (omega + xi | id),
 #'   survival_formula = Surv(time, status) ~ w1 + w2,
 #'   longitudinal_data = sim$data$longitudinal_data,
 #'   survival_data = sim$data$survival_data,
@@ -92,8 +91,7 @@ JointODE <- function(
     boundary_knots = NULL
   ),
   init = "default",
-  control = list(),
-  ...
+  control = list()
 ) {
   cl <- match.call()
 
@@ -169,6 +167,8 @@ JointODE <- function(
   parameters$configurations$baseline <- model_config$spline_baseline_config
   parameters$configurations$hazard_quadrature <- control$hazard_quadrature
   parameters$configurations$gamma <- gamma
+  parameters$configurations$covariance <-
+    if (isTRUE(parsed_long$diagonal)) "diagonal" else "full"
 
   # Data-driven defaults for initial state and sigma_e
   # (prevents inner Newton divergence when init = "default")
@@ -212,14 +212,11 @@ JointODE <- function(
   tmb_data <- .pack_joint_data(data_fit, parameters_fit, control)
   tmb_params <- .pack_joint_params(parameters_fit)
 
-  fit <- .fit_variance_tmb(
+  fit <- .fit_tmb(
     tmb_data = tmb_data,
     tmb_params = tmb_params,
     control = control,
-    fixed = c(
-      "baseline", "hazard", "longitudinal", "initial_state"
-    ),
-    eval_factor = 10
+    map = .correlation_map(parsed_long, tmb_params)
   )
   obj <- fit$obj
   opt <- fit$opt
@@ -258,7 +255,7 @@ JointODE <- function(
 summary.JointODE <- function(object, ...) {
   coefs <- coef(object)
   se <- if (!is.null(object$vcov)) {
-    sqrt(diag(object$vcov))
+    sqrt(pmax(diag(object$vcov), 0))
   } else {
     rep(NA_real_, length(coefs))
   }
@@ -294,30 +291,43 @@ summary.JointODE <- function(object, ...) {
 
   # Derived ODE physical parameters
   derived_params <- NULL
-  if (!is.null(object$vcov) && n_longitudinal >= 2) {
-    raw_b1 <- coefs[idx_longitudinal[1]]
-    raw_b2 <- coefs[idx_longitudinal[2]]
-    var_b1 <- object$vcov[idx_longitudinal[1], idx_longitudinal[1]]
-    var_b2 <- object$vcov[idx_longitudinal[2], idx_longitudinal[2]]
-    cov_b12 <- object$vcov[idx_longitudinal[1], idx_longitudinal[2]]
+  long_names <- names(object$parameters$coefficients$longitudinal)
+  has_roots <- all(c("omega", "xi") %in% long_names)
+  if (!is.null(object$vcov) && has_roots) {
+    idx_o <- idx_longitudinal[which(long_names == "omega")]
+    idx_x <- idx_longitudinal[which(long_names == "xi")]
+    log_omega <- coefs[idx_o]
+    log_xi <- coefs[idx_x]
+    var_o <- object$vcov[idx_o, idx_o]
+    var_x <- object$vcov[idx_x, idx_x]
+    cov_ox <- object$vcov[idx_o, idx_x]
 
-    omega_est <- exp(raw_b1 / 2)
-    xi_est <- exp(raw_b2 - raw_b1 / 2) / 2
+    omega_est <- exp(log_omega)
+    xi_est <- exp(log_xi)
+    damping_est <- 2 * xi_est * omega_est
 
-    se_omega <- sqrt((omega_est / 2)^2 * var_b1)
-    var_xi <- (xi_est / 2)^2 * var_b1 + xi_est^2 * var_b2 -
-      xi_est^2 * cov_b12
-    se_xi <- sqrt(var_xi)
+    se_omega <- sqrt(pmax(omega_est^2 * var_o, 0))
+    se_xi <- sqrt(pmax(xi_est^2 * var_x, 0))
+    grad_damping <- c(damping_est, damping_est)
+    vc_damping <- matrix(c(var_o, cov_ox, cov_ox, var_x), 2, 2)
+    se_damping <- sqrt(pmax(
+      drop(t(grad_damping) %*% vc_damping %*% grad_damping), 0
+    ))
+    estimates <- c(omega_est, xi_est, damping_est)
+    ses <- c(se_omega, se_xi, se_damping)
+    z_values <- estimates / ses
 
     derived_params <- cbind(
-      Estimate = c(omega_est, xi_est),
-      `Std. Error` = c(se_omega, se_xi),
-      `z value` = c(omega_est / se_omega, xi_est / se_xi),
-      `Pr(>|z|)` = 2 * pnorm(-abs(c(
-        omega_est / se_omega, xi_est / se_xi
-      )))
+      Estimate = estimates,
+      `Std. Error` = ses,
+      `z value` = z_values,
+      `Pr(>|z|)` = 2 * pnorm(-abs(z_values))
     )
-    rownames(derived_params) <- c("omega (natural frequency)", "xi (damping ratio)")
+    rownames(derived_params) <- c(
+      "omega (natural frequency)",
+      "xi (damping ratio)",
+      "damping coefficient (2 xi omega)"
+    )
   }
 
   n_subjects <- length(object$data)

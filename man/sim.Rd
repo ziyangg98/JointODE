@@ -32,10 +32,10 @@ measurements from 200 subjects:
 \item{random_effects}{Matrix (200 x 4) with subject-specific
 random effects:
 \itemize{
-\item init_biomarker: Initial biomarker value
-\item init_velocity: Initial velocity
-\item dyn_biomarker: ODE biomarker coefficient (\eqn{-\omega^2})
-\item dyn_velocity: ODE velocity coefficient (\eqn{-2\xi\omega})
+\item initial_biomarker: Initial biomarker value
+\item initial_velocity: Initial velocity
+\item omega: Latent log-frequency random effect
+\item xi: Latent damping-root random effect
 }
 }
 }
@@ -46,13 +46,13 @@ random effects:
 \itemize{
 \item baseline: B-spline coefficients for log baseline hazard
 \item longitudinal: Fixed effects for ODE dynamics
-(dyn_offset, dyn_biomarker, dyn_velocity, covariate effects)
+(omega, xi, dyn_offset, covariate effects)
 \item hazard: Association parameters (value, slope) and
 survival covariate effects
 \item measurement_error_sd: Measurement error SD (0.1)
 \item random_effect_sigma: 4x4 covariance matrix for
-random effects (init_biomarker, init_velocity,
-dyn_biomarker, dyn_velocity)
+random effects (initial_biomarker, initial_velocity,
+omega, xi)
 }
 }
 \item{configurations}{Model configuration:
@@ -81,9 +81,8 @@ measurements and survival outcomes.
 \details{
 The dataset contains 200 subjects with heterogeneous ODE dynamics.
 Subject-specific dynamics are characterized by random effects on
-dyn_biomarker (\eqn{-\omega^2}) and dyn_velocity (\eqn{-2\xi\omega})
-parameters. Population means: damping ratio \eqn{\xi \approx 0.4},
-period \eqn{T \approx 6}.
+latent omega and xi parameters. Population means: damping ratio
+\eqn{\xi \approx 0.4}, period \eqn{T \approx 6}.
 }
 \examples{
 # Load the data
@@ -111,7 +110,7 @@ apply(sim$data$random_effects, 2, sd)
 # Fit a Joint ODE model using this data
 fit <- JointODE(
   longitudinal_formula = observed ~
-    biomarker + velocity + x1 + x2 + (biomarker + velocity | id),
+    omega + xi + x1 + x2 + (omega + xi | id),
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = sim$data$longitudinal_data,
   survival_data = sim$data$survival_data,

@@ -175,8 +175,9 @@
   }
 
   formula_str <- deparse(formula, width.cutoff = 500)
+  formula_str_for_pipes <- gsub("\\|\\|", "|", formula_str)
 
-  pipe_matches <- gregexpr("\\|", formula_str)[[1]]
+  pipe_matches <- gregexpr("\\|", formula_str_for_pipes)[[1]]
   pipe_count <- if (pipe_matches[1] == -1L) 0L else length(pipe_matches)
   if (pipe_count > 1) {
     stop(
@@ -195,6 +196,12 @@
   }
 
   parts <- parsed
+
+  tau_active <- parts$tau$fixed || parts$tau$random
+  lambda_active <- parts$lambda$fixed || parts$lambda$random
+  if (tau_active && !lambda_active) {
+    stop("The 'tau' ODE term requires an active 'lambda' term.", call. = FALSE)
+  }
 
   if (!is.null(parts$grouping) && !(parts$grouping %in% names(data))) {
     stop(
@@ -563,47 +570,47 @@
         stop("init$configurations$baseline: must be a list", call. = FALSE)
       }
     }
-    if (!is.null(init$configurations$biomarker)) {
-      if (!is.list(init$configurations$biomarker)) {
-        stop("init$configurations$biomarker: must be a list", call. = FALSE)
+    if (!is.null(init$configurations$omega)) {
+      if (!is.list(init$configurations$omega)) {
+        stop("init$configurations$omega: must be a list", call. = FALSE)
       }
       if (
-        !all(c("fixed", "random") %in% names(init$configurations$biomarker))
+        !all(c("fixed", "random") %in% names(init$configurations$omega))
       ) {
         stop(
           paste0(
-            "init$configurations$biomarker: ",
+            "init$configurations$omega: ",
             "must have 'fixed' and 'random' fields"
           ),
           call. = FALSE
         )
       }
       if (
-        !is.logical(init$configurations$biomarker$fixed) ||
-          !is.logical(init$configurations$biomarker$random)
+        !is.logical(init$configurations$omega$fixed) ||
+          !is.logical(init$configurations$omega$random)
       ) {
         stop(
-          "init$configurations$biomarker: 'fixed' and 'random' must be logical",
+          "init$configurations$omega: 'fixed' and 'random' must be logical",
           call. = FALSE
         )
       }
     }
-    if (!is.null(init$configurations$velocity)) {
-      if (!is.list(init$configurations$velocity)) {
-        stop("init$configurations$velocity: must be a list", call. = FALSE)
+    if (!is.null(init$configurations$xi)) {
+      if (!is.list(init$configurations$xi)) {
+        stop("init$configurations$xi: must be a list", call. = FALSE)
       }
-      if (!all(c("fixed", "random") %in% names(init$configurations$velocity))) {
+      if (!all(c("fixed", "random") %in% names(init$configurations$xi))) {
         stop(
-          "init$configurations$velocity: must have 'fixed' and 'random' fields",
+          "init$configurations$xi: must have 'fixed' and 'random' fields",
           call. = FALSE
         )
       }
       if (
-        !is.logical(init$configurations$velocity$fixed) ||
-          !is.logical(init$configurations$velocity$random)
+        !is.logical(init$configurations$xi$fixed) ||
+          !is.logical(init$configurations$xi$random)
       ) {
         stop(
-          "init$configurations$velocity: 'fixed' and 'random' must be logical",
+          "init$configurations$xi: 'fixed' and 'random' must be logical",
           call. = FALSE
         )
       }
@@ -628,4 +635,8 @@
       "id column not found in data" = id %in% names(data)
     )
   }
+  .validate_longitudinal_formula(
+    formula,
+    if (is.matrix(data)) as.data.frame(data) else data
+  )
 }

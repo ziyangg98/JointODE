@@ -117,12 +117,12 @@
 #'         Baseline survival covariates (if specified)
 #'     }
 #'   }
-#'   \item{\code{random_effects}}{An \eqn{n \times 4} matrix of
+#'   \item{\code{random_effects}}{An \eqn{n \times 5} matrix of
 #'     subject-specific random effects (centered at zero). Columns
-#'     \code{init_biomarker} and \code{init_velocity} capture initial
-#'     state variability; \code{dyn_biomarker} and \code{dyn_velocity}
-#'     capture ODE coefficient variability corresponding to the formula
-#'     term \code{(biomarker + velocity | id)}.}
+#'     \code{initial_biomarker} and \code{initial_velocity} capture initial
+#'     state variability; \code{omega} and \code{xi} capture latent ODE
+#'     parameter variability; \code{forcing_(Intercept)} matches the lme-style
+#'     random intercept in \code{(omega + xi | id)}.}
 #'   }}
 #'   \item{\code{init}}{A list of initial parameter values suitable for
 #'     passing to \code{JointODE()}, containing \code{$coefficients} and
@@ -480,9 +480,7 @@ simulate <- function(
   surv_data <- merge(surv, x_surv, by = "id")
   names(surv_data)[names(surv_data) == "eventtime"] <- "time"
 
-  mu <- attr(dynamics, "mu")
-  dyn_vals <- as.matrix(dynamics[, c("dyn_biomarker", "dyn_velocity")])
-  dyn_re <- sweep(log(-dyn_vals), 2, log(-mu[c("dyn_biomarker", "dyn_velocity")]))
+  dyn_re <- sweep(attr(dynamics, "latent"), 2, attr(dynamics, "mu_tmb"))
 
   # Initial state random effects: deviations from mean
   init_final <- as.matrix(init[, c("biomarker", "velocity")])
@@ -492,10 +490,11 @@ simulate <- function(
   )
   state_re <- sweep(init_final, 2, state_means)
 
-  random_effects <- cbind(state_re, dyn_re)
+  forcing_re <- matrix(0, nrow = n_subjects, ncol = 1)
+  random_effects <- cbind(state_re, dyn_re, forcing_re)
   colnames(random_effects) <- c(
-    "init_biomarker", "init_velocity",
-    "dyn_biomarker", "dyn_velocity"
+    "initial_biomarker", "initial_velocity",
+    "omega", "xi", "forcing_(Intercept)"
   )
   list(
     longitudinal_data = long_data,
@@ -554,6 +553,7 @@ simulate <- function(
   )
   longitudinal_coef <- dynamics_params$mu
   longitudinal_coef[1:2] <- dynamics_params$mu_tmb
+  names(longitudinal_coef)[1:2] <- names(dynamics_params$mu_tmb)
   random_effect_sigma <- dynamics_params$sigma
 
   hazard_coef <- c(
@@ -561,13 +561,14 @@ simulate <- function(
     eval(coef_args$survival$slope),
     eval(coef_args$survival$covariates)
   )
-  # Full random effect sigma: [state(2), dynamics(2)]
+  # Full random effect sigma: [state(2), dynamics(2), forcing intercept]
   n_coef_re <- nrow(random_effect_sigma)
-  n_re_total <- n_coef_re + 2
+  n_re_total <- n_coef_re + 3
   full_sigma <- matrix(0, n_re_total, n_re_total)
   full_sigma[1, 1] <- long_params$initial$biomarker["sd"]^2
   full_sigma[2, 2] <- long_params$initial$velocity["sd"]^2
-  full_sigma[3:n_re_total, 3:n_re_total] <- random_effect_sigma
+  full_sigma[3:(n_re_total - 1), 3:(n_re_total - 1)] <- random_effect_sigma
+  full_sigma[n_re_total, n_re_total] <- 1e-4
 
   parameters <- list(
     coefficients = list(
@@ -584,8 +585,8 @@ simulate <- function(
     configurations = list(
       baseline = spline_config,
       gamma = eval(coef_args$survival$gamma),
-      biomarker = list(fixed = TRUE, random = TRUE),
-      velocity = list(fixed = TRUE, random = TRUE)
+      omega = list(fixed = TRUE, random = TRUE),
+      xi = list(fixed = TRUE, random = TRUE)
     )
   )
   list(data = data, init = parameters)
@@ -652,13 +653,22 @@ simulate <- function(
   }
   names(mu) <- c("dyn_biomarker", "dyn_velocity", "dyn_offset", cov_names)
 
-  mu_tmb <- c(log(mu_omega^2), log(2 * mu_xi * mu_omega))
+  sigma_log_omega <- sqrt(log1p((sigma_omega / mu_omega)^2))
+  mu_log_omega <- log(mu_omega) - 0.5 * sigma_log_omega^2
 
-  # Jacobian of (log(-b1), log(-b2)) w.r.t. (omega, xi)
-  jacobian <- matrix(c(2 / mu_omega, 1 / mu_omega, 0, 1 / mu_xi), 2, 2)
+  xi_var <- sigma_xi^2
+  root_var <- if (xi_var == 0) {
+    0
+  } else if (xi_var <= 2 * mu_xi^2) {
+    mu_xi - sqrt(mu_xi^2 - xi_var / 2)
+  } else {
+    min(mu_xi / 2, xi_var / (4 * mu_xi))
+  }
+  mu_xi_root <- sqrt(max(mu_xi - root_var, .Machine$double.eps))
 
-  sigma_orig <- diag(c(sigma_omega^2, sigma_xi^2))
-  sigma <- jacobian %*% sigma_orig %*% t(jacobian)
+  mu_tmb <- c(omega = unname(mu_log_omega), xi = unname(mu_xi_root))
+  sigma <- diag(c(unname(sigma_log_omega^2), unname(root_var)))
+  dimnames(sigma) <- list(names(mu_tmb), names(mu_tmb))
 
   list(mu = mu, mu_tmb = mu_tmb, sigma = sigma)
 }
@@ -666,17 +676,21 @@ simulate <- function(
 .generate_patient_dynamics <- function(n_subjects, xi, period, excitation) {
   params <- .compute_dynamics_parameters(xi, period, excitation)
 
-  # Sample (log(-b1), b2) jointly, convert b1 to natural
+  # Sample latent log(omega) and xi root, then convert to natural ODE coefficients.
   samples <- MASS::mvrnorm(
     n_subjects,
     mu = params$mu_tmb,
     Sigma = params$sigma
   )
   if (n_subjects == 1) samples <- matrix(samples, nrow = 1)
+  colnames(samples) <- names(params$mu_tmb)
 
   n_coefs <- length(params$mu)
   random_effects <- matrix(0, nrow = n_subjects, ncol = n_coefs)
-  random_effects[, 1:2] <- -exp(samples)
+  omega_i <- exp(samples[, "omega"])
+  xi_i <- samples[, "xi"]^2
+  random_effects[, 1] <- -omega_i^2
+  random_effects[, 2] <- -2 * xi_i * omega_i
   random_effects[, 3:n_coefs] <- matrix(
     rep(params$mu[3:n_coefs], each = n_subjects),
     nrow = n_subjects,
@@ -688,6 +702,7 @@ simulate <- function(
   attr(dynamics, "mu") <- params$mu
   attr(dynamics, "mu_tmb") <- params$mu_tmb
   attr(dynamics, "sigma") <- params$sigma
+  attr(dynamics, "latent") <- samples
   dynamics
 }
 

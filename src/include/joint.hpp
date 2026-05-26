@@ -28,10 +28,11 @@ Type joint_ode_nll(objective_function<Type>* obj) {
   DATA_INTEGER(baseline_degree);
   DATA_VECTOR(baseline_knots);
   DATA_VECTOR(baseline_boundary);
-  DATA_INTEGER(biomarker_fixed);
-  DATA_INTEGER(biomarker_random);
-  DATA_INTEGER(velocity_fixed);
-  DATA_INTEGER(velocity_random);
+  DATA_INTEGER(omega_fixed);
+  DATA_INTEGER(omega_random);
+  DATA_INTEGER(xi_fixed);
+  DATA_INTEGER(xi_random);
+  DATA_INTEGER(diagonal_re);
 
   // Convert DATA_SCALAR/VECTOR to double for non-AD helper functions
   double velocity_power_val = asDouble(velocity_power);
@@ -84,7 +85,12 @@ Type joint_ode_nll(objective_function<Type>* obj) {
     vector<Type> bi = random_effects.row(i);
 
     // --- Random effect prior: MVN(0, Sigma_b) ---
-    nll += VECSCALE(corr_structure, exp(log_sd_re))(bi);
+    if (diagonal_re) {
+      for (int j = 0; j < n_random_effects; j++)
+        nll -= dnorm(bi(j), Type(0), exp(log_sd_re(j)), true);
+    } else {
+      nll += VECSCALE(corr_structure, exp(log_sd_re))(bi);
+    }
 
     // --- Unpack subject data as double ---
     vector<double> obs_t(ni), obs_y(ni);
@@ -114,13 +120,22 @@ Type joint_ode_nll(objective_function<Type>* obj) {
     vector<Type> sol_m(n_times), sol_v(n_times), sol_H(n_times);
     sol_m(0) = m;  sol_v(0) = v;  sol_H(0) = cum_haz;
 
-    // b1, b2 are constant across time steps (depend on fixed + RE only)
-    Type b1(0), b2(0);
+    // Dynamic parameters are constant across time steps.
+    Type log_omega(0), log_xi(0);
     int fixed_idx = 0, re_idx = 2;
-    if (biomarker_fixed)  b1  = -exp(longitudinal(fixed_idx++));
-    if (biomarker_random) b1 *= exp(bi(re_idx++));
-    if (velocity_fixed)   b2  = -exp(longitudinal(fixed_idx++));
-    if (velocity_random)  b2 *= exp(bi(re_idx++));
+    bool omega_active = omega_fixed || omega_random;
+    bool xi_active = xi_fixed || xi_random;
+    if (omega_fixed)  log_omega += longitudinal(fixed_idx++);
+    if (omega_random) log_omega += bi(re_idx++);
+    if (xi_fixed)     log_xi += longitudinal(fixed_idx++);
+    if (xi_random)    log_xi += bi(re_idx++);
+    Type b1(0), b2(0), omega2(0);
+    if (omega_active) {
+      Type omega = exp(log_omega);
+      omega2 = omega * omega;
+      b1 = -omega2;
+      if (xi_active) b2 = -Type(2) * exp(log_xi) * omega;
+    }
     int forcing_fixed_start = fixed_idx;
     int forcing_re_start = re_idx;
 
@@ -130,12 +145,13 @@ Type joint_ode_nll(objective_function<Type>* obj) {
       double sub_dt = dt / n_quadrature;
       int cov_idx = covariate_index_at(t0, obs_t);
 
-      // Forcing varies with covariates at t0.
-      Type forcing(0);
+      // The forcing model is a target level mu(t); the ODE uses omega^2 * mu(t).
+      Type mu(0);
       for (int k = 0; k < n_fixed_covariates; k++)
-        forcing += longitudinal(forcing_fixed_start + k) * Type(long_fixed_covariates_i(cov_idx, k));
+        mu += longitudinal(forcing_fixed_start + k) * Type(long_fixed_covariates_i(cov_idx, k));
       for (int k = 0; k < n_random_covariates; k++)
-        forcing += bi(forcing_re_start + k) * Type(long_random_covariates_i(cov_idx, k));
+        mu += bi(forcing_re_start + k) * Type(long_random_covariates_i(cov_idx, k));
+      Type forcing = omega2 * mu;
 
       // Composite Simpson's rule for cumulative hazard
       Type h_left = eval_hazard(m, v, t0, baseline_degree, full_knots,
@@ -184,10 +200,17 @@ Type joint_ode_nll(objective_function<Type>* obj) {
   }
 
   // Reconstruct Sigma_b for reporting
-  matrix<Type> Sigma_b = corr_structure.cov();
-  for (int i = 0; i < n_random_effects; i++)
-    for (int j = 0; j < n_random_effects; j++)
-      Sigma_b(i, j) *= exp(log_sd_re(i)) * exp(log_sd_re(j));
+  matrix<Type> Sigma_b(n_random_effects, n_random_effects);
+  Sigma_b.setZero();
+  if (diagonal_re) {
+    for (int i = 0; i < n_random_effects; i++)
+      Sigma_b(i, i) = exp(log_sd_re(i)) * exp(log_sd_re(i));
+  } else {
+    Sigma_b = corr_structure.cov();
+    for (int i = 0; i < n_random_effects; i++)
+      for (int j = 0; j < n_random_effects; j++)
+        Sigma_b(i, j) *= exp(log_sd_re(i)) * exp(log_sd_re(j));
+  }
 
   REPORT(fitted_biomarker);
   REPORT(fitted_velocity);

@@ -87,13 +87,11 @@ MarginalODE <- function(
     cli::cli_h2("Marginal ODE Model Estimation (TMB)")
   }
 
-  fit <- .fit_variance_tmb(
+  fit <- .fit_tmb_em(
     tmb_data = tmb_data,
     tmb_params = tmb_params,
     control = control,
-    fixed = c("longitudinal", "initial_state"),
-    eval_factor = 2,
-    direct_trust = TRUE
+    map = .correlation_map(parsed_long, tmb_params)
   )
   obj <- fit$obj
   opt <- fit$opt
@@ -115,14 +113,15 @@ MarginalODE <- function(
 
   # Store configs needed for predict
   configs <- list(
-    biomarker = list(
-      fixed = parsed_long$biomarker$fixed,
-      random = parsed_long$biomarker$random
+    lambda = list(
+      fixed = parsed_long$lambda$fixed,
+      random = parsed_long$lambda$random
     ),
-    velocity = list(
-      fixed = parsed_long$velocity$fixed,
-      random = parsed_long$velocity$random
-    )
+    tau = list(
+      fixed = parsed_long$tau$fixed,
+      random = parsed_long$tau$random
+    ),
+    covariance = if (isTRUE(parsed_long$diagonal)) "diagonal" else "full"
   )
   coefs <- list(
     longitudinal = results$parameters[coef_names$longitudinal],
@@ -208,7 +207,7 @@ logLik.MarginalODE <- function(object, ...) {
 #' @export
 summary.MarginalODE <- function(object, ...) {
   se <- if (!is.null(object$vcov) && !all(is.na(object$vcov))) {
-    sqrt(diag(object$vcov))
+    sqrt(pmax(diag(object$vcov), 0))
   } else {
     rep(NA_real_, length(object$parameters))
   }
@@ -216,35 +215,43 @@ summary.MarginalODE <- function(object, ...) {
   # Derived ODE physical parameters
   derived_params <- NULL
   nms <- names(object$parameters)
-  has_bv <- "log_omega2" %in% nms && "log_2xi_omega" %in% nms
-  if (!is.null(object$vcov) && !all(is.na(object$vcov)) && has_bv) {
-    idx_b <- which(nms == "log_omega2")
-    idx_v <- which(nms == "log_2xi_omega")
-    raw_b1 <- object$parameters[idx_b]
-    raw_b2 <- object$parameters[idx_v]
-    var_b1 <- object$vcov[idx_b, idx_b]
-    var_b2 <- object$vcov[idx_v, idx_v]
-    cov_b12 <- object$vcov[idx_b, idx_v]
+  has_dynamics <- all(c("lambda", "tau") %in% nms)
+  if (!is.null(object$vcov) && !all(is.na(object$vcov)) && has_dynamics) {
+    idx_l <- which(nms == "lambda")
+    idx_t <- which(nms == "tau")
+    log_lambda <- object$parameters[idx_l]
+    log_tau <- object$parameters[idx_t]
+    var_l <- object$vcov[idx_l, idx_l]
+    var_t <- object$vcov[idx_t, idx_t]
+    cov_lt <- object$vcov[idx_l, idx_t]
 
-    # omega = exp(raw_b1/2), xi = exp(raw_b2 - raw_b1/2)/2
-    omega_est <- exp(raw_b1 / 2)
-    xi_est <- exp(raw_b2 - raw_b1 / 2) / 2
+    lambda_est <- exp(log_lambda)
+    tau_est <- exp(log_tau)
+    omega_est <- sqrt(lambda_est / tau_est)
+    xi_est <- 1 / (2 * sqrt(lambda_est * tau_est))
 
-    se_omega <- sqrt((omega_est / 2)^2 * var_b1)
-    var_xi <- (xi_est / 2)^2 * var_b1 + xi_est^2 * var_b2 -
-      xi_est^2 * cov_b12
-    se_xi <- sqrt(var_xi)
+    se_lambda <- sqrt(pmax(lambda_est^2 * var_l, 0))
+    se_tau <- sqrt(pmax(tau_est^2 * var_t, 0))
+    vc_dyn <- matrix(c(var_l, cov_lt, cov_lt, var_t), 2, 2)
+    grad_omega <- c(0.5 * omega_est, -0.5 * omega_est)
+    grad_xi <- c(-0.5 * xi_est, -0.5 * xi_est)
+    se_omega <- sqrt(pmax(drop(t(grad_omega) %*% vc_dyn %*% grad_omega), 0))
+    se_xi <- sqrt(pmax(drop(t(grad_xi) %*% vc_dyn %*% grad_xi), 0))
+    estimates <- c(lambda_est, tau_est, omega_est, xi_est)
+    ses <- c(se_lambda, se_tau, se_omega, se_xi)
+    z_values <- estimates / ses
 
     derived_params <- cbind(
-      Estimate = c(omega_est, xi_est),
-      `Std. Error` = c(se_omega, se_xi),
-      `z value` = c(omega_est / se_omega, xi_est / se_xi),
-      `Pr(>|z|)` = 2 * pnorm(-abs(c(
-        omega_est / se_omega, xi_est / se_xi
-      )))
+      Estimate = estimates,
+      `Std. Error` = ses,
+      `z value` = z_values,
+      `Pr(>|z|)` = 2 * pnorm(-abs(z_values))
     )
     rownames(derived_params) <- c(
-      "omega (natural frequency)", "xi (damping ratio)"
+      "lambda (relaxation rate)",
+      "tau (inertia time scale)",
+      "omega (natural frequency)",
+      "xi (damping ratio)"
     )
   }
 
