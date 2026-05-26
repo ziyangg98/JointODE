@@ -35,15 +35,15 @@ Rewriting as $\ddot{m}_i(t) = b_{1,i}\,m_i(t) + b_{2,i}\,\dot{m}_i(t) + f_i(t)$,
 
 $$b_{1,i} = -\omega_i^2, \quad b_{2,i} = -2\xi_i\omega_i$$
 
-Stability is enforced by modeling $\log\omega_i$ and a latent damping root $\xi_{\mathrm{root},i}$ with Gaussian fixed and random effects:
+Stability is enforced by modeling the log-coefficients with Gaussian fixed and random effects:
 
-$$\omega_i = \exp(\ell_{\omega,i}), \quad \xi_i = \xi_{\mathrm{root},i}^2$$
+$$\theta_{\omega i}=\log\omega_i^2,\quad \theta_{d i}=\log(2\xi_i\omega_i)$$
 
 so the ODE coefficients are
 
-$$b_{1,i} = -\exp(2\ell_{\omega,i}), \quad b_{2,i} = -2\xi_{\mathrm{root},i}^2\exp(\ell_{\omega,i}).$$
+$$b_{1,i} = -\exp(\theta_{\omega i}), \quad b_{2,i} = -\exp(\theta_{d i}).$$
 
-The formula keywords are `omega` for $\ell_{\omega,i}$ and `xi` for $\xi_{\mathrm{root},i}$.
+The formula keywords are `biomarker` for $\theta_{\omega i}$ and `velocity` for $\theta_{d i}$.
 
 The complete random effects vector for subject $i$ is:
 

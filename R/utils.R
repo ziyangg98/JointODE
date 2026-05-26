@@ -200,14 +200,14 @@
 .adjust_longitudinal_time_scale <- function(x, parsed_long, scale, to_internal) {
   if (!is.finite(scale) || scale <= 0 || scale == 1) return(x)
   direction <- if (to_internal) 1 else -1
-  forcing_mult <- if (to_internal) scale else 1 / scale
+  forcing_mult <- if (to_internal) scale^2 else 1 / scale^2
   idx <- 1L
-  if (parsed_long$lambda$fixed) {
-    x[idx] <- x[idx] + direction * log(scale)
+  if (parsed_long$biomarker$fixed) {
+    x[idx] <- x[idx] + direction * 2 * log(scale)
     idx <- idx + 1L
   }
-  if (parsed_long$tau$fixed) {
-    x[idx] <- x[idx] - direction * log(scale)
+  if (parsed_long$velocity$fixed) {
+    x[idx] <- x[idx] + direction * log(scale)
     idx <- idx + 1L
   }
   if (idx <= length(x)) x[idx:length(x)] <- x[idx:length(x)] * forcing_mult
@@ -218,21 +218,23 @@
 .random_effect_time_scale <- function(parsed_long, n_re, scale, to_internal) {
   mult <- rep(1, n_re)
   if (n_re >= 2) mult[2] <- scale
-  forcing_start <- 3L + sum(parsed_long$lambda$random, parsed_long$tau$random)
-  if (forcing_start <= n_re) mult[forcing_start:n_re] <- scale
+  forcing_start <- 3L + sum(
+    parsed_long$biomarker$random, parsed_long$velocity$random
+  )
+  if (forcing_start <= n_re) mult[forcing_start:n_re] <- scale^2
   if (to_internal) mult else 1 / mult
 }
 
 #' @noRd
 .longitudinal_vcov_time_scale <- function(parsed_long, n_long, scale) {
   if (!is.finite(scale) || scale <= 0 || scale == 1) return(rep(1, n_long))
-  mult <- rep(1 / scale, n_long)
+  mult <- rep(1 / scale^2, n_long)
   idx <- 1L
-  if (parsed_long$lambda$fixed) {
+  if (parsed_long$biomarker$fixed) {
     mult[idx] <- 1
     idx <- idx + 1L
   }
-  if (parsed_long$tau$fixed) {
+  if (parsed_long$velocity$fixed) {
     mult[idx] <- 1
     idx <- idx + 1L
   }
@@ -397,7 +399,7 @@
   boundary_knots = NULL
 )
 
-.reserved_words <- c("lambda", "tau")
+.reserved_words <- c("biomarker", "velocity")
 
 .init_state_names <- c("initial_biomarker", "initial_velocity")
 
@@ -440,8 +442,8 @@
     fixed_formula <- formula
     random_terms <- NULL
     grouping <- NULL
-    lambda_random <- FALSE
-    tau_random <- FALSE
+    biomarker_random <- FALSE
+    velocity_random <- FALSE
     diagonal <- FALSE
   } else {
     inner <- substr(re_match, 2, nchar(re_match) - 1)
@@ -462,8 +464,8 @@
     fixed_str <- gsub("\\+\\s*\\+", "+", fixed_str)
     fixed_formula <- as.formula(fixed_str)
 
-    lambda_random <- "lambda" %in% random_terms
-    tau_random <- "tau" %in% random_terms
+    biomarker_random <- "biomarker" %in% random_terms
+    velocity_random <- "velocity" %in% random_terms
     random_terms <- setdiff(random_terms, .reserved_words)
     if (length(random_terms) == 0) random_terms <- NULL
   }
@@ -472,8 +474,8 @@
   fixed_terms_labels <- attr(fixed_terms_obj, "term.labels")
   has_intercept <- attr(fixed_terms_obj, "intercept") == 1
 
-  lambda_in_fixed <- "lambda" %in% fixed_terms_labels
-  tau_in_fixed <- "tau" %in% fixed_terms_labels
+  biomarker_in_fixed <- "biomarker" %in% fixed_terms_labels
+  velocity_in_fixed <- "velocity" %in% fixed_terms_labels
   fixed_covariates <- setdiff(fixed_terms_labels, .reserved_words)
 
   if (has_intercept) {
@@ -484,10 +486,8 @@
     response = as.character(formula[[2]]),
     fixed_terms = fixed_covariates,
     random_terms = random_terms,
-    lambda = list(fixed = lambda_in_fixed, random = lambda_random),
-    tau = list(fixed = tau_in_fixed, random = tau_random),
-    omega = list(fixed = lambda_in_fixed, random = lambda_random),
-    xi = list(fixed = tau_in_fixed, random = tau_random),
+    biomarker = list(fixed = biomarker_in_fixed, random = biomarker_random),
+    velocity = list(fixed = velocity_in_fixed, random = velocity_random),
     grouping = grouping,
     diagonal = diagonal
   )
@@ -542,8 +542,8 @@
     length(parsed_surv$covariate_terms)
   }
 
-  n_ode_fixed <- sum(parsed_long$lambda$fixed, parsed_long$tau$fixed)
-  n_ode_random <- sum(parsed_long$lambda$random, parsed_long$tau$random)
+  n_ode_fixed <- sum(parsed_long$biomarker$fixed, parsed_long$velocity$fixed)
+  n_ode_random <- sum(parsed_long$biomarker$random, parsed_long$velocity$random)
 
   list(
     n_longitudinal_coef = n_longitudinal_fixed + n_ode_fixed,
@@ -663,31 +663,28 @@
     m <- cf$initial_state[1] + bi[1]
     v <- cf$initial_state[2] + bi[2]
 
-    log_lambda <- 0
-    log_tau <- 0
+    log_omega2 <- 0
+    log_2xi_omega <- 0
     fi <- 1
     ri <- 3
-    if (configs$lambda$fixed) {
-      log_lambda <- log_lambda + lc[fi]
+    if (configs$biomarker$fixed) {
+      log_omega2 <- log_omega2 + lc[fi]
       fi <- fi + 1
     }
-    if (configs$lambda$random) {
-      log_lambda <- log_lambda + bi[ri]
+    if (configs$biomarker$random) {
+      log_omega2 <- log_omega2 + bi[ri]
       ri <- ri + 1
     }
-    if (configs$tau$fixed) {
-      log_tau <- log_tau + lc[fi]
+    if (configs$velocity$fixed) {
+      log_2xi_omega <- log_2xi_omega + lc[fi]
       fi <- fi + 1
     }
-    if (configs$tau$random) {
-      log_tau <- log_tau + bi[ri]
+    if (configs$velocity$random) {
+      log_2xi_omega <- log_2xi_omega + bi[ri]
       ri <- ri + 1
     }
-    lambda <- exp(log_lambda)
-    tau <- exp(log_tau)
-    inv_tau <- 1 / tau
-    b1 <- -lambda * inv_tau
-    b2 <- -inv_tau
+    b1 <- -exp(log_omega2)
+    b2 <- -exp(log_2xi_omega)
     ffs <- fi
     rfs <- ri
 
@@ -705,8 +702,7 @@
           eta <- eta + sum(bi[rfs:(rfs + ncol(rcov) - 1)] * rcov[ci, ])
         }
 
-        forcing <- eta * inv_tau
-        mv <- .ode_step_r(m, v, b1, b2, forcing, dt)
+        mv <- .ode_step_r(m, v, b1, b2, eta, dt)
         m <- mv[1]
         v <- mv[2]
       }
@@ -748,7 +744,8 @@
 .predict_trajectories <- function(
   data_list, times, cf, configs, re, n_quad
 ) {
-  n_quad <- max(n_quad %||% 1L, 1L)
+  if (is.null(n_quad)) n_quad <- 1L
+  n_quad <- max(n_quad, 1L)
   bl <- unname(cf$baseline)
   hz <- unname(cf$hazard)
   lc <- unname(cf$longitudinal)
@@ -764,8 +761,8 @@
     obs_t <- subj$longitudinal$times
     fcov <- subj$longitudinal$covariates$fixed
     rcov <- subj$longitudinal$covariates$random
-    surv_cov <- if (!is.null(subj$survival$covariates)) {
-      as.numeric(subj$survival$covariates)
+    surv_cov <- if (!is.null(subj$covariates)) {
+      as.numeric(subj$covariates)
     } else {
       numeric(0)
     }
@@ -774,35 +771,28 @@
     m <- cf$initial_state[1] + bi[1]
     v <- cf$initial_state[2] + bi[2]
 
-    log_omega <- 0
-    log_xi <- 0
+    log_omega2 <- 0
+    log_2xi_omega <- 0
     fi <- 1
     ri <- 3
-    omega_active <- configs$omega$fixed || configs$omega$random
-    xi_active <- configs$xi$fixed || configs$xi$random
-    if (configs$omega$fixed) {
-      log_omega <- log_omega + lc[fi]
+    if (configs$biomarker$fixed) {
+      log_omega2 <- log_omega2 + lc[fi]
       fi <- fi + 1
     }
-    if (configs$omega$random) {
-      log_omega <- log_omega + bi[ri]
+    if (configs$biomarker$random) {
+      log_omega2 <- log_omega2 + bi[ri]
       ri <- ri + 1
     }
-    if (configs$xi$fixed) {
-      log_xi <- log_xi + lc[fi]
+    if (configs$velocity$fixed) {
+      log_2xi_omega <- log_2xi_omega + lc[fi]
       fi <- fi + 1
     }
-    if (configs$xi$random) {
-      log_xi <- log_xi + bi[ri]
+    if (configs$velocity$random) {
+      log_2xi_omega <- log_2xi_omega + bi[ri]
       ri <- ri + 1
     }
-    omega2 <- if (omega_active) exp(2 * log_omega) else 0
-    b1 <- -omega2
-    b2 <- if (omega_active && xi_active) {
-      -2 * exp(log_xi) * exp(log_omega)
-    } else {
-      0
-    }
+    b1 <- -exp(log_omega2)
+    b2 <- -exp(log_2xi_omega)
     ffs <- fi
     rfs <- ri
 
@@ -816,12 +806,11 @@
       if (dt > 0 && length(obs_t) > 0) {
         ci <- findInterval(prev_t, obs_t)
         ci <- max(1, min(ci, nrow(fcov)))
-        mu <- sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci, ])
+        forcing <- sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci, ])
         if (ncol(rcov) > 0) {
-          mu <- mu + sum(bi[rfs:(rfs + ncol(rcov) - 1)] * rcov[ci, ])
+          forcing <- forcing +
+            sum(bi[rfs:(rfs + ncol(rcov) - 1)] * rcov[ci, ])
         }
-
-        forcing <- omega2 * mu
         sub_dt <- dt / n_quad
         hl <- .eval_hazard_r(m, v, prev_t, bl, hz, surv_cov, sbc, configs$gamma)
         for (q in seq_len(n_quad)) {

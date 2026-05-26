@@ -4,11 +4,17 @@
 \alias{diagnose}
 \title{Diagnose Subject-Level ODE Identifiability}
 \usage{
-diagnose(formula, data, time = "time", id = "id", verbose = TRUE)
+diagnose(
+  formula,
+  data,
+  time = "time",
+  id = "id",
+  hessian_condition = 1e+10,
+  verbose = TRUE
+)
 }
 \arguments{
-\item{formula}{Formula whose left-hand side is the longitudinal response.
-The right-hand side is ignored by this diagnostic.}
+\item{formula}{Formula whose left-hand side is the longitudinal response.}
 
 \item{data}{Data frame containing the response, time, and subject ID.}
 
@@ -16,12 +22,15 @@ The right-hand side is ignored by this diagnostic.}
 
 \item{id}{Name of the subject ID variable.}
 
+\item{hessian_condition}{Maximum allowed mixed posterior Hessian condition
+number. Defaults to \code{1e10}.}
+
 \item{verbose}{Whether to print progress.}
 }
 \value{
 A \code{JointODEDiagnose} object.
 }
 \description{
-Fits a tau-lambda ODE separately for each subject and diagnoses
-identifiability from the subject-level AD Hessian.
+Fits the second-order ODE separately for each subject and diagnoses
+identifiability from the mixed posterior Hessian.
 }

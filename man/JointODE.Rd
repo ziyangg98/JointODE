@@ -13,8 +13,7 @@ JointODE(
   spline_baseline = list(degree = 2, n_knots = 1, knot_placement = "equal",
     boundary_knots = NULL),
   init = "default",
-  control = list(),
-  ...
+  control = list()
 )
 }
 \arguments{
@@ -69,8 +68,6 @@ data-driven initial estimates.
 
 \item{control}{A list of control parameters for optimization, or output from
 \code{\link{JointODE.control}}.}
-
-\item{...}{Additional arguments passed to internal optimization routines.}
 }
 \value{
 An S3 object of class \code{"JointODE"} containing fitted model
@@ -89,7 +86,7 @@ shared random effects and flexible hazard specifications.
 data(sim)
 fit <- JointODE(
   longitudinal_formula = observed ~
-    omega + xi + x1 + x2 + (omega + xi | id),
+    biomarker + velocity + x1 + x2 + (biomarker + velocity | id),
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = sim$data$longitudinal_data,
   survival_data = sim$data$survival_data,

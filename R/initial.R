@@ -5,9 +5,6 @@
   dims, gamma, parsed_long, spline_baseline_config
 ) {
   longitudinal <- rep(0, dims$n_longitudinal_coef)
-  idx <- 1L
-  if (parsed_long$omega$fixed) idx <- idx + 1L
-  if (parsed_long$xi$fixed) longitudinal[idx] <- log(0.4)
 
   list(
     coefficients = list(
@@ -21,13 +18,13 @@
     configurations = list(
       baseline = spline_baseline_config,
       gamma = gamma,
-      omega = list(
-        fixed = parsed_long$omega$fixed,
-        random = parsed_long$omega$random
+      biomarker = list(
+        fixed = parsed_long$biomarker$fixed,
+        random = parsed_long$biomarker$random
       ),
-      xi = list(
-        fixed = parsed_long$xi$fixed,
-        random = parsed_long$xi$random
+      velocity = list(
+        fixed = parsed_long$velocity$fixed,
+        random = parsed_long$velocity$random
       )
     )
   )
@@ -87,7 +84,8 @@
   params$random_effects_init <- marginal_re
 
   # --- Survival: time-dependent Cox with predicted trajectories ---
-  surv_cov_names <- parsed_surv$covariate_terms %||% character(0)
+  surv_cov_names <- parsed_surv$covariate_terms
+  if (is.null(surv_cov_names)) surv_cov_names <- character(0)
 
   # Get per-subject fitted values at observation times
   pred <- predict(marginal_fit)

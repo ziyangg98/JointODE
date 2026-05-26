@@ -197,10 +197,13 @@
 
   parts <- parsed
 
-  tau_active <- parts$tau$fixed || parts$tau$random
-  lambda_active <- parts$lambda$fixed || parts$lambda$random
-  if (tau_active && !lambda_active) {
-    stop("The 'tau' ODE term requires an active 'lambda' term.", call. = FALSE)
+  velocity_active <- parts$velocity$fixed || parts$velocity$random
+  biomarker_active <- parts$biomarker$fixed || parts$biomarker$random
+  if (velocity_active && !biomarker_active) {
+    stop(
+      "The 'velocity' ODE term requires an active 'biomarker' term.",
+      call. = FALSE
+    )
   }
 
   if (!is.null(parts$grouping) && !(parts$grouping %in% names(data))) {

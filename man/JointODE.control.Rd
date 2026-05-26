@@ -11,15 +11,14 @@ JointODE.control(
   parallel = FALSE,
   n_cores = 0,
   hazard_quadrature = 1,
-  .list = NULL,
-  ...
+  .list = NULL
 )
 }
 \arguments{
-\item{maxit}{Maximum number of EM iterations (default: 200)}
+\item{maxit}{Maximum number of \code{nlminb} iterations (default: 200)}
 
-\item{tol}{Convergence tolerance on maximum absolute parameter
-change: max|delta_theta| < tol (default: 1e-4)}
+\item{tol}{Relative convergence tolerance passed to \code{nlminb}
+(default: 1e-4)}
 
 \item{verbose}{Numeric verbosity level: 0 = silent, 1 = progress,
 2 = outer iterations, 3 = inner Newton detail (default: 0)}
@@ -33,8 +32,6 @@ If 0, uses all available cores (default: 0)}
 observation interval for hazard integration (default: 1)}
 
 \item{.list}{Optional list of control parameters to process}
-
-\item{...}{Additional control parameters}
 }
 \value{
 A list of control parameters with all defaults filled in

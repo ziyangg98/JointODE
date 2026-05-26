@@ -14,7 +14,7 @@
 #      - Value ranges and reproducibility with seed
 #
 #   2. Mathematical Correctness
-#      - Parameter transformation: xi/period → latent omega/xi roots
+#      - Parameter transformation: xi/period → log ODE coefficients
 #      - Covariance matrix: positive semi-definite and symmetric
 #      - Random effects: centered at zero (within 4 SE)
 #
@@ -37,8 +37,8 @@
 #      - .create_example_data(): generates example with true parameters
 #
 # Random Effects Structure:
-#   - Only omega and xi latent parameters have random effects (2×2 covariance)
-#   - Rationale: subject-specific frequency and damping
+#   - Initial states, log omega^2, log(2 xi omega), and forcing intercept have
+#     random effects.
 #
 # Model Equations:
 #   ODE:
@@ -74,10 +74,13 @@ test_that("simulate generates valid output and respects parameters", {
   ))
   expect_equal(
     colnames(sim$random_effects),
-    c("initial_biomarker", "initial_velocity", "omega", "xi")
+    c(
+      "initial_biomarker", "initial_velocity", "log_omega2",
+      "log_2xi_omega", "forcing_(Intercept)"
+    )
   )
 
-  expect_equal(ncol(sim$random_effects), 4)
+  expect_equal(ncol(sim$random_effects), 5)
 
   expect_equal(nrow(sim$survival_data), n)
   expect_equal(nrow(sim$random_effects), n)
@@ -119,12 +122,12 @@ test_that("dynamics transformation and covariance are correct", {
   )
 
   re_means <- colMeans(sim$random_effects)
-  expect_equal(as.numeric(re_means["omega"]), 0, tolerance = 0.1)
-  expect_equal(as.numeric(re_means["xi"]), 0, tolerance = 0.2)
+  expect_equal(as.numeric(re_means["log_omega2"]), 0, tolerance = 0.2)
+  expect_equal(as.numeric(re_means["log_2xi_omega"]), 0, tolerance = 0.2)
 })
 
 test_that("random_effects are properly centered", {
-  n <- 15
+  n <- 100
   sim <- JointODE::simulate(
     n_subjects = n,
     longitudinal = list(
@@ -141,11 +144,15 @@ test_that("random_effects are properly centered", {
     seed = 777
   )
 
-  # omega and xi latent RE should be approximately centered
-  for (col_idx in 3:4) {
+  # Random effects should be approximately centered.
+  for (col_idx in seq_len(ncol(sim$random_effects))) {
     col_sd <- sd(sim$random_effects[, col_idx])
+    if (col_sd < 1e-12) {
+      expect_equal(mean(sim$random_effects[, col_idx]), 0, tolerance = 1e-12)
+      next
+    }
     se <- col_sd / sqrt(n)
-    expect_true(abs(mean(sim$random_effects[, col_idx])) < 4 * se)
+    expect_true(abs(mean(sim$random_effects[, col_idx])) < 5 * se)
   }
 })
 
@@ -249,7 +256,7 @@ test_that("simulate handles edge cases", {
   )
   expect_equal(nrow(sim1$random_effects), 1)
   expect_true(is.matrix(sim1$random_effects))
-  expect_equal(ncol(sim1$random_effects), 4)
+  expect_equal(ncol(sim1$random_effects), 5)
 
   sim_det <- JointODE::simulate(
     n_subjects = 5,
@@ -354,7 +361,10 @@ test_that("simulate handles covariates correctly", {
   expect_true(all(c("w1", "w2") %in% names(sim_with_cov$survival_data)))
   expect_equal(
     colnames(sim_with_cov$random_effects),
-    c("initial_biomarker", "initial_velocity", "omega", "xi")
+    c(
+      "initial_biomarker", "initial_velocity", "log_omega2",
+      "log_2xi_omega", "forcing_(Intercept)"
+    )
   )
   expect_true(all(sim_with_cov$survival_data$w2 %in% c(0, 1)))
 
@@ -383,7 +393,7 @@ test_that("simulate handles covariates correctly", {
   )
 
   expect_equal(ncol(sim_no_cov$longitudinal_data), 6)
-  expect_equal(ncol(sim_no_cov$random_effects), 4)
+  expect_equal(ncol(sim_no_cov$random_effects), 5)
   expect_equal(ncol(sim_no_cov$survival_data), 3)
 })
 

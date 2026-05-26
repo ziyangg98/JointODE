@@ -1,4 +1,4 @@
-// Subject-level tau-lambda diagnostic objective
+// Subject-level second-order ODE diagnostic objective
 #ifndef DIAGNOSE_ODE_HPP
 #define DIAGNOSE_ODE_HPP
 
@@ -15,13 +15,9 @@ Type diagnose_ode_nll(objective_function<Type>* obj) {
 
   Type m = theta(0);
   Type v = theta(1);
-  Type lambda = exp(theta(2));
-  Type tau = exp(theta(3));
-  Type eta = theta(4);
-  Type inv_tau = Type(1) / tau;
-  Type b1 = -lambda * inv_tau;
-  Type b2 = -inv_tau;
-  Type forcing = eta * inv_tau;
+  Type b1 = -exp(theta(2));
+  Type b2 = -exp(theta(3));
+  Type forcing = theta(4);
 
   int n = y.size();
   Type nll(0);

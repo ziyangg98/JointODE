@@ -66,7 +66,7 @@
 #' data(sim)
 #' fit <- JointODE(
 #'   longitudinal_formula = observed ~
-#'     omega + xi + x1 + x2 + (omega + xi | id),
+#'     biomarker + velocity + x1 + x2 + (biomarker + velocity | id),
 #'   survival_formula = Surv(time, status) ~ w1 + w2,
 #'   longitudinal_data = sim$data$longitudinal_data,
 #'   survival_data = sim$data$survival_data,
@@ -146,6 +146,7 @@ JointODE <- function(
     spline_config = spline_config
   )
 
+  default_init <- FALSE
   if (is.character(init) && init == "marginal") {
     parameters <- .initialize_from_marginal(
       longitudinal_formula, longitudinal_data, survival_data,
@@ -154,6 +155,7 @@ JointODE <- function(
   } else if (is.list(init)) {
     parameters <- init
   } else {
+    default_init <- TRUE
     parameters <- .default_parameters(
       model_config$dims, gamma, parsed_long,
       model_config$spline_baseline_config
@@ -167,6 +169,14 @@ JointODE <- function(
   parameters$configurations$baseline <- model_config$spline_baseline_config
   parameters$configurations$hazard_quadrature <- control$hazard_quadrature
   parameters$configurations$gamma <- gamma
+  parameters$configurations$biomarker <- list(
+    fixed = parsed_long$biomarker$fixed,
+    random = parsed_long$biomarker$random
+  )
+  parameters$configurations$velocity <- list(
+    fixed = parsed_long$velocity$fixed,
+    random = parsed_long$velocity$random
+  )
   parameters$configurations$covariance <-
     if (isTRUE(parsed_long$diagonal)) "diagonal" else "full"
 
@@ -178,6 +188,17 @@ JointODE <- function(
   }
   if (is.null(cf$measurement_error_sd)) {
     cf$measurement_error_sd <- sd(all_y)
+  }
+  if (default_init && is.finite(scales$time) &&
+    scales$time > 0 && scales$time != 1) {
+    idx <- 1L
+    if (parsed_long$biomarker$fixed) {
+      cf$longitudinal[idx] <- -2 * log(scales$time)
+      idx <- idx + 1L
+    }
+    if (parsed_long$velocity$fixed) {
+      cf$longitudinal[idx] <- -log(scales$time)
+    }
   }
   parameters$coefficients <- cf
 
@@ -292,29 +313,25 @@ summary.JointODE <- function(object, ...) {
   # Derived ODE physical parameters
   derived_params <- NULL
   long_names <- names(object$parameters$coefficients$longitudinal)
-  has_roots <- all(c("omega", "xi") %in% long_names)
+  has_roots <- all(c("log_omega2", "log_2xi_omega") %in% long_names)
   if (!is.null(object$vcov) && has_roots) {
-    idx_o <- idx_longitudinal[which(long_names == "omega")]
-    idx_x <- idx_longitudinal[which(long_names == "xi")]
-    log_omega <- coefs[idx_o]
-    log_xi <- coefs[idx_x]
+    idx_o <- idx_longitudinal[which(long_names == "log_omega2")]
+    idx_x <- idx_longitudinal[which(long_names == "log_2xi_omega")]
+    log_omega2 <- coefs[idx_o]
+    log_2xi_omega <- coefs[idx_x]
     var_o <- object$vcov[idx_o, idx_o]
     var_x <- object$vcov[idx_x, idx_x]
     cov_ox <- object$vcov[idx_o, idx_x]
 
-    omega_est <- exp(log_omega)
-    xi_est <- exp(log_xi)
-    damping_est <- 2 * xi_est * omega_est
+    omega_est <- sqrt(exp(log_omega2))
+    xi_est <- exp(log_2xi_omega) / (2 * omega_est)
 
-    se_omega <- sqrt(pmax(omega_est^2 * var_o, 0))
-    se_xi <- sqrt(pmax(xi_est^2 * var_x, 0))
-    grad_damping <- c(damping_est, damping_est)
+    se_omega <- sqrt(pmax(0.25 * omega_est^2 * var_o, 0))
+    grad_xi <- c(-0.5 * xi_est, xi_est)
     vc_damping <- matrix(c(var_o, cov_ox, cov_ox, var_x), 2, 2)
-    se_damping <- sqrt(pmax(
-      drop(t(grad_damping) %*% vc_damping %*% grad_damping), 0
-    ))
-    estimates <- c(omega_est, xi_est, damping_est)
-    ses <- c(se_omega, se_xi, se_damping)
+    se_xi <- sqrt(pmax(drop(t(grad_xi) %*% vc_damping %*% grad_xi), 0))
+    estimates <- c(omega_est, xi_est)
+    ses <- c(se_omega, se_xi)
     z_values <- estimates / ses
 
     derived_params <- cbind(
@@ -325,8 +342,7 @@ summary.JointODE <- function(object, ...) {
     )
     rownames(derived_params) <- c(
       "omega (natural frequency)",
-      "xi (damping ratio)",
-      "damping coefficient (2 xi omega)"
+      "xi (damping ratio)"
     )
   }
 

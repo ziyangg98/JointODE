@@ -73,6 +73,16 @@ MarginalODE <- function(
   re_sds <- pmax(apply(random_effects_init, 2, sd), sd(all_y) * 0.1)
   parameters$coefficients$random_effect_sigma <- diag(re_sds^2, n_re)
   parameters$random_effects_init <- random_effects_init
+  if (is.finite(scales$time) && scales$time > 0 && scales$time != 1) {
+    idx <- 1L
+    if (parsed_long$biomarker$fixed) {
+      parameters$coefficients$longitudinal[idx] <- -2 * log(scales$time)
+      idx <- idx + 1L
+    }
+    if (parsed_long$velocity$fixed) {
+      parameters$coefficients$longitudinal[idx] <- -log(scales$time)
+    }
+  }
   parameters_fit <- .prepare_marginal_time_scale(
     parameters, parsed_long, scales$time
   )
@@ -113,13 +123,13 @@ MarginalODE <- function(
 
   # Store configs needed for predict
   configs <- list(
-    lambda = list(
-      fixed = parsed_long$lambda$fixed,
-      random = parsed_long$lambda$random
+    biomarker = list(
+      fixed = parsed_long$biomarker$fixed,
+      random = parsed_long$biomarker$random
     ),
-    tau = list(
-      fixed = parsed_long$tau$fixed,
-      random = parsed_long$tau$random
+    velocity = list(
+      fixed = parsed_long$velocity$fixed,
+      random = parsed_long$velocity$random
     ),
     covariance = if (isTRUE(parsed_long$diagonal)) "diagonal" else "full"
   )
@@ -215,30 +225,26 @@ summary.MarginalODE <- function(object, ...) {
   # Derived ODE physical parameters
   derived_params <- NULL
   nms <- names(object$parameters)
-  has_dynamics <- all(c("lambda", "tau") %in% nms)
+  has_dynamics <- all(c("log_omega2", "log_2xi_omega") %in% nms)
   if (!is.null(object$vcov) && !all(is.na(object$vcov)) && has_dynamics) {
-    idx_l <- which(nms == "lambda")
-    idx_t <- which(nms == "tau")
-    log_lambda <- object$parameters[idx_l]
-    log_tau <- object$parameters[idx_t]
-    var_l <- object$vcov[idx_l, idx_l]
-    var_t <- object$vcov[idx_t, idx_t]
-    cov_lt <- object$vcov[idx_l, idx_t]
+    idx_o <- which(nms == "log_omega2")
+    idx_d <- which(nms == "log_2xi_omega")
+    log_omega2 <- object$parameters[idx_o]
+    log_2xi_omega <- object$parameters[idx_d]
+    var_o <- object$vcov[idx_o, idx_o]
+    var_d <- object$vcov[idx_d, idx_d]
+    cov_od <- object$vcov[idx_o, idx_d]
 
-    lambda_est <- exp(log_lambda)
-    tau_est <- exp(log_tau)
-    omega_est <- sqrt(lambda_est / tau_est)
-    xi_est <- 1 / (2 * sqrt(lambda_est * tau_est))
+    omega_est <- sqrt(exp(log_omega2))
+    xi_est <- exp(log_2xi_omega) / (2 * omega_est)
 
-    se_lambda <- sqrt(pmax(lambda_est^2 * var_l, 0))
-    se_tau <- sqrt(pmax(tau_est^2 * var_t, 0))
-    vc_dyn <- matrix(c(var_l, cov_lt, cov_lt, var_t), 2, 2)
-    grad_omega <- c(0.5 * omega_est, -0.5 * omega_est)
-    grad_xi <- c(-0.5 * xi_est, -0.5 * xi_est)
+    vc_dyn <- matrix(c(var_o, cov_od, cov_od, var_d), 2, 2)
+    grad_omega <- c(0.5 * omega_est, 0)
+    grad_xi <- c(-0.5 * xi_est, xi_est)
     se_omega <- sqrt(pmax(drop(t(grad_omega) %*% vc_dyn %*% grad_omega), 0))
     se_xi <- sqrt(pmax(drop(t(grad_xi) %*% vc_dyn %*% grad_xi), 0))
-    estimates <- c(lambda_est, tau_est, omega_est, xi_est)
-    ses <- c(se_lambda, se_tau, se_omega, se_xi)
+    estimates <- c(omega_est, xi_est)
+    ses <- c(se_omega, se_xi)
     z_values <- estimates / ses
 
     derived_params <- cbind(
@@ -248,8 +254,6 @@ summary.MarginalODE <- function(object, ...) {
       `Pr(>|z|)` = 2 * pnorm(-abs(z_values))
     )
     rownames(derived_params) <- c(
-      "lambda (relaxation rate)",
-      "tau (inertia time scale)",
       "omega (natural frequency)",
       "xi (damping ratio)"
     )

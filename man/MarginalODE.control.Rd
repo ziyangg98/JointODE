@@ -10,16 +10,14 @@ MarginalODE.control(
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,
-  .list = NULL,
-  ...
+  .list = NULL
 )
 }
 \arguments{
-\item{maxit}{Maximum number of alternating optimization iterations
-(default: 200)}
+\item{maxit}{Maximum number of \code{nlminb} iterations (default: 200)}
 
-\item{tol}{Convergence tolerance on max absolute parameter
-change (default: 1e-4)}
+\item{tol}{Relative convergence tolerance passed to \code{nlminb}
+(default: 1e-4)}
 
 \item{verbose}{Logical or numeric; FALSE/0 for silent, TRUE/1 for basic
 progress, 2 for detailed output (default: FALSE)}
@@ -29,8 +27,6 @@ progress, 2 for detailed output (default: FALSE)}
 \item{n_cores}{Integer; number of cores (0 = auto) (default: 0)}
 
 \item{.list}{Optional list of control parameters to process}
-
-\item{...}{Additional control parameters}
 }
 \value{
 A list of control parameters with all defaults filled in

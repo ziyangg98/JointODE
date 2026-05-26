@@ -3,9 +3,10 @@
 # ==============================================================================
 
 test_that("MarginalODE basic fit returns finite likelihood", {
+  ld <- sim$data$longitudinal_data[, c("id", "time", "observed", "x1", "x2")]
   fit <- MarginalODE(
     formula = observed ~ x1 + x2,
-    data = sim$data$longitudinal_data,
+    data = ld,
     control = list(maxit = 100, verbose = 0)
   )
   expect_true(is.finite(fit$logLik))
@@ -14,12 +15,12 @@ test_that("MarginalODE basic fit returns finite likelihood", {
 })
 
 test_that("MarginalODE with dynamics RE converges", {
-  ids30 <- unique(sim$data$longitudinal_data$id)[1:30]
-  sub_data <- sim$data$longitudinal_data[
-    sim$data$longitudinal_data$id %in% ids30,
-  ]
+  ld <- sim$data$longitudinal_data[, c("id", "time", "observed", "x1", "x2")]
+  ids30 <- unique(ld$id)[1:30]
+  sub_data <- ld[ld$id %in% ids30, ]
   fit <- MarginalODE(
-    formula = observed ~ omega + xi + x1 + x2 + (omega + xi | id),
+    formula = observed ~ biomarker + velocity + x1 + x2 +
+      (biomarker + velocity | id),
     data = sub_data,
     control = list(maxit = 200, verbose = 0)
   )
@@ -33,7 +34,8 @@ test_that("JointODE with sim$init converges", {
   ]
   ids20 <- unique(ld$id)[1:20]
   fit <- JointODE(
-    longitudinal_formula = observed ~ omega + xi + x1 + x2 + (omega + xi | id),
+    longitudinal_formula = observed ~ biomarker + velocity + x1 + x2 +
+      (biomarker + velocity | id),
     survival_formula = Surv(time, status) ~ w1 + w2,
     longitudinal_data = ld[ld$id %in% ids20, ],
     survival_data = sim$data$survival_data[
@@ -47,9 +49,10 @@ test_that("JointODE with sim$init converges", {
 })
 
 test_that("coef returns named vector with correct length", {
+  ld <- sim$data$longitudinal_data[, c("id", "time", "observed", "x1", "x2")]
   fit <- MarginalODE(
     formula = observed ~ x1 + x2,
-    data = sim$data$longitudinal_data,
+    data = ld,
     control = list(maxit = 50, verbose = 0)
   )
   co <- coef(fit)
@@ -59,9 +62,10 @@ test_that("coef returns named vector with correct length", {
 })
 
 test_that("predict returns expected columns", {
+  ld <- sim$data$longitudinal_data[, c("id", "time", "observed", "x1", "x2")]
   fit <- MarginalODE(
     formula = observed ~ x1 + x2,
-    data = sim$data$longitudinal_data,
+    data = ld,
     control = list(maxit = 50, verbose = 0)
   )
   pred <- predict(fit)

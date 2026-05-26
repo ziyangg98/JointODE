@@ -20,10 +20,10 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
   DATA_INTEGER(n_random_covariates);
   DATA_VECTOR(long_fixed_covariates);
   DATA_VECTOR(long_random_covariates);
-  DATA_INTEGER(lambda_fixed);
-  DATA_INTEGER(lambda_random);
-  DATA_INTEGER(tau_fixed);
-  DATA_INTEGER(tau_random);
+  DATA_INTEGER(biomarker_fixed);
+  DATA_INTEGER(biomarker_random);
+  DATA_INTEGER(velocity_fixed);
+  DATA_INTEGER(velocity_random);
   DATA_INTEGER(diagonal_re);
 
   // Pre-compute per-subject offsets
@@ -92,20 +92,14 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
     sol_m(0) = m;  sol_v(0) = v;
 
     // Dynamic parameters are constant across time steps.
-    Type log_lambda(0), log_tau(0);
+    Type log_omega2(0), log_2xi_omega(0);
     int fixed_idx = 0, re_idx = 2;
-    if (lambda_fixed) log_lambda += longitudinal(fixed_idx++);
-    if (lambda_random) log_lambda += bi(re_idx++);
-    if (tau_fixed) log_tau += longitudinal(fixed_idx++);
-    if (tau_random) {
-      log_tau += bi(re_idx);
-      re_idx++;
-    }
-    Type lambda = exp(log_lambda);
-    Type tau = exp(log_tau);
-    Type inv_tau = Type(1) / tau;
-    Type b1 = -lambda * inv_tau;
-    Type b2 = -inv_tau;
+    if (biomarker_fixed) log_omega2 += longitudinal(fixed_idx++);
+    if (biomarker_random) log_omega2 += bi(re_idx++);
+    if (velocity_fixed) log_2xi_omega += longitudinal(fixed_idx++);
+    if (velocity_random) log_2xi_omega += bi(re_idx++);
+    Type b1 = -exp(log_omega2);
+    Type b2 = -exp(log_2xi_omega);
     int forcing_fixed_start = fixed_idx;
     int forcing_re_start = re_idx;
 
@@ -120,7 +114,7 @@ Type marginal_ode_nll(objective_function<Type>* obj) {
       for (int k = 0; k < n_random_covariates; k++)
         eta += bi(forcing_re_start + k) * Type(long_random_covariates_i(cov_idx, k));
 
-      ode_step(m, v, b1, b2, eta * inv_tau, dt);
+      ode_step(m, v, b1, b2, eta, dt);
       sol_m(ti) = m;  sol_v(ti) = v;
     }
 

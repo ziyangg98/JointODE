@@ -143,8 +143,8 @@
   extract_long <- function(field) {
     lapply(data_list, function(d) d$longitudinal[[field]])
   }
-  obs_times <- unlist(extract_long("times")) %||% numeric(0)
-  obs_values <- unlist(extract_long("measurements")) %||% numeric(0)
+  obs_times <- unlist(extract_long("times"))
+  obs_values <- unlist(extract_long("measurements"))
   n_observations <- vapply(data_list, function(d) {
     length(d$longitudinal$measurements)
   }, integer(1))
@@ -158,7 +158,7 @@
     result <- unlist(lapply(data_list, function(d) {
       as.vector(t(d$longitudinal$covariates[[type]]))
     }))
-    result %||% numeric(0)
+    if (length(result) == 0) numeric(0) else result
   }
 
   # Survival covariates
@@ -200,10 +200,10 @@
       numeric(0)
     },
     baseline_boundary = baseline_config$boundary_knots,
-    omega_fixed = as.integer(configs$omega$fixed),
-    omega_random = as.integer(configs$omega$random),
-    xi_fixed = as.integer(configs$xi$fixed),
-    xi_random = as.integer(configs$xi$random),
+    biomarker_fixed = as.integer(configs$biomarker$fixed),
+    biomarker_random = as.integer(configs$biomarker$random),
+    velocity_fixed = as.integer(configs$velocity$fixed),
+    velocity_random = as.integer(configs$velocity$random),
     diagonal_re = as.integer(isTRUE(configs$covariance == "diagonal"))
   )
 }
@@ -312,7 +312,7 @@
     result <- unlist(lapply(data_list, function(d) {
       as.vector(t(d$longitudinal$covariates[[type]]))
     }))
-    result %||% numeric(0)
+    if (length(result) == 0) numeric(0) else result
   }
 
   list(
@@ -320,16 +320,16 @@
     n_subjects = as.integer(n_subjects),
     n_random_effects = as.integer(n_re),
     n_observations = as.integer(n_observations),
-    obs_times = obs_times %||% numeric(0),
-    obs_values = obs_values %||% numeric(0),
+    obs_times = if (length(obs_times) == 0) numeric(0) else obs_times,
+    obs_values = if (length(obs_values) == 0) numeric(0) else obs_values,
     n_fixed_covariates = as.integer(n_fixed_covariates),
     n_random_covariates = as.integer(n_random_covariates),
     long_fixed_covariates = flatten_design("fixed"),
     long_random_covariates = flatten_design("random"),
-    lambda_fixed = as.integer(parsed_long$lambda$fixed),
-    lambda_random = as.integer(parsed_long$lambda$random),
-    tau_fixed = as.integer(parsed_long$tau$fixed),
-    tau_random = as.integer(parsed_long$tau$random),
+    biomarker_fixed = as.integer(parsed_long$biomarker$fixed),
+    biomarker_random = as.integer(parsed_long$biomarker$random),
+    velocity_fixed = as.integer(parsed_long$velocity$fixed),
+    velocity_random = as.integer(parsed_long$velocity$random),
     diagonal_re = as.integer(isTRUE(parsed_long$diagonal))
   )
 }
@@ -338,12 +338,6 @@
 #' @noRd
 .default_marginal_parameters <- function(model_config, parsed_long) {
   longitudinal <- rep(0, model_config$n_longitudinal_coef)
-  idx <- 1L
-  if (parsed_long$lambda$fixed) {
-    longitudinal[idx] <- log(0.05)
-    idx <- idx + 1L
-  }
-  if (parsed_long$tau$fixed) longitudinal[idx] <- log(5)
 
   list(
     coefficients = list(
@@ -353,13 +347,13 @@
       random_effect_sigma = diag(1, model_config$n_re)
     ),
     configurations = list(
-      lambda = list(
-        fixed = parsed_long$lambda$fixed,
-        random = parsed_long$lambda$random
+      biomarker = list(
+        fixed = parsed_long$biomarker$fixed,
+        random = parsed_long$biomarker$random
       ),
-      tau = list(
-        fixed = parsed_long$tau$fixed,
-        random = parsed_long$tau$random
+      velocity = list(
+        fixed = parsed_long$velocity$fixed,
+        random = parsed_long$velocity$random
       ),
       covariance = if (isTRUE(parsed_long$diagonal)) "diagonal" else "full"
     )

@@ -31,31 +31,31 @@ test_that("parse formula without random effects", {
   result <- .parse_longitudinal_formula(y ~ x1 + x2)
   expect_equal(result$response, "y")
   expect_null(result$random_terms)
-  expect_false(result$omega$random)
+  expect_false(result$biomarker$random)
 })
 
 test_that("parse formula with reserved words", {
-  result <- .parse_longitudinal_formula(y ~ x + (omega + xi | id))
+  result <- .parse_longitudinal_formula(y ~ x + (biomarker + velocity | id))
   expect_equal(result$random_terms, "(Intercept)")
-  expect_true(result$omega$random)
-  expect_true(result$xi$random)
-  expect_false(result$omega$fixed)
+  expect_true(result$biomarker$random)
+  expect_true(result$velocity$random)
+  expect_false(result$biomarker$fixed)
 })
 
 test_that("parse formula with reserved words in fixed effects", {
-  result <- .parse_longitudinal_formula(y ~ omega + xi + x + (1 | id))
-  expect_true(result$omega$fixed)
-  expect_true(result$xi$fixed)
+  result <- .parse_longitudinal_formula(y ~ biomarker + velocity + x + (1 | id))
+  expect_true(result$biomarker$fixed)
+  expect_true(result$velocity$fixed)
   expect_equal(result$fixed_terms, c("(Intercept)", "x"))
 })
 
 test_that("parse formula with reserved words in both", {
   result <- .parse_longitudinal_formula(
-    y ~ omega + (omega + xi | id)
+    y ~ biomarker + (biomarker + velocity | id)
   )
-  expect_true(result$omega$fixed)
-  expect_true(result$omega$random)
-  expect_true(result$xi$random)
+  expect_true(result$biomarker$fixed)
+  expect_true(result$biomarker$random)
+  expect_true(result$velocity$random)
 })
 
 test_that("parse random intercept/slope variants", {
@@ -79,7 +79,7 @@ test_that("parse interaction terms", {
 })
 
 test_that("variable in fixed only / random only / both", {
-  r1 <- .parse_longitudinal_formula(y ~ time + (omega | id))
+  r1 <- .parse_longitudinal_formula(y ~ time + (biomarker | id))
   expect_true("time" %in% r1$fixed_terms)
 
   r2 <- .parse_longitudinal_formula(y ~ x + (time | id))
@@ -98,16 +98,16 @@ test_that("validate accepts valid formula", {
     y ~ x + (1 | id), .formula_test_data()
   ))
   expect_silent(.validate_longitudinal_formula(
-    y ~ x + (omega + xi | id), .formula_test_data()
+    y ~ x + (biomarker + velocity | id), .formula_test_data()
   ))
   # No RE term is valid (initial state RE are always included)
   expect_silent(.validate_longitudinal_formula(y ~ x, .formula_test_data()))
 })
 
-test_that("validate requires omega when xi is active", {
+test_that("validate requires biomarker when velocity is active", {
   d <- .formula_test_data()
-  expect_error(.validate_longitudinal_formula(y ~ xi + x, d), "requires")
-  expect_error(.validate_longitudinal_formula(y ~ x + (xi | id), d), "requires")
+  expect_error(.validate_longitudinal_formula(y ~ velocity + x, d), "requires")
+  expect_error(.validate_longitudinal_formula(y ~ x + (velocity | id), d), "requires")
 })
 
 test_that("validate rejects invalid longitudinal formulas", {
@@ -127,7 +127,7 @@ test_that("validate rejects invalid longitudinal formulas", {
 })
 
 test_that("validate rejects reserved words in data", {
-  d <- data.frame(y = 1:10, omega = 1:10, id = rep(1:2, each = 5))
+  d <- data.frame(y = 1:10, biomarker = 1:10, id = rep(1:2, each = 5))
   expect_error(.validate_longitudinal_formula(y ~ 1 + (1 | id), d), "Reserved")
 })
 
@@ -377,7 +377,7 @@ test_that(".compute_dimensions returns correct values", {
 
   dims2 <- .compute_dimensions(
     .parse_longitudinal_formula(
-      y ~ omega + xi + (omega + xi | id)
+      y ~ biomarker + velocity + (biomarker + velocity | id)
     ),
     .parse_survival_formula(Surv(time, status) ~ 1),
     list(degree = 2, n_knots = 0)

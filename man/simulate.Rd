@@ -134,12 +134,12 @@ with columns:
 Baseline survival covariates (if specified)
 }
 }
-\item{\code{random_effects}}{An \eqn{n \times 4} matrix of
+\item{\code{random_effects}}{An \eqn{n \times 5} matrix of
 subject-specific random effects (centered at zero). Columns
 \code{initial_biomarker} and \code{initial_velocity} capture initial
-state variability; \code{omega} and \code{xi}
-capture latent ODE parameter variability corresponding to the formula
-term \code{(omega + xi | id)}.}
+state variability; \code{log_omega2} and \code{log_2xi_omega} capture
+latent ODE parameter variability; \code{forcing_(Intercept)} matches the
+lme-style random intercept in \code{(biomarker + velocity | id)}.}
 }}
 \item{\code{init}}{A list of initial parameter values suitable for
 passing to \code{JointODE()}, containing \code{$coefficients} and

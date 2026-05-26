@@ -29,13 +29,15 @@ measurements from 200 subjects:
 \item w1, w2: Survival covariates
 }
 }
-\item{random_effects}{Matrix (200 x 4) with subject-specific
+\item{random_effects}{Matrix (200 x 5) with subject-specific
 random effects:
 \itemize{
 \item initial_biomarker: Initial biomarker value
 \item initial_velocity: Initial velocity
-\item omega: Latent log-frequency random effect
-\item xi: Latent damping-root random effect
+\item log_omega2: Random effect on \eqn{\log \omega_i^2}
+\item log_2xi_omega: Random effect on
+\eqn{\log(2\xi_i\omega_i)}
+\item forcing_(Intercept): Random forcing intercept
 }
 }
 }
@@ -81,7 +83,7 @@ measurements and survival outcomes.
 \details{
 The dataset contains 200 subjects with heterogeneous ODE dynamics.
 Subject-specific dynamics are characterized by random effects on
-latent omega and xi parameters. Population means: damping ratio
+latent ODE log-coefficients. Population means: damping ratio
 \eqn{\xi \approx 0.4}, period \eqn{T \approx 6}.
 }
 \examples{
@@ -110,7 +112,7 @@ apply(sim$data$random_effects, 2, sd)
 # Fit a Joint ODE model using this data
 fit <- JointODE(
   longitudinal_formula = observed ~
-    omega + xi + x1 + x2 + (omega + xi | id),
+    biomarker + velocity + x1 + x2 + (biomarker + velocity | id),
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = sim$data$longitudinal_data,
   survival_data = sim$data$survival_data,

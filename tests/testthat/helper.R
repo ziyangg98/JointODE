@@ -17,7 +17,7 @@ data("sim", package = "JointODE", envir = environment())
       c("id", "time", "observed", "x1", "x2")
     ],
     longitudinal_formula = observed ~
-      omega + xi + x1 + x2 + (omega + xi | id),
+      biomarker + velocity + x1 + x2 + (biomarker + velocity | id),
     survival_data = sim$data$survival_data[
       sim$data$survival_data$id %in% test_ids,
     ],
@@ -74,8 +74,8 @@ data("sim", package = "JointODE", envir = environment())
       data = td$data_list,
       control = JointODE.control(),
       call = quote(JointODE(
-        longitudinal_formula = observed ~ omega + xi + x1 + x2 +
-          (omega + xi | id),
+        longitudinal_formula = observed ~ biomarker + velocity + x1 + x2 +
+          (biomarker + velocity | id),
         survival_formula = Surv(time, status) ~ w1 + w2
       ))
     ),
