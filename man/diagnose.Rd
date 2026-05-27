@@ -23,8 +23,9 @@ diagnose(
 \item{id}{Name of the subject ID variable.}
 
 \item{q_threshold}{Optional minimum subject-level dynamic information ratio.
-When supplied, filtering uses only \code{q_i >= q_threshold}; Hessian
-diagnostics are still reported but do not determine \code{keep_ids}.}
+Use a positive number or \code{"elbow"}. Filtering uses only
+\code{q_i >= q_threshold}; Hessian diagnostics are still reported but do
+not determine \code{keep_ids}.}
 
 \item{verbose}{Whether to print progress.}
 }

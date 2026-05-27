@@ -9,8 +9,9 @@
 #' @param time Name of the time variable.
 #' @param id Name of the subject ID variable.
 #' @param q_threshold Optional minimum subject-level dynamic information ratio.
-#'   When supplied, filtering uses only \code{q_i >= q_threshold}; Hessian
-#'   diagnostics are still reported but do not determine \code{keep_ids}.
+#'   Use a positive number or \code{"elbow"}. Filtering uses only
+#'   \code{q_i >= q_threshold}; Hessian diagnostics are still reported but do
+#'   not determine \code{keep_ids}.
 #' @param verbose Whether to print progress.
 #'
 #' @return A \code{JointODEDiagnose} object.
@@ -27,10 +28,12 @@ diagnose <- function(
   if (!inherits(formula, "formula") || length(formula) < 3) {
     stop("formula must have a response on the left-hand side", call. = FALSE)
   }
-  if (!is.null(q_threshold) && (!is.numeric(q_threshold) ||
-    length(q_threshold) != 1 || !is.finite(q_threshold) ||
-    q_threshold <= 0)) {
-    stop("q_threshold must be a positive finite number", call. = FALSE)
+  valid_threshold <- is.null(q_threshold) ||
+    identical(q_threshold, "elbow") ||
+    (is.numeric(q_threshold) && length(q_threshold) == 1 &&
+      is.finite(q_threshold) && q_threshold > 0)
+  if (!valid_threshold) {
+    stop("q_threshold must be a positive finite number or 'elbow'", call. = FALSE)
   }
   response <- as.character(formula[[2]])
   missing <- setdiff(c(response, time, id), names(data))
@@ -63,6 +66,16 @@ diagnose <- function(
       time_scale = time_scale
     )
   }))
+  q_threshold_method <- if (identical(q_threshold, "elbow")) "elbow" else "fixed"
+  if (identical(q_threshold, "elbow")) {
+    log_q <- sort(log10(subject$q_i[is.finite(subject$q_i) & subject$q_i > 0]))
+    if (length(log_q) < 3 || diff(range(log_q)) == 0) {
+      stop("Cannot estimate elbow q_threshold from fewer than 3 finite positive q_i values.", call. = FALSE)
+    }
+    x <- seq(0, 1, length.out = length(log_q))
+    y <- (log_q - min(log_q)) / diff(range(log_q))
+    q_threshold <- 10^log_q[which.max(abs(y - x))]
+  }
   if (is.null(q_threshold)) {
     subject$status <- "identifiable"
     subject$reason <- "q_threshold_not_supplied"
@@ -118,6 +131,7 @@ diagnose <- function(
       keep_ids = keep_ids,
       drop_ids = drop_ids,
       q_threshold = q_threshold,
+      q_threshold_method = q_threshold_method,
       scales = list(time = time_scale),
       call = cl
     ),
@@ -255,6 +269,9 @@ print.JointODEDiagnose <- function(
     cat(
       "\nFiltering: q_i >= ",
       format(x$q_threshold, digits = digits),
+      " (",
+      x$q_threshold_method,
+      ")",
       "\n",
       sep = ""
     )
