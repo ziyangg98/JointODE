@@ -46,6 +46,16 @@ Type expm1c2(Type x) {
     (exp(x) - Type(1) - x) / x2_safe);
 }
 
+template <class Type>
+Type expm1_over_x(Type x, Type dt) {
+  Type xdt = x * dt;
+  Type x2 = x * x;
+  Type x_safe = CppAD::CondExpLt(x2, Type(1e-20), Type(1), x);
+  return CppAD::CondExpLt(x2, Type(1e-20),
+    dt + x * dt * dt * Type(0.5) + x * x * dt * dt * dt / Type(6),
+    (exp(xdt) - Type(1)) / x_safe);
+}
+
 // ============================================================================
 // Cayley-Hamilton ODE solver (sinhc/sinc formulation)
 // Solves d²m/dt² = b1·m + b2·dm/dt + forcing exactly.
@@ -67,8 +77,39 @@ Type expm1c2(Type x) {
 template <class Type>
 void ode_step(Type& biomarker, Type& velocity,
               Type b1, Type b2, Type forcing, Type dt) {
-  Type m = b2 * dt * Type(0.5);
   Type D = b2 * b2 + Type(4) * b1;
+
+  double D_value = asDouble(D);
+  double dt_value = fabs(asDouble(dt));
+  double b2_dt_value = fabs(asDouble(b2) * dt_value);
+  double root_dt_value = D_value > 0 ? sqrt(D_value) * dt_value : 0.0;
+  if (D_value > 0 && std::max(b2_dt_value, root_dt_value) > 50.0) {
+    Type root_D = sqrt(D);
+    Type r_plus = (b2 + root_D) * Type(0.5);
+    Type r_minus = (b2 - root_D) * Type(0.5);
+    Type slow_denom = root_D - b2;
+    Type slow_denom_safe = CppAD::CondExpLt(
+      slow_denom * slow_denom, Type(1e-20), Type(1), slow_denom);
+    Type r_slow = CppAD::CondExpLt(b2, Type(0),
+      Type(2) * b1 / slow_denom_safe,
+      r_minus);
+    Type r_fast = CppAD::CondExpLt(b2, Type(0), r_minus, r_plus);
+    Type denom = r_slow - r_fast;
+    Type e_slow = exp(r_slow * dt);
+    Type e_fast = exp(r_fast * dt);
+    Type a1 = (e_slow - e_fast) / denom;
+    Type a0 = (r_slow * e_fast - r_fast * e_slow) / denom;
+    Type J1 = (expm1_over_x(r_slow, dt) -
+      expm1_over_x(r_fast, dt)) / denom;
+    Type new_m = a0 * biomarker + a1 * velocity + forcing * J1;
+    Type new_v = b1 * a1 * biomarker + (a0 + b2 * a1) * velocity +
+      forcing * a1;
+    biomarker = new_m;
+    velocity = new_v;
+    return;
+  }
+
+  Type m = b2 * dt * Type(0.5);
   Type s2 = D * dt * dt * Type(0.25);  // delta^2 or -omega^2
 
   // Taylor expansion in s2 (valid for both D>0 and D<0 near D=0)

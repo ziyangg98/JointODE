@@ -9,7 +9,7 @@ diagnose(
   data,
   time = "time",
   id = "id",
-  hessian_condition = 1e+10,
+  q_threshold = NULL,
   verbose = TRUE
 )
 }
@@ -22,8 +22,9 @@ diagnose(
 
 \item{id}{Name of the subject ID variable.}
 
-\item{hessian_condition}{Maximum allowed mixed posterior Hessian condition
-number. Defaults to \code{1e10}.}
+\item{q_threshold}{Optional minimum subject-level dynamic information ratio.
+When supplied, filtering uses only \code{q_i >= q_threshold}; Hessian
+diagnostics are still reported but do not determine \code{keep_ids}.}
 
 \item{verbose}{Whether to print progress.}
 }
@@ -32,5 +33,5 @@ A \code{JointODEDiagnose} object.
 }
 \description{
 Fits the second-order ODE separately for each subject and diagnoses
-identifiability from the mixed posterior Hessian.
+identifiability from the subject-level dynamic information ratio.
 }

@@ -133,7 +133,11 @@ JointODE <- function(
     parsed_surv = parsed_surv
   )
   scales <- list(time = .estimate_time_scale(data_list))
-  data_fit <- .scale_data_time(data_list, scales$time)
+  data_fit <- lapply(data_list, function(d) {
+    d$longitudinal$times <- d$longitudinal$times / scales$time
+    d$time <- d$time / scales$time
+    d
+  })
 
   # Initialize parameters
   model_config <- .setup_model(
@@ -184,13 +188,12 @@ JointODE <- function(
   # (prevents inner Newton divergence when init = "default")
   cf <- parameters$coefficients
   if (is.null(cf$initial_state)) {
-    cf$initial_state <- c(mean(all_y), 0)
+    cf$initial_state <- mean(all_y)
   }
   if (is.null(cf$measurement_error_sd)) {
     cf$measurement_error_sd <- sd(all_y)
   }
-  if (default_init && is.finite(scales$time) &&
-    scales$time > 0 && scales$time != 1) {
+  if (default_init) {
     idx <- 1L
     if (parsed_long$biomarker$fixed) {
       cf$longitudinal[idx] <- -2 * log(scales$time)
@@ -219,9 +222,47 @@ JointODE <- function(
       nrow = length(data_list), ncol = n_re
     )
   }
-  parameters_fit <- .prepare_joint_time_scale(
-    parameters, parsed_long, scales$time, gamma
+  parameters_fit <- parameters
+  idx <- 1L
+  if (parsed_long$biomarker$fixed) {
+    parameters_fit$coefficients$longitudinal[idx] <-
+      parameters_fit$coefficients$longitudinal[idx] + 2 * log(scales$time)
+    idx <- idx + 1L
+  }
+  if (parsed_long$velocity$fixed) {
+    parameters_fit$coefficients$longitudinal[idx] <-
+      parameters_fit$coefficients$longitudinal[idx] + log(scales$time)
+    idx <- idx + 1L
+  }
+  if (idx <= length(parameters_fit$coefficients$longitudinal)) {
+    parameters_fit$coefficients$longitudinal[
+      idx:length(parameters_fit$coefficients$longitudinal)
+    ] <- parameters_fit$coefficients$longitudinal[
+      idx:length(parameters_fit$coefficients$longitudinal)
+    ] * scales$time^2
+  }
+  parameters_fit$coefficients$baseline <-
+    parameters_fit$coefficients$baseline + log(scales$time)
+  if (length(parameters_fit$coefficients$hazard) >= 2) {
+    parameters_fit$coefficients$hazard[2] <-
+      parameters_fit$coefficients$hazard[2] / scales$time^gamma
+  }
+  re_scale <- rep(1, ncol(parameters_fit$random_effects_init))
+  forcing_start <- 2L + sum(
+    parsed_long$biomarker$random, parsed_long$velocity$random
   )
+  if (forcing_start <= length(re_scale)) {
+    re_scale[forcing_start:length(re_scale)] <- scales$time^2
+  }
+  parameters_fit$random_effects_init <- sweep(
+    parameters_fit$random_effects_init, 2, re_scale, `*`
+  )
+  parameters_fit$coefficients$random_effect_sigma <-
+    parameters_fit$coefficients$random_effect_sigma * outer(re_scale, re_scale)
+  bc <- parameters_fit$configurations$baseline
+  bc$knots <- bc$knots / scales$time
+  bc$boundary_knots <- bc$boundary_knots / scales$time
+  parameters_fit$configurations$baseline <- bc
 
   if (control$verbose > 0) {
     cli::cli_h2("Joint ODE Model Estimation (TMB)")
@@ -252,9 +293,53 @@ JointODE <- function(
   dimnames(sigma_b) <- list(re_nms, re_nms)
   results$parameters$coefficients$random_effect_sigma <- sigma_b
   colnames(results$random_effects) <- re_nms
-  results <- .restore_joint_time_scale(
-    results, parsed_long, scales$time, gamma
+  cf <- results$parameters$coefficients
+  cf$baseline <- cf$baseline - log(scales$time)
+  if (length(cf$hazard) >= 2) cf$hazard[2] <- cf$hazard[2] * scales$time^gamma
+  idx <- 1L
+  if (parsed_long$biomarker$fixed) {
+    cf$longitudinal[idx] <- cf$longitudinal[idx] - 2 * log(scales$time)
+    idx <- idx + 1L
+  }
+  if (parsed_long$velocity$fixed) {
+    cf$longitudinal[idx] <- cf$longitudinal[idx] - log(scales$time)
+    idx <- idx + 1L
+  }
+  if (idx <= length(cf$longitudinal)) {
+    cf$longitudinal[idx:length(cf$longitudinal)] <-
+      cf$longitudinal[idx:length(cf$longitudinal)] / scales$time^2
+  }
+  re_scale <- rep(1, ncol(results$random_effects))
+  forcing_start <- 2L + sum(
+    parsed_long$biomarker$random, parsed_long$velocity$random
   )
+  if (forcing_start <= length(re_scale)) {
+    re_scale[forcing_start:length(re_scale)] <- 1 / scales$time^2
+  }
+  results$random_effects <- sweep(results$random_effects, 2, re_scale, `*`)
+  cf$random_effect_sigma <- cf$random_effect_sigma * outer(re_scale, re_scale)
+  n_baseline <- length(cf$baseline)
+  n_hazard <- length(cf$hazard)
+  n_long <- length(cf$longitudinal)
+  long_scale <- rep(1 / scales$time^2, n_long)
+  idx <- 1L
+  if (parsed_long$biomarker$fixed) {
+    long_scale[idx] <- 1
+    idx <- idx + 1L
+  }
+  if (parsed_long$velocity$fixed) long_scale[idx] <- 1
+  vcov_scale <- c(
+    rep(1, n_baseline),
+    c(1, scales$time^gamma, rep(1, max(0, n_hazard - 2L))),
+    long_scale,
+    1
+  )
+  results$vcov <- results$vcov * outer(vcov_scale, vcov_scale)
+  bc <- results$parameters$configurations$baseline
+  bc$knots <- bc$knots * scales$time
+  bc$boundary_knots <- bc$boundary_knots * scales$time
+  results$parameters$configurations$baseline <- bc
+  results$parameters$coefficients <- cf
 
   structure(c(results, list(
     data = data_list, control = control, call = cl,

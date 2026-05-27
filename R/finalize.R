@@ -6,6 +6,8 @@
   obj$fn(opt$par)
   reported <- obj$report()
   par <- obj$env$parList()
+  gradient <- obj$gr(opt$par)
+  max_abs_gradient <- suppressWarnings(max(abs(gradient), na.rm = TRUE))
 
   longitudinal <- as.numeric(par$longitudinal)
   names(longitudinal) <- coef_names$longitudinal
@@ -35,12 +37,15 @@
     BIC = -2 * loglik + n_total_params * log(n_subjects),
     vcov = vcov_matrix,
     random_effects = random_effects,
+    max_abs_gradient = max_abs_gradient,
     convergence = list(
       converged = converged,
       iterations = opt$iterations,
       message = sprintf(
-        "%s (%s)",
-        if (converged) "Converged" else "Did not converge", opt$message
+        "%s (%s; max |gradient| = %.3g)",
+        if (converged) "Converged" else "Did not converge",
+        opt$message,
+        max_abs_gradient
       )
     )
   )

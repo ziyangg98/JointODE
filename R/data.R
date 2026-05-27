@@ -29,11 +29,10 @@
 #'           \item w1, w2: Survival covariates
 #'         }
 #'       }
-#'       \item{random_effects}{Matrix (200 x 5) with subject-specific
+#'       \item{random_effects}{Matrix (200 x 4) with subject-specific
 #'         random effects:
 #'         \itemize{
 #'           \item initial_biomarker: Initial biomarker value
-#'           \item initial_velocity: Initial velocity
 #'           \item log_omega2: Random effect on \eqn{\log \omega_i^2}
 #'           \item log_2xi_omega: Random effect on
 #'             \eqn{\log(2\xi_i\omega_i)}
@@ -53,8 +52,8 @@
 #'             survival covariate effects
 #'           \item measurement_error_sd: Measurement error SD (0.1)
 #'           \item random_effect_sigma: 4x4 covariance matrix for
-#'             random effects (initial_biomarker, initial_velocity,
-#'             omega, xi)
+#'             random effects (initial_biomarker, log_omega2,
+#'             log_2xi_omega, forcing intercept)
 #'         }
 #'       }
 #'       \item{configurations}{Model configuration:

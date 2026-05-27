@@ -31,13 +31,14 @@ second-order ODE:
 
 $$\ddot{m}_i(t) + 2 \xi_i \omega_i \dot{m}_i(t) + \omega_i^2 m_i(t) = f_i(t)$$
 
-with initial conditions $m_i(0) = m_{0,i}$ and $\dot{m}_i(0) = v_{0,i}$,
-where $\omega_i$ is the natural frequency, $\xi_i$ is the damping ratio,
-and $f_i(t)$ is covariate-driven forcing. Stability ($\omega > 0$,
-$\xi > 0$) is enforced by estimating $\log(\omega^2)$ and
-$\log(2\xi\omega)$. Individual heterogeneity is captured through random
-effects on initial states $(m_{0,i}, v_{0,i})$ and multiplicative random
-effects on ODE parameters.
+with $m_i(0) = m_{0,i}$ and a quasi-steady initial velocity
+$\dot{m}_i(0)=\{f_i(0)-\omega_i^2m_{0,i}\}/(2\xi_i\omega_i)$. Here
+$\omega_i$ is the natural frequency, $\xi_i$ is the damping ratio, and
+$f_i(t)$ is covariate-driven forcing. The dynamic parameters are
+estimated on log-coefficient scales: `biomarker` is $\log \omega_i^2$
+and `velocity` is $\log(2\xi_i\omega_i)$. Individual heterogeneity is
+captured through random effects on initial biomarker level, ODE
+parameters, and optional forcing terms.
 
 **Survival Model:** The hazard function incorporates biomarker dynamics:
 
@@ -74,10 +75,10 @@ Here’s a basic example using the included simulated dataset:
 
 ``` r
 library(JointODE)
-#> 
+#>
 #> Attaching package: 'JointODE'
 #> The following object is masked from 'package:stats':
-#> 
+#>
 #>     simulate
 
 # Load example dataset (200 subjects with longitudinal and survival data)
@@ -90,83 +91,87 @@ longitudinal_data <- sim$data$longitudinal_data[
 t0 <- proc.time()
 fit <- JointODE(
   longitudinal_formula = observed ~ biomarker + velocity + x1 + x2 +
-    (biomarker + velocity | id),
+    (1 + biomarker + velocity | id),
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = longitudinal_data,
   survival_data = sim$data$survival_data,
   init = "marginal"
 )
 cat(sprintf("Elapsed: %.1f s\n", (proc.time() - t0)["elapsed"]))
-#> Elapsed: 450.5 s
+#> Elapsed: 87.2 s
 ```
 
 ``` r
 # Model summary
 summary(fit)
-#> 
+#>
 #> Call:
-#> JointODE(longitudinal_formula = observed ~ biomarker + velocity + 
-#>     x1 + x2 + (biomarker + velocity | id), survival_formula = Surv(time, 
-#>     status) ~ w1 + w2, longitudinal_data = longitudinal_data, 
+#> JointODE(longitudinal_formula = observed ~ biomarker + velocity +
+#>     x1 + x2 + (1 + biomarker + velocity | id), survival_formula = Surv(time,
+#>     status) ~ w1 + w2, longitudinal_data = longitudinal_data,
 #>     survival_data = sim$data$survival_data, init = "marginal")
-#> 
+#>
 #> Data Descriptives:
 #> Longitudinal Process            Survival Process
-#> Number of Observations: 17319   Number of Events: 58 (29%)
+#> Number of Observations: 16894   Number of Events: 67 (34%)
 #> Number of Subjects: 200
-#> 
+#>
 #>        AIC        BIC     logLik
-#> -28900.821 -28815.064  14476.410
-#> 
+#> -26764.725 -26682.267  13407.362
+#>
 #> Coefficients:
 #> Longitudinal Process: Second-Order ODE Model
-#>               Estimate Std. Error  z value Pr(>|z|)    
-#> log_omega2      0.0872     0.0075   11.644   <2e-16 ***
-#> log_2xi_omega  -0.1907     0.0202   -9.450   <2e-16 ***
-#> (Intercept)    -0.0013     0.0015   -0.844    0.399    
-#> x1              0.5477     0.0040  136.034   <2e-16 ***
-#> x2             -0.4909     0.0037 -131.452   <2e-16 ***
+#>               Estimate Std. Error z value Pr(>|z|)
+#> log_omega2      0.0949     0.0225   4.212 2.53e-05 ***
+#> log_2xi_omega  -0.1369     0.0236  -5.793 6.93e-09 ***
+#> (Intercept)    -0.0158     0.0146  -1.083    0.279
+#> x1              0.5380     0.0165  32.652  < 2e-16 ***
+#> x2             -0.4830     0.0152 -31.780  < 2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#> 
+#>
 #> ODE System Characteristics:
-#>                           Estimate Std. Error z value Pr(>|z|)    
-#> omega (natural frequency)   1.0446     0.0039  267.04   <2e-16 ***
-#> xi (damping ratio)          0.3955     0.0078   50.67   <2e-16 ***
+#>                           Estimate Std. Error z value Pr(>|z|)
+#> omega (natural frequency)   1.0486     0.0118   88.76   <2e-16 ***
+#> xi (damping ratio)          0.4158     0.0100   41.55   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#> 
+#>
 #> Survival Process: Proportional Hazards Model
-#>          Estimate Std. Error z value Pr(>|z|)    
-#> value      0.9475     0.2138   4.432 9.35e-06 ***
-#> velocity   2.1034     0.6429   3.272 0.001070 ** 
-#> w1         0.7079     0.1358   5.211 1.88e-07 ***
-#> w2        -0.9126     0.2759  -3.308 0.000941 ***
+#>          Estimate Std. Error z value Pr(>|z|)
+#> value      0.7728     0.1808   4.273 1.93e-05 ***
+#> velocity   1.7008     0.3848   4.420 9.85e-06 ***
+#> w1         0.6337     0.1464   4.329 1.49e-05 ***
+#> w2        -0.9578     0.2672  -3.585 0.000337 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#> 
+#>
 #> Baseline Hazard: B-spline with 4 basis functions
-#> (Coefficients range: [-4.705, -2.446] )
-#> 
+#> (Coefficients range: [-5.253, -2.394] )
+#>
 #> Initial State: Population Mean
-#>                   Estimate Std. Error z value Pr(>|z|)    
-#> initial_biomarker  -0.4988     0.0073  -68.47   <2e-16 ***
-#> initial_velocity   -0.1012     0.0093  -10.90   <2e-16 ***
+#>                   Estimate Std. Error z value Pr(>|z|)
+#> initial_biomarker  -0.5016     0.0075  -66.98   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#> 
+#>
 #> Variance Components:
-#> Measurement Error SD: 0.099369
+#> Measurement Error SD: 0.099662
 #> Random Effect Covariance Matrix:
-#>                   initial_biomarker initial_velocity log_omega2 log_2xi_omega
-#> initial_biomarker         0.0083456        0.0008110  0.0002327     0.0008118
-#> initial_velocity          0.0008110        0.0094564  0.0001412     0.0006467
-#> log_omega2                0.0002327        0.0001412  0.0017059    -0.0004349
-#> log_2xi_omega             0.0008118        0.0006467 -0.0004349     0.0514761
-#> 
+#>                     initial_biomarker log_omega2 log_2xi_omega
+#> initial_biomarker           0.0087971  -0.006464     0.0001618
+#> log_omega2                 -0.0064640   0.075953     0.0070495
+#> log_2xi_omega               0.0001618   0.007049     0.0862564
+#> forcing_(Intercept)         0.0012301   0.001358     0.0043238
+#>                     forcing_(Intercept)
+#> initial_biomarker              0.001230
+#> log_omega2                     0.001358
+#> log_2xi_omega                  0.004324
+#> forcing_(Intercept)            0.034458
+#>
 #> Model Diagnostics:
-#> C-index (Concordance): 0.616
-#> Convergence: Converged (outer parameter convergence; last M-step: relative convergence (4))
+#> C-index (Concordance): 0.631
+#> Convergence: Converged (relative convergence (4))
 
 # Plot results
 plot(fit)
@@ -176,12 +181,10 @@ plot(fit)
 
 The formula uses two reserved keywords (not data columns):
 
-- **`biomarker`**: includes the frequency parameter $\omega^2$ in the
-  ODE ($b_1 m(t)$ term)
-- **`velocity`**: includes the damping parameter $2\xi\omega$ in the ODE
-  ($b_2 \dot{m}(t)$ term)
-- **`(biomarker + velocity | id)`**: adds subject-specific
-  multiplicative random effects on these ODE parameters
+- **`biomarker`**: includes the latent $\log \omega_i^2$ parameter
+- **`velocity`**: includes the latent $\log(2\xi_i\omega_i)$ parameter
+- **`(1 + biomarker + velocity | id)`**: adds a subject-specific forcing
+  intercept and random effects on these ODE parameters
 - **`x1`, `x2`**: standard covariates driving the forcing function
   $f(t)$
 

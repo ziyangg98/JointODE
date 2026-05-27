@@ -21,13 +21,15 @@
 #'     \item{period}{Natural period \eqn{T} of oscillation in time units,
 #'       related to natural frequency as \eqn{\omega = 2\pi/T}.
 #'       Specified as c(mean = ..., sd = ...) for population mean and
-#'       standard deviation. Default: c(mean = 6, sd = 0.1)}
+#'       standard deviation. Default: c(mean = 6, sd = 0.8)}
 #'     \item{excitation}{List specifying external forcing parameters:
 #'       \describe{
 #'         \item{offset}{Constant excitation term \eqn{f_0} (default: 0.0)}
 #'         \item{covariates}{Named vector of covariate effects
 #'           \eqn{\boldsymbol{\beta}_{exc}} on excitation
 #'           (default: c(x1 = 0.5, x2 = -0.45))}
+#'         \item{random_intercept_sd}{Standard deviation of subject-specific
+#'           forcing intercepts (default: 0.2)}
 #'       }
 #'     }
 #'     \item{initial}{List specifying initial condition parameters:
@@ -35,9 +37,6 @@
 #'         \item{biomarker}{Population distribution of initial biomarker value
 #'           \eqn{m_i(0)}, specified as \code{c(mean = ..., sd = ...)}.
 #'           (default: c(mean = -0.5, sd = 0.1))}
-#'         \item{velocity}{Population distribution of initial velocity
-#'           \eqn{\dot{m}_i(0)}, specified as \code{c(mean = ..., sd = ...)}.
-#'           (default: c(mean = -0.1, sd = 0.1))}
 #'       }
 #'     }
 #'     \item{error_sd}{Standard deviation \eqn{\sigma_{\epsilon}} of the
@@ -117,11 +116,11 @@
 #'         Baseline survival covariates (if specified)
 #'     }
 #'   }
-#'   \item{\code{random_effects}}{An \eqn{n \times 5} matrix of
+#'   \item{\code{random_effects}}{An \eqn{n \times 4} matrix of
 #'     subject-specific random effects (centered at zero). Columns
-#'     \code{initial_biomarker} and \code{initial_velocity} capture initial
-#'     state variability; \code{log_omega2} and \code{log_2xi_omega} capture
-#'     latent ODE parameter variability; \code{forcing_(Intercept)} matches the
+#'     \code{initial_biomarker} captures initial state variability;
+#'     \code{log_omega2} and \code{log_2xi_omega} capture latent ODE
+#'     parameter variability; \code{forcing_(Intercept)} matches the
 #'     lme-style random intercept in \code{(biomarker + velocity | id)}.}
 #'   }}
 #'   \item{\code{init}}{A list of initial parameter values suitable for
@@ -165,11 +164,12 @@
 #'           excitation
 #' }
 #'
-#' Initial conditions are drawn from population distributions:
+#' The initial biomarker is drawn from a population distribution:
 #' \itemize{
 #'   \item \eqn{m_i(0) \sim \mathcal{N}(\mu_{m,0}, \sigma_{m,0}^2)}
-#'   \item \eqn{\dot{m}_i(0) \sim \mathcal{N}(\mu_{v,0}, \sigma_{v,0}^2)}
 #' }
+#' The initial velocity is derived from the quasi-steady balance
+#' \eqn{\ddot{m}_i(0) \approx 0}.
 #'
 #' The observed longitudinal measurements incorporate additive Gaussian noise:
 #' \deqn{y_{ij} = m_i(t_{ij}) + b_i + \epsilon_{ij}}
@@ -237,10 +237,12 @@
 #'   longitudinal = list(
 #'     xi = c(mean = 0.5, sd = 0.1),
 #'     period = c(mean = 8, sd = 1),
-#'     excitation = list(offset = 4.0, covariates = c(x1 = 0.8, x2 = -0.5)),
+#'     excitation = list(
+#'       offset = 4.0, covariates = c(x1 = 0.8, x2 = -0.5),
+#'       random_intercept_sd = 0.2
+#'     ),
 #'     initial = list(
-#'       biomarker = c(mean = 3.8, sd = 0.2),
-#'       velocity = c(mean = -0.1, sd = 0.1)
+#'       biomarker = c(mean = 3.8, sd = 0.2)
 #'     ),
 #'     error_sd = 0.1,
 #'     n_measurements = 20
@@ -264,14 +266,14 @@ simulate <- function(
   n_subjects = 500,
   longitudinal = list(
     xi = c(mean = 0.4, sd = 0.1),
-    period = c(mean = 6, sd = 0.1),
+    period = c(mean = 6, sd = 0.8),
     excitation = list(
       offset = 0.0,
-      covariates = c(x1 = 0.5, x2 = -0.45)
+      covariates = c(x1 = 0.5, x2 = -0.45),
+      random_intercept_sd = 0.2
     ),
     initial = list(
-      biomarker = c(mean = -0.5, sd = 0.1),
-      velocity = c(mean = -0.1, sd = 0.1)
+      biomarker = c(mean = -0.5, sd = 0.1)
     ),
     error_sd = 0.1,
     n_measurements = 100
@@ -350,23 +352,24 @@ simulate <- function(
       longitudinal$excitation$covariates
     ) &&
       is.vector(longitudinal$excitation$covariates),
+    "excitation$random_intercept_sd must be non-negative" =
+      is.null(longitudinal$excitation$random_intercept_sd) ||
+        longitudinal$excitation$random_intercept_sd >= 0,
     "longitudinal$initial must be a list" = is.list(longitudinal$initial),
     "initial$biomarker must have mean and sd" =
       length(longitudinal$initial$biomarker) == 2 &&
         all(c("mean", "sd") %in% names(longitudinal$initial$biomarker)),
-    "initial$velocity must have mean and sd" =
-      length(longitudinal$initial$velocity) == 2 &&
-        all(c("mean", "sd") %in% names(longitudinal$initial$velocity)),
     "initial$biomarker sd must be non-negative" =
-      longitudinal$initial$biomarker["sd"] >= 0,
-    "initial$velocity sd must be non-negative" =
-      longitudinal$initial$velocity["sd"] >= 0
+      longitudinal$initial$biomarker["sd"] >= 0
   )
 
   # Handle empty covariates (convert numeric(0) to named numeric vector)
   if (length(longitudinal$excitation$covariates) == 0) {
     longitudinal$excitation$covariates <- numeric(0)
     names(longitudinal$excitation$covariates) <- character(0)
+  }
+  if (is.null(longitudinal$excitation$random_intercept_sd)) {
+    longitudinal$excitation$random_intercept_sd <- 0
   }
 
   if (length(survival$covariates) == 0) {
@@ -454,7 +457,9 @@ simulate <- function(
   x_long <- x[, c("id", long_cov_names), drop = FALSE]
   x_surv <- x[, c("id", surv_cov_names), drop = FALSE]
 
-  init <- .compute_initial_states(n_subjects, longitudinal$initial)
+  init <- .compute_initial_states(
+    n_subjects, longitudinal$initial, dynamics, x_long
+  )
 
   surv <- .generate_survival_data(
     x_surv,
@@ -482,19 +487,12 @@ simulate <- function(
 
   dyn_re <- sweep(attr(dynamics, "latent"), 2, attr(dynamics, "mu_tmb"))
 
-  # Initial state random effects: deviations from mean
-  init_final <- as.matrix(init[, c("biomarker", "velocity")])
-  state_means <- c(
-    longitudinal$initial$biomarker["mean"],
-    longitudinal$initial$velocity["mean"]
-  )
-  state_re <- sweep(init_final, 2, state_means)
-
-  forcing_re <- matrix(0, nrow = n_subjects, ncol = 1)
-  random_effects <- cbind(state_re, dyn_re, forcing_re)
+  state_re <- init$biomarker - longitudinal$initial$biomarker["mean"]
+  forcing_re <- matrix(attr(dynamics, "forcing_re"), nrow = n_subjects, ncol = 1)
+  random_effects <- cbind(initial_biomarker = state_re, dyn_re, forcing_re)
   colnames(random_effects) <- c(
-    "initial_biomarker", "initial_velocity",
-    "log_omega2", "log_2xi_omega", "forcing_(Intercept)"
+    "initial_biomarker", "log_omega2", "log_2xi_omega",
+    "forcing_(Intercept)"
   )
   list(
     longitudinal_data = long_data,
@@ -561,14 +559,18 @@ simulate <- function(
     eval(coef_args$survival$slope),
     eval(coef_args$survival$covariates)
   )
-  # Full random effect sigma: [state(2), dynamics(2), forcing intercept]
+  # Full random effect sigma: [initial biomarker, dynamics(2), forcing intercept]
   n_coef_re <- nrow(random_effect_sigma)
-  n_re_total <- n_coef_re + 3
+  n_re_total <- n_coef_re + 2
   full_sigma <- matrix(0, n_re_total, n_re_total)
   full_sigma[1, 1] <- long_params$initial$biomarker["sd"]^2
-  full_sigma[2, 2] <- long_params$initial$velocity["sd"]^2
-  full_sigma[3:(n_re_total - 1), 3:(n_re_total - 1)] <- random_effect_sigma
-  full_sigma[n_re_total, n_re_total] <- 1e-4
+  full_sigma[2:(n_re_total - 1), 2:(n_re_total - 1)] <- random_effect_sigma
+  full_sigma[n_re_total, n_re_total] <-
+    long_params$excitation$random_intercept_sd^2
+  dimnames(full_sigma) <- list(
+    c("initial_biomarker", names(dynamics_params$mu_tmb), "forcing_(Intercept)"),
+    c("initial_biomarker", names(dynamics_params$mu_tmb), "forcing_(Intercept)")
+  )
 
   parameters <- list(
     coefficients = list(
@@ -576,8 +578,7 @@ simulate <- function(
       hazard = hazard_coef,
       longitudinal = longitudinal_coef,
       initial_state = c(
-        biomarker = unname(long_params$initial$biomarker["mean"]),
-        velocity = unname(long_params$initial$velocity["mean"])
+        biomarker = unname(long_params$initial$biomarker["mean"])
       ),
       measurement_error_sd = eval(coef_args$longitudinal$error_sd),
       random_effect_sigma = full_sigma
@@ -694,20 +695,27 @@ simulate <- function(
   )
   colnames(random_effects) <- names(params$mu)
 
+  forcing_re <- rnorm(n_subjects, 0, excitation$random_intercept_sd)
   dynamics <- data.frame(id = seq_len(n_subjects), random_effects)
+  dynamics$dyn_offset <- dynamics$dyn_offset + forcing_re
   attr(dynamics, "mu") <- params$mu
   attr(dynamics, "mu_tmb") <- params$mu_tmb
   attr(dynamics, "sigma") <- params$sigma
   attr(dynamics, "latent") <- samples
+  attr(dynamics, "forcing_re") <- forcing_re
   dynamics
 }
 
-.compute_initial_states <- function(n, initial) {
-  data.frame(
-    id = seq_len(n),
-    biomarker = rnorm(n, initial$biomarker["mean"], initial$biomarker["sd"]),
-    velocity = rnorm(n, initial$velocity["mean"], initial$velocity["sd"])
-  )
+.compute_initial_states <- function(n, initial, dynamics, covariates) {
+  biomarker <- rnorm(n, initial$biomarker["mean"], initial$biomarker["sd"])
+  velocity <- numeric(n)
+  for (i in seq_len(n)) {
+    dyn <- as.numeric(dynamics[i, names(dynamics) != "id"])
+    x <- as.numeric(covariates[i, names(covariates) != "id"])
+    forcing <- dyn[3] + sum(dyn[-(1:3)] * x)
+    velocity[[i]] <- (forcing + dyn[1] * biomarker[[i]]) / (-dyn[2])
+  }
+  data.frame(id = seq_len(n), biomarker = biomarker, velocity = velocity)
 }
 
 .solve_biomarker_ode <- function(times, covariates, init, dynamics) {

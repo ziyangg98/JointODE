@@ -215,15 +215,6 @@
     )
   }
 
-  reserved_in_data <- intersect(.reserved_words, names(data))
-  if (length(reserved_in_data) > 0) {
-    stop(
-      "Reserved words cannot be used as variable names in data: ",
-      paste(reserved_in_data, collapse = ", "),
-      call. = FALSE
-    )
-  }
-
   all_vars <- all.vars(formula)
   reserved_in_formula <- intersect(.reserved_words, all_vars)
   vars_to_check <- setdiff(all_vars, reserved_in_formula)
@@ -573,47 +564,27 @@
         stop("init$configurations$baseline: must be a list", call. = FALSE)
       }
     }
-    if (!is.null(init$configurations$omega)) {
-      if (!is.list(init$configurations$omega)) {
-        stop("init$configurations$omega: must be a list", call. = FALSE)
+    for (nm in c("biomarker", "velocity")) {
+      if (is.null(init$configurations[[nm]])) next
+      if (!is.list(init$configurations[[nm]])) {
+        stop(sprintf("init$configurations$%s: must be a list", nm), call. = FALSE)
       }
-      if (
-        !all(c("fixed", "random") %in% names(init$configurations$omega))
-      ) {
+      if (!all(c("fixed", "random") %in% names(init$configurations[[nm]]))) {
         stop(
-          paste0(
-            "init$configurations$omega: ",
-            "must have 'fixed' and 'random' fields"
+          sprintf(
+            "init$configurations$%s: must have 'fixed' and 'random' fields",
+            nm
           ),
           call. = FALSE
         )
       }
-      if (
-        !is.logical(init$configurations$omega$fixed) ||
-          !is.logical(init$configurations$omega$random)
-      ) {
+      if (!is.logical(init$configurations[[nm]]$fixed) ||
+        !is.logical(init$configurations[[nm]]$random)) {
         stop(
-          "init$configurations$omega: 'fixed' and 'random' must be logical",
-          call. = FALSE
-        )
-      }
-    }
-    if (!is.null(init$configurations$xi)) {
-      if (!is.list(init$configurations$xi)) {
-        stop("init$configurations$xi: must be a list", call. = FALSE)
-      }
-      if (!all(c("fixed", "random") %in% names(init$configurations$xi))) {
-        stop(
-          "init$configurations$xi: must have 'fixed' and 'random' fields",
-          call. = FALSE
-        )
-      }
-      if (
-        !is.logical(init$configurations$xi$fixed) ||
-          !is.logical(init$configurations$xi$random)
-      ) {
-        stop(
-          "init$configurations$xi: 'fixed' and 'random' must be logical",
+          sprintf(
+            "init$configurations$%s: 'fixed' and 'random' must be logical",
+            nm
+          ),
           call. = FALSE
         )
       }

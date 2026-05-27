@@ -14,10 +14,10 @@ Type diagnose_ode_nll(objective_function<Type>* obj) {
   PARAMETER_VECTOR(theta);
 
   Type m = theta(0);
-  Type v = theta(1);
-  Type b1 = -exp(theta(2));
-  Type b2 = -exp(theta(3));
-  Type forcing = theta(4);
+  Type b1 = -exp(theta(1));
+  Type b2 = -exp(theta(2));
+  Type forcing = theta(3);
+  Type v = (forcing + b1 * m) / (-b2);
 
   int n = y.size();
   Type nll(0);

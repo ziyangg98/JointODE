@@ -33,7 +33,13 @@ JointODE models biomarker evolution using **ordinary differential equations** (O
 
 $$\ddot{m}_i(t) + 2 \xi_i \omega_i \dot{m}_i(t) + \omega_i^2 m_i(t) = f_i(t)$$
 
-with initial conditions $m_i(0) = m_{0,i}$ and $\dot{m}_i(0) = v_{0,i}$, where $\omega_i$ is the natural frequency, $\xi_i$ is the damping ratio, and $f_i(t)$ is covariate-driven forcing. The dynamic parameters are estimated on log-coefficient scales: `biomarker` is $\log \omega_i^2$ and `velocity` is $\log(2\xi_i\omega_i)$. Individual heterogeneity is captured through random effects on initial states $(m_{0,i}, v_{0,i})$ and ODE parameters.
+with $m_i(0) = m_{0,i}$ and a quasi-steady initial velocity
+$\dot{m}_i(0)=\{f_i(0)-\omega_i^2m_{0,i}\}/(2\xi_i\omega_i)$.
+Here $\omega_i$ is the natural frequency, $\xi_i$ is the damping ratio, and
+$f_i(t)$ is covariate-driven forcing. The dynamic parameters are estimated on
+log-coefficient scales: `biomarker` is $\log \omega_i^2$ and `velocity` is
+$\log(2\xi_i\omega_i)$. Individual heterogeneity is captured through random
+effects on initial biomarker level, ODE parameters, and optional forcing terms.
 
 **Survival Model:** The hazard function incorporates biomarker dynamics:
 
@@ -75,7 +81,7 @@ longitudinal_data <- sim$data$longitudinal_data[
 t0 <- proc.time()
 fit <- JointODE(
   longitudinal_formula = observed ~ biomarker + velocity + x1 + x2 +
-    (biomarker + velocity | id),
+    (1 + biomarker + velocity | id),
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = longitudinal_data,
   survival_data = sim$data$survival_data,
@@ -96,7 +102,7 @@ The formula uses two reserved keywords (not data columns):
 
 - **`biomarker`**: includes the latent $\log \omega_i^2$ parameter
 - **`velocity`**: includes the latent $\log(2\xi_i\omega_i)$ parameter
-- **`(biomarker + velocity | id)`**: adds subject-specific random effects on these ODE parameters
+- **`(1 + biomarker + velocity | id)`**: adds a subject-specific forcing intercept and random effects on these ODE parameters
 - **`x1`, `x2`**: standard covariates driving the forcing function $f(t)$
 
 ## Learn More

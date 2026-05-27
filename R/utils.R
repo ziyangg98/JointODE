@@ -65,106 +65,6 @@
 }
 
 #' @noRd
-.fit_tmb_em <- function(tmb_data, tmb_params, control, map = NULL) {
-  opt_control <- list(
-    iter.max = control$maxit,
-    eval.max = control$maxit,
-    rel.tol = control$tol,
-    trace = as.integer(control$verbose >= 2)
-  )
-  variance_map <- list(
-    log_sd_re = factor(rep(NA, length(tmb_params$log_sd_re))),
-    corr_par = factor(rep(NA, length(tmb_params$corr_par)))
-  )
-  if (!is.null(map) && !is.null(map$corr_par)) {
-    tmb_params$corr_par[is.na(map$corr_par)] <- 0
-    variance_map$corr_par <- map$corr_par
-  }
-
-  previous_fixed <- NULL
-  fixed_change <- Inf
-  for (iter in seq_len(control$maxit)) {
-    if (control$verbose >= 1) {
-      cli::cli_alert_info("Laplace-EM iteration {iter}")
-    }
-    obj <- TMB::MakeADFun(
-      data = tmb_data,
-      parameters = tmb_params,
-      random = "random_effects",
-      map = variance_map,
-      DLL = "JointODE",
-      silent = control$verbose < 3
-    )
-    opt <- stats::nlminb(obj$par, obj$fn, obj$gr, control = opt_control)
-    obj$fn(opt$par)
-    par <- obj$env$parList()
-    fixed <- c(par$longitudinal, par$initial_state, par$log_sigma_e)
-
-    random_effects <- matrix(
-      par$random_effects,
-      nrow = tmb_data$n_subjects,
-      ncol = tmb_data$n_random_effects
-    )
-    sigma_b <- .em_random_effect_sigma(obj, random_effects, tmb_data$n_random_effects)
-    corr <- .pack_correlation_theta(sigma_b, tmb_data$n_random_effects)
-
-    tmb_params$longitudinal <- par$longitudinal
-    tmb_params$initial_state <- par$initial_state
-    tmb_params$log_sigma_e <- par$log_sigma_e
-    tmb_params$random_effects <- random_effects
-    tmb_params$log_sd_re <- corr$log_sd_re
-    tmb_params$corr_par <- corr$corr_par
-    if (!is.null(map) && !is.null(map$corr_par)) {
-      tmb_params$corr_par[is.na(map$corr_par)] <- 0
-    }
-
-    fixed_change <- if (is.null(previous_fixed)) {
-      Inf
-    } else {
-      max(abs(fixed - previous_fixed))
-    }
-    if (control$verbose >= 1) {
-      cli::cli_alert_info(sprintf(
-        "objective = %.4f; fixed change = %.3g",
-        opt$objective, fixed_change
-      ))
-    }
-    if (is.finite(fixed_change) && fixed_change < control$tol) break
-    previous_fixed <- fixed
-  }
-
-  if (is.finite(fixed_change) && fixed_change < control$tol) {
-    opt$convergence <- 0L
-    opt$message <- "EM fixed parameters converged"
-  } else {
-    opt$convergence <- 1L
-    opt$message <- "EM reached the iteration limit"
-  }
-
-  list(obj = obj, opt = opt)
-}
-
-#' @noRd
-.em_random_effect_sigma <- function(obj, random_effects, n_re) {
-  H <- obj$env$spHess(random = TRUE)
-  n_subjects <- nrow(random_effects)
-  sigma_b <- crossprod(random_effects)
-  for (i in seq_len(n_subjects)) {
-    idx <- i + (seq_len(n_re) - 1L) * n_subjects
-    Hi <- as.matrix(H[idx, idx, drop = FALSE])
-    Hi <- (Hi + t(Hi)) / 2
-    sigma_b <- sigma_b + solve(Hi)
-  }
-  sigma_b <- sigma_b / n_subjects
-  sigma_b <- (sigma_b + t(sigma_b)) / 2
-  ev <- eigen(sigma_b, symmetric = TRUE, only.values = TRUE)$values
-  if (min(ev) <= 0 || any(!is.finite(ev))) {
-    sigma_b <- sigma_b + diag(abs(min(ev, na.rm = TRUE)) + 1e-6, n_re)
-  }
-  sigma_b
-}
-
-#' @noRd
 .correlation_map <- function(parsed_long, tmb_params) {
   if (!isTRUE(parsed_long$diagonal)) return(NULL)
   list(corr_par = factor(rep(NA, length(tmb_params$corr_par))))
@@ -183,182 +83,10 @@
   }))
   slope <- median(abs(slopes[is.finite(slopes) & slopes != 0]), na.rm = TRUE)
   scale <- stats::sd(y, na.rm = TRUE) / slope
-  if (is.finite(scale) && scale > 0) scale else 1
-}
-
-#' @noRd
-.scale_data_time <- function(data_list, scale) {
-  if (!is.finite(scale) || scale <= 0 || scale == 1) return(data_list)
-  lapply(data_list, function(d) {
-    d$longitudinal$times <- d$longitudinal$times / scale
-    if (!is.null(d$time)) d$time <- d$time / scale
-    d
-  })
-}
-
-#' @noRd
-.adjust_longitudinal_time_scale <- function(x, parsed_long, scale, to_internal) {
-  if (!is.finite(scale) || scale <= 0 || scale == 1) return(x)
-  direction <- if (to_internal) 1 else -1
-  forcing_mult <- if (to_internal) scale^2 else 1 / scale^2
-  idx <- 1L
-  if (parsed_long$biomarker$fixed) {
-    x[idx] <- x[idx] + direction * 2 * log(scale)
-    idx <- idx + 1L
+  if (!is.finite(scale) || scale <= 0) {
+    stop("Unable to estimate a positive time scale.", call. = FALSE)
   }
-  if (parsed_long$velocity$fixed) {
-    x[idx] <- x[idx] + direction * log(scale)
-    idx <- idx + 1L
-  }
-  if (idx <= length(x)) x[idx:length(x)] <- x[idx:length(x)] * forcing_mult
-  x
-}
-
-#' @noRd
-.random_effect_time_scale <- function(parsed_long, n_re, scale, to_internal) {
-  mult <- rep(1, n_re)
-  if (n_re >= 2) mult[2] <- scale
-  forcing_start <- 3L + sum(
-    parsed_long$biomarker$random, parsed_long$velocity$random
-  )
-  if (forcing_start <= n_re) mult[forcing_start:n_re] <- scale^2
-  if (to_internal) mult else 1 / mult
-}
-
-#' @noRd
-.longitudinal_vcov_time_scale <- function(parsed_long, n_long, scale) {
-  if (!is.finite(scale) || scale <= 0 || scale == 1) return(rep(1, n_long))
-  mult <- rep(1 / scale^2, n_long)
-  idx <- 1L
-  if (parsed_long$biomarker$fixed) {
-    mult[idx] <- 1
-    idx <- idx + 1L
-  }
-  if (parsed_long$velocity$fixed) {
-    mult[idx] <- 1
-    idx <- idx + 1L
-  }
-  mult
-}
-
-#' @noRd
-.prepare_marginal_time_scale <- function(parameters, parsed_long, scale) {
-  if (!is.finite(scale) || scale <= 0 || scale == 1) return(parameters)
-  parameters$coefficients$longitudinal <- .adjust_longitudinal_time_scale(
-    parameters$coefficients$longitudinal, parsed_long, scale, TRUE
-  )
-  parameters$coefficients$initial_state[2] <-
-    parameters$coefficients$initial_state[2] * scale
-
-  re_mult <- .random_effect_time_scale(
-    parsed_long, ncol(parameters$random_effects_init), scale, TRUE
-  )
-  parameters$random_effects_init <- sweep(
-    parameters$random_effects_init, 2, re_mult, `*`
-  )
-  parameters$coefficients$random_effect_sigma <-
-    parameters$coefficients$random_effect_sigma * outer(re_mult, re_mult)
-  parameters
-}
-
-#' @noRd
-.restore_marginal_time_scale <- function(results, parsed_long, scale) {
-  if (!is.finite(scale) || scale <= 0 || scale == 1) return(results)
-  n_long <- length(results$parameters) - 2L
-  long_idx <- seq_len(n_long)
-  init_idx <- n_long + seq_len(2L)
-
-  results$parameters[long_idx] <- .adjust_longitudinal_time_scale(
-    results$parameters[long_idx], parsed_long, scale, FALSE
-  )
-  results$parameters[init_idx[2]] <- results$parameters[init_idx[2]] / scale
-
-  vscale <- c(
-    .longitudinal_vcov_time_scale(parsed_long, n_long, scale),
-    1, 1 / scale
-  )
-  results$vcov <- results$vcov * outer(vscale, vscale)
-
-  re_mult <- .random_effect_time_scale(
-    parsed_long, ncol(results$random_effects), scale, FALSE
-  )
-  results$random_effects <- sweep(results$random_effects, 2, re_mult, `*`)
-  results$random_effect_sigma <-
-    results$random_effect_sigma * outer(re_mult, re_mult)
-  results
-}
-
-#' @noRd
-.prepare_joint_time_scale <- function(parameters, parsed_long, scale, gamma) {
-  parameters <- .prepare_marginal_time_scale(parameters, parsed_long, scale)
-  if (!is.finite(scale) || scale <= 0 || scale == 1) return(parameters)
-  parameters$coefficients$baseline <-
-    parameters$coefficients$baseline + log(scale)
-  if (length(parameters$coefficients$hazard) >= 2) {
-    parameters$coefficients$hazard[2] <-
-      parameters$coefficients$hazard[2] / scale^gamma
-  }
-  bc <- parameters$configurations$baseline
-  bc$knots <- bc$knots / scale
-  bc$boundary_knots <- bc$boundary_knots / scale
-  parameters$configurations$baseline <- bc
-  parameters
-}
-
-#' @noRd
-.restore_joint_time_scale <- function(results, parsed_long, scale, gamma) {
-  if (!is.finite(scale) || scale <= 0 || scale == 1) return(results)
-  cf <- results$parameters$coefficients
-  cf$baseline <- cf$baseline - log(scale)
-  if (length(cf$hazard) >= 2) cf$hazard[2] <- cf$hazard[2] * scale^gamma
-  cf$longitudinal <- .adjust_longitudinal_time_scale(
-    cf$longitudinal, parsed_long, scale, FALSE
-  )
-  cf$initial_state[2] <- cf$initial_state[2] / scale
-
-  re_mult <- .random_effect_time_scale(
-    parsed_long, ncol(results$random_effects), scale, FALSE
-  )
-  cf$random_effect_sigma <- cf$random_effect_sigma * outer(re_mult, re_mult)
-  results$random_effects <- sweep(results$random_effects, 2, re_mult, `*`)
-
-  bc <- results$parameters$configurations$baseline
-  bc$knots <- bc$knots * scale
-  bc$boundary_knots <- bc$boundary_knots * scale
-  results$parameters$configurations$baseline <- bc
-
-  n_baseline <- length(cf$baseline)
-  n_hazard <- length(cf$hazard)
-  n_long <- length(cf$longitudinal)
-  vscale <- c(
-    rep(1, n_baseline),
-    c(1, scale^gamma, rep(1, max(0, n_hazard - 2L))),
-    .longitudinal_vcov_time_scale(parsed_long, n_long, scale),
-    1, 1 / scale
-  )
-  results$vcov <- results$vcov * outer(vscale, vscale)
-  results$parameters$coefficients <- cf
-  results
-}
-
-#' Initialize RE columns 1-2 from first observations
-#' @noRd
-.init_re_from_observations <- function(data_list, m0, v0 = 0, n_re = 2L) {
-  n_subjects <- length(data_list)
-  re <- matrix(0, nrow = n_subjects, ncol = max(n_re, 2L))
-  for (i in seq_along(data_list)) {
-    obs <- data_list[[i]]$longitudinal
-    if (length(obs$measurements) >= 1) {
-      re[i, 1] <- obs$measurements[1] - m0
-    }
-    if (length(obs$measurements) >= 2) {
-      dt <- obs$times[2] - obs$times[1]
-      if (dt > 0) {
-        re[i, 2] <- (obs$measurements[2] - obs$measurements[1]) / dt - v0
-      }
-    }
-  }
-  re
+  scale
 }
 
 #' Build counting process (start, stop, event) from predictions + survival
@@ -401,7 +129,7 @@
 
 .reserved_words <- c("biomarker", "velocity")
 
-.init_state_names <- c("initial_biomarker", "initial_velocity")
+.init_state_names <- "initial_biomarker"
 
 # Formula Parsing ==============================================================
 
@@ -547,7 +275,7 @@
 
   list(
     n_longitudinal_coef = n_longitudinal_fixed + n_ode_fixed,
-    n_random_effects = n_longitudinal_random + n_ode_random + 2,
+    n_random_effects = n_longitudinal_random + n_ode_random + 1,
     n_survival_covariates = n_survival_covariates,
     n_spline_basis = spline_config$degree + spline_config$n_knots + 1,
     spline_config = spline_config
@@ -612,8 +340,33 @@
 #' ODE step via Cayley-Hamilton (sinhc/sinc formulation)
 #' @noRd
 .ode_step_r <- function(m, v, b1, b2, f, dt) {
-  h <- b2 * dt / 2
   D <- b2^2 + 4 * b1
+  if (D > 0 && max(abs(b2 * dt), sqrt(D) * abs(dt)) > 50) {
+    expm1_over_x <- function(x) {
+      if (x^2 < 1e-20) {
+        dt + x * dt^2 / 2 + x^2 * dt^3 / 6
+      } else {
+        (exp(x * dt) - 1) / x
+      }
+    }
+    root_D <- sqrt(D)
+    r_plus <- (b2 + root_D) / 2
+    r_minus <- (b2 - root_D) / 2
+    r_slow <- if (b2 < 0) 2 * b1 / (root_D - b2) else r_minus
+    r_fast <- if (b2 < 0) r_minus else r_plus
+    denom <- r_slow - r_fast
+    e_slow <- exp(r_slow * dt)
+    e_fast <- exp(r_fast * dt)
+    a1 <- (e_slow - e_fast) / denom
+    a0 <- (r_slow * e_fast - r_fast * e_slow) / denom
+    J1 <- (expm1_over_x(r_slow) - expm1_over_x(r_fast)) / denom
+    return(c(
+      a0 * m + a1 * v + f * J1,
+      b1 * a1 * m + (a0 + b2 * a1) * v + f * a1
+    ))
+  }
+
+  h <- b2 * dt / 2
   s2 <- D * dt^2 / 4
 
   if (D >= 0) {
@@ -661,12 +414,11 @@
 
     bi <- re[i, ]
     m <- cf$initial_state[1] + bi[1]
-    v <- cf$initial_state[2] + bi[2]
 
     log_omega2 <- 0
     log_2xi_omega <- 0
     fi <- 1
-    ri <- 3
+    ri <- 2
     if (configs$biomarker$fixed) {
       log_omega2 <- log_omega2 + lc[fi]
       fi <- fi + 1
@@ -688,6 +440,16 @@
     ffs <- fi
     rfs <- ri
 
+    ci0 <- max(1, min(findInterval(0, obs_t), nrow(fcov)))
+    eta0 <- 0
+    if (ncol(fcov) > 0) {
+      eta0 <- eta0 + sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci0, ])
+    }
+    if (ncol(rcov) > 0) {
+      eta0 <- eta0 + sum(bi[rfs:(rfs + ncol(rcov) - 1)] * rcov[ci0, ])
+    }
+    v <- (eta0 - exp(log_omega2) * m) / exp(log_2xi_omega)
+
     bio <- vel <- numeric(n_times)
     prev_t <- 0
 
@@ -697,7 +459,10 @@
       if (dt > 0 && length(obs_t) > 0) {
         ci <- findInterval(prev_t, obs_t)
         ci <- max(1, min(ci, nrow(fcov)))
-        eta <- sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci, ])
+        eta <- 0
+        if (ncol(fcov) > 0) {
+          eta <- eta + sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci, ])
+        }
         if (ncol(rcov) > 0) {
           eta <- eta + sum(bi[rfs:(rfs + ncol(rcov) - 1)] * rcov[ci, ])
         }
@@ -769,12 +534,11 @@
 
     bi <- re[i, ]
     m <- cf$initial_state[1] + bi[1]
-    v <- cf$initial_state[2] + bi[2]
 
     log_omega2 <- 0
     log_2xi_omega <- 0
     fi <- 1
-    ri <- 3
+    ri <- 2
     if (configs$biomarker$fixed) {
       log_omega2 <- log_omega2 + lc[fi]
       fi <- fi + 1
@@ -796,6 +560,16 @@
     ffs <- fi
     rfs <- ri
 
+    ci0 <- max(1, min(findInterval(0, obs_t), nrow(fcov)))
+    eta0 <- 0
+    if (ncol(fcov) > 0) {
+      eta0 <- eta0 + sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci0, ])
+    }
+    if (ncol(rcov) > 0) {
+      eta0 <- eta0 + sum(bi[rfs:(rfs + ncol(rcov) - 1)] * rcov[ci0, ])
+    }
+    v <- (eta0 - exp(log_omega2) * m) / exp(log_2xi_omega)
+
     bio <- vel <- cumhaz <- numeric(n_times)
     ch <- 0
     prev_t <- 0
@@ -806,7 +580,11 @@
       if (dt > 0 && length(obs_t) > 0) {
         ci <- findInterval(prev_t, obs_t)
         ci <- max(1, min(ci, nrow(fcov)))
-        forcing <- sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci, ])
+        forcing <- 0
+        if (ncol(fcov) > 0) {
+          forcing <- forcing +
+            sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci, ])
+        }
         if (ncol(rcov) > 0) {
           forcing <- forcing +
             sum(bi[rfs:(rfs + ncol(rcov) - 1)] * rcov[ci, ])

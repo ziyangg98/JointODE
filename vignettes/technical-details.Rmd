@@ -23,7 +23,12 @@ The true trajectory $m_i(t)$ satisfies a second-order linear ODE:
 
 $$\ddot{m}_i(t) + 2\xi_i\omega_i\,\dot{m}_i(t) + \omega_i^2\,m_i(t) = f_i(t)$$
 
-with initial conditions $m_i(0) = m_{0,i}$ and $\dot{m}_i(0) = v_{0,i}$, where:
+with $m_i(0) = m_{0,i}$. The initial velocity is not estimated independently;
+it is derived from the quasi-steady balance
+
+$$\dot{m}_i(0)=\frac{f_i(0)-\omega_i^2m_{0,i}}{2\xi_i\omega_i}.$$
+
+Here:
 
 - $\omega_i > 0$: natural frequency (controls oscillation speed)
 - $\xi_i > 0$: damping ratio ($\xi < 1$: underdamped oscillation; $\xi > 1$: overdamped monotonic decay; $\xi = 1$: critical damping)
@@ -47,9 +52,9 @@ The formula keywords are `biomarker` for $\theta_{\omega i}$ and `velocity` for 
 
 The complete random effects vector for subject $i$ is:
 
-$$\mathbf{b}_i = \begin{pmatrix} m_{0,i} - \bar{m}_0 \\ v_{0,i} - \bar{v}_0 \\ u_{1,i} \\ u_{2,i} \\ \vdots \end{pmatrix} \sim \mathcal{N}(\mathbf{0}, \boldsymbol{\Sigma}_b)$$
+$$\mathbf{b}_i = \begin{pmatrix} m_{0,i} - \bar{m}_0 \\ u_{1,i} \\ u_{2,i} \\ \vdots \end{pmatrix} \sim \mathcal{N}(\mathbf{0}, \boldsymbol{\Sigma}_b)$$
 
-where the first two components capture initial-state heterogeneity (additive), followed by dynamics RE (multiplicative on log scale), and optional forcing RE.
+where the first component captures initial biomarker heterogeneity (additive), followed by dynamics RE (multiplicative on log scale), and optional forcing RE.
 
 ### 1.3 Survival Sub-Model
 
@@ -79,7 +84,7 @@ p(T_i, \delta_i \mid \mathbf{b}_i) &= \lambda_i(T_i \mid \mathbf{b}_i)^{\delta_i
 p(\mathbf{b}_i) &= \mathcal{N}(\mathbf{0}, \boldsymbol{\Sigma}_b)
 \end{aligned}$$
 
-where $\boldsymbol{\theta}$ collects all fixed parameters: $(\boldsymbol{\eta}, \alpha_\text{value}, \alpha_\text{velocity}, \boldsymbol{\phi}, \theta_1, \theta_2, \boldsymbol{\beta}_X, \bar{m}_0, \bar{v}_0, \sigma_e, \text{vech}(\boldsymbol{\Sigma}_b))$.
+where $\boldsymbol{\theta}$ collects all fixed parameters: $(\boldsymbol{\eta}, \alpha_\text{value}, \alpha_\text{velocity}, \boldsymbol{\phi}, \theta_1, \theta_2, \boldsymbol{\beta}_X, \bar{m}_0, \sigma_e, \text{vech}(\boldsymbol{\Sigma}_b))$.
 
 ## 2. ODE Solver
 
@@ -168,7 +173,7 @@ branch evaluates to a finite value with finite gradient.
 removable singularity at $b_1 = 0$. The limit
 $\lim_{b_1 \to 0} J_1 = \Delta t^2\,\text{expm1c2}(b_2\Delta t)$
 where $\text{expm1c2}(x) = (e^x - 1 - x)/x^2$ is used as a Taylor
-fallback.
+expansion.
 
 ### 2.3 Physical Stability Guarantee
 
@@ -179,13 +184,10 @@ parameter values. This provides:
 - **Bounded trajectories**: Both eigenvalues have negative real parts
   (underdamped: $\text{Re}(\lambda) = b_2/2 < 0$; overdamped:
   $\lambda_{1,2} < 0$ since $\sqrt{D} < |b_2|$), so trajectories
-  decay rather than grow. The factor $e^\mu = e^{b_2\Delta t/2} < 1$
-  prevents overflow in the matrix exponential.
-- **Convex inner optimization**: With stable dynamics, the negative
-  log-likelihood as a function of random effects is unimodal, ensuring
-  the Laplace approximation (Section 3) is valid.
-- **Well-conditioned Hessian**: The inner Hessian eigenvalues remain
-  bounded, enabling fast Newton convergence for the random effects mode.
+  decay rather than grow.
+- **Stable numerical propagation**: The solver uses Taylor expansions
+  near removable singularities and a root-based transition in extreme
+  overdamped cases to avoid overflow in the matrix exponential.
 
 ## 3. Parameter Estimation
 
@@ -212,14 +214,12 @@ The observed information matrix is obtained from the Hessian of the Laplace-appr
 
 $$\text{SE}(\hat{\theta}_k) = \sqrt{[\mathcal{I}(\hat{\boldsymbol{\theta}})^{-1}]_{kk}}$$
 
-### 3.4 Warm Start Strategy
+### 3.4 Joint-Model Initialization
 
-For models with dynamics random effects, a two-phase approach improves convergence:
-
-1. **Phase 1**: Fit a reduced model without dynamics RE (only initial-state RE). This converges quickly because the inner optimization is low-dimensional.
-2. **Phase 2**: Use Phase 1 estimates as starting values for the full model. The inner Newton starts near the mode, accelerating convergence.
-
-For the joint model, `MarginalODE` (longitudinal only) provides initial values, followed by time-dependent Cox regression for survival parameters.
+For the joint model, `MarginalODE` (longitudinal only) can provide initial
+values when `init = "marginal"`, followed by time-dependent Cox regression for
+survival parameters. The marginal optimizer itself uses the direct TMB
+Laplace objective with `nlminb`.
 
 ## 4. Derived Physical Parameters
 
@@ -233,17 +233,23 @@ The natural period is $\hat{T} = 2\pi/\hat\omega$.
 
 ### 4.2 Standard Errors via Delta Method
 
-Let $\mathbf{V} = \text{Var}(\hat\ell_\omega, \hat\xi_{\mathrm{root}})$ be the estimated covariance from the information matrix.
+Let $\mathbf{V} = \text{Var}(\hat\theta_1, \hat\theta_2)$ be the estimated covariance from the information matrix.
 
 **Natural frequency:**
 
-$$\frac{\partial\omega}{\partial\ell_\omega} = \omega, \quad \text{SE}(\hat\omega) = \hat\omega\sqrt{V_{11}}$$
+$$\frac{\partial\omega}{\partial\theta_1} = \frac{1}{2}\omega, \quad \text{SE}(\hat\omega) = \frac{1}{2}\hat\omega\sqrt{V_{11}}$$
 
 **Damping ratio:**
 
-$$\frac{\partial\xi}{\partial\xi_{\mathrm{root}}} = 2\xi_{\mathrm{root}}$$
+$$\xi = \frac{1}{2}\exp(\theta_2 - \theta_1/2)$$
 
-$$\text{Var}(\hat\xi) = 4\hat\xi_{\mathrm{root}}^2 V_{22}$$
+with gradient
+
+$$\nabla \xi = \left(-\frac{1}{2}\xi,\ \xi\right)^\top.$$
+
+Thus
+
+$$\text{Var}(\hat\xi) \approx \nabla\xi^\top \mathbf{V}\nabla\xi.$$
 
 ## 5. Computational Details
 

@@ -52,7 +52,10 @@ MarginalODE <- function(
   # Process data
   data_list <- .process_marginal(formula, data, time, id, parsed_long)
   scales <- list(time = .estimate_time_scale(data_list))
-  data_fit <- .scale_data_time(data_list, scales$time)
+  data_fit <- lapply(data_list, function(d) {
+    d$longitudinal$times <- d$longitudinal$times / scales$time
+    d
+  })
   n_subjects <- length(data_list)
 
   # Model setup
@@ -64,28 +67,59 @@ MarginalODE <- function(
   parameters <- .default_marginal_parameters(model_config, parsed_long)
   all_y <- unlist(lapply(data_list, function(d) d$longitudinal$measurements))
   mean_y <- mean(all_y)
-  parameters$coefficients$initial_state <- c(mean_y, 0)
+  parameters$coefficients$initial_state <- mean_y
   parameters$coefficients$measurement_error_sd <- sd(all_y)
-  random_effects_init <- .init_re_from_observations(
-    data_list, mean_y, 0, n_re
-  )
+  random_effects_init <- matrix(0, nrow = n_subjects, ncol = n_re)
+  for (i in seq_along(data_list)) {
+    obs <- data_list[[i]]$longitudinal
+    if (length(obs$measurements) >= 1) {
+      random_effects_init[i, 1] <- obs$measurements[1] - mean_y
+    }
+  }
 
   re_sds <- pmax(apply(random_effects_init, 2, sd), sd(all_y) * 0.1)
   parameters$coefficients$random_effect_sigma <- diag(re_sds^2, n_re)
   parameters$random_effects_init <- random_effects_init
-  if (is.finite(scales$time) && scales$time > 0 && scales$time != 1) {
-    idx <- 1L
-    if (parsed_long$biomarker$fixed) {
-      parameters$coefficients$longitudinal[idx] <- -2 * log(scales$time)
-      idx <- idx + 1L
-    }
-    if (parsed_long$velocity$fixed) {
-      parameters$coefficients$longitudinal[idx] <- -log(scales$time)
-    }
+  idx <- 1L
+  if (parsed_long$biomarker$fixed) {
+    parameters$coefficients$longitudinal[idx] <- -2 * log(scales$time)
+    idx <- idx + 1L
   }
-  parameters_fit <- .prepare_marginal_time_scale(
-    parameters, parsed_long, scales$time
+  if (parsed_long$velocity$fixed) {
+    parameters$coefficients$longitudinal[idx] <- -log(scales$time)
+  }
+  parameters_fit <- parameters
+  idx <- 1L
+  if (parsed_long$biomarker$fixed) {
+    parameters_fit$coefficients$longitudinal[idx] <-
+      parameters_fit$coefficients$longitudinal[idx] + 2 * log(scales$time)
+    idx <- idx + 1L
+  }
+  if (parsed_long$velocity$fixed) {
+    parameters_fit$coefficients$longitudinal[idx] <-
+      parameters_fit$coefficients$longitudinal[idx] + log(scales$time)
+    idx <- idx + 1L
+  }
+  if (idx <= length(parameters_fit$coefficients$longitudinal)) {
+    parameters_fit$coefficients$longitudinal[
+      idx:length(parameters_fit$coefficients$longitudinal)
+    ] <- parameters_fit$coefficients$longitudinal[
+      idx:length(parameters_fit$coefficients$longitudinal)
+    ] * scales$time^2
+  }
+  re_scale <- rep(1, ncol(parameters_fit$random_effects_init))
+  forcing_start <- 2L + sum(
+    parsed_long$biomarker$random, parsed_long$velocity$random
   )
+  if (forcing_start <= length(re_scale)) {
+    re_scale[forcing_start:length(re_scale)] <- scales$time^2
+  }
+  parameters_fit$random_effects_init <- sweep(
+    parameters_fit$random_effects_init, 2, re_scale, `*`
+  )
+  parameters_fit$coefficients$random_effect_sigma <-
+    parameters_fit$coefficients$random_effect_sigma *
+      outer(re_scale, re_scale)
 
   # Pack TMB inputs
   tmb_data <- .pack_marginal_data(data_fit, parsed_long, n_re)
@@ -97,7 +131,7 @@ MarginalODE <- function(
     cli::cli_h2("Marginal ODE Model Estimation (TMB)")
   }
 
-  fit <- .fit_tmb_em(
+  fit <- .fit_tmb(
     tmb_data = tmb_data,
     tmb_params = tmb_params,
     control = control,
@@ -110,7 +144,40 @@ MarginalODE <- function(
   re_nms <- model_config$re_names
   dimnames(results$random_effect_sigma) <- list(re_nms, re_nms)
   colnames(results$random_effects) <- re_nms
-  results <- .restore_marginal_time_scale(results, parsed_long, scales$time)
+  n_long <- length(results$parameters) - 1L
+  idx <- 1L
+  if (parsed_long$biomarker$fixed) {
+    results$parameters[idx] <- results$parameters[idx] - 2 * log(scales$time)
+    idx <- idx + 1L
+  }
+  if (parsed_long$velocity$fixed) {
+    results$parameters[idx] <- results$parameters[idx] - log(scales$time)
+    idx <- idx + 1L
+  }
+  if (idx <= n_long) {
+    results$parameters[idx:n_long] <- results$parameters[idx:n_long] /
+      scales$time^2
+  }
+  par_scale <- rep(1 / scales$time^2, n_long)
+  idx <- 1L
+  if (parsed_long$biomarker$fixed) {
+    par_scale[idx] <- 1
+    idx <- idx + 1L
+  }
+  if (parsed_long$velocity$fixed) par_scale[idx] <- 1
+  vcov_scale <- c(par_scale, 1)
+  results$vcov <- results$vcov * outer(vcov_scale, vcov_scale)
+
+  re_scale <- rep(1, ncol(results$random_effects))
+  forcing_start <- 2L + sum(
+    parsed_long$biomarker$random, parsed_long$velocity$random
+  )
+  if (forcing_start <= length(re_scale)) {
+    re_scale[forcing_start:length(re_scale)] <- 1 / scales$time^2
+  }
+  results$random_effects <- sweep(results$random_effects, 2, re_scale, `*`)
+  results$random_effect_sigma <- results$random_effect_sigma *
+    outer(re_scale, re_scale)
 
   if (control$verbose > 0) {
     if (results$convergence$converged) {

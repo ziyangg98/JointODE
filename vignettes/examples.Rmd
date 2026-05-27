@@ -78,15 +78,15 @@ longitudinal_data |>
 # Step 2: Random Effects Selection with MarginalODE
 
 The ODE is $m''(t) + 2\xi\omega\, m'(t) + \omega^2 m(t) = f(t)$,
-with initial conditions $m(0) = m_0$, $m'(0) = v_0$. The formula uses
-two reserved keywords:
+with $m(0) = m_0$ and quasi-steady initial velocity
+$m'(0)=\{f(0)-\omega^2m_0\}/(2\xi\omega)$. The formula uses two reserved
+keywords:
 
 - `biomarker`: latent $\log \omega_i^2$ parameter
 - `velocity`: latent $\log(2\xi_i\omega_i)$ parameter
 
-Random effects on initial states $(m_{0,i}, v_{0,i})$ are always
-included. We fit models at increasing complexity to find the right
-RE structure.
+Random effects on the initial biomarker level are always included. We fit
+models at increasing complexity to find the right RE structure.
 
 ```{r marginal-fits}
 ctrl <- list(parallel = TRUE, verbose = 1)

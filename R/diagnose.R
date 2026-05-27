@@ -2,14 +2,15 @@
 #'
 #' @description
 #' Fits the second-order ODE separately for each subject and diagnoses
-#' identifiability from the mixed posterior Hessian.
+#' identifiability from the subject-level dynamic information ratio.
 #'
 #' @param formula Formula whose left-hand side is the longitudinal response.
 #' @param data Data frame containing the response, time, and subject ID.
 #' @param time Name of the time variable.
 #' @param id Name of the subject ID variable.
-#' @param hessian_condition Maximum allowed mixed posterior Hessian condition
-#'   number. Defaults to \code{1e10}.
+#' @param q_threshold Optional minimum subject-level dynamic information ratio.
+#'   When supplied, filtering uses only \code{q_i >= q_threshold}; Hessian
+#'   diagnostics are still reported but do not determine \code{keep_ids}.
 #' @param verbose Whether to print progress.
 #'
 #' @return A \code{JointODEDiagnose} object.
@@ -19,16 +20,17 @@ diagnose <- function(
   data,
   time = "time",
   id = "id",
-  hessian_condition = 1e10,
+  q_threshold = NULL,
   verbose = TRUE
 ) {
   cl <- match.call()
   if (!inherits(formula, "formula") || length(formula) < 3) {
     stop("formula must have a response on the left-hand side", call. = FALSE)
   }
-  if (!is.numeric(hessian_condition) || length(hessian_condition) != 1 ||
-    !is.finite(hessian_condition) || hessian_condition <= 0) {
-    stop("hessian_condition must be a positive finite number", call. = FALSE)
+  if (!is.null(q_threshold) && (!is.numeric(q_threshold) ||
+    length(q_threshold) != 1 || !is.finite(q_threshold) ||
+    q_threshold <= 0)) {
+    stop("q_threshold must be a positive finite number", call. = FALSE)
   }
   response <- as.character(formula[[2]])
   missing <- setdiff(c(response, time, id), names(data))
@@ -61,9 +63,44 @@ diagnose <- function(
       time_scale = time_scale
     )
   }))
-  subject <- .diagnose_mixed_hessian(subject, id, hessian_condition)
-
-  drop_ids <- subject[[id]][subject$status == "not_identifiable"]
+  if (is.null(q_threshold)) {
+    subject$status <- "identifiable"
+    subject$reason <- "q_threshold_not_supplied"
+    subject$mechanism <- "not_filtered"
+    subject$explanation <- "No q_threshold was supplied; all subjects are retained."
+    drop_ids <- subject[[id]][FALSE]
+  } else {
+    keep_q <- is.finite(subject$q_i) & subject$q_i >= q_threshold
+    subject$status <- ifelse(keep_q, "identifiable", "not_identifiable")
+    subject$reason <- ifelse(keep_q, "q_threshold_passed", "low_dynamic_information")
+    subject$mechanism <- "q_threshold_passed"
+    subject$mechanism[!keep_q & !is.finite(subject$q_i)] <- "optimization_failed"
+    subject$mechanism[!keep_q & is.finite(subject$q_i)] <- "weak_dynamic_information"
+    subject$mechanism[!keep_q & is.finite(subject$omega) & subject$omega < 0.05] <-
+      "omega_near_zero"
+    xi_extreme <- !keep_q & is.finite(subject$xi) &
+      (subject$xi < 0.05 | subject$xi > 5)
+    subject$mechanism[xi_extreme] <- "xi_extreme"
+    subject$mechanism[!keep_q & is.finite(subject$omega) & subject$omega < 0.05 &
+      xi_extreme] <- "omega_near_zero_and_xi_extreme"
+    subject$explanation <- ifelse(
+      keep_q,
+      "Subject retained: dynamic information ratio is above q_threshold.",
+      paste0(
+        "Subject removed: q_i is below q_threshold; single-subject estimates ",
+        "indicate weak or unstable second-order dynamic information."
+      )
+    )
+    subject$explanation[subject$mechanism == "optimization_failed"] <-
+      "Subject removed: single-subject diagnostic did not produce a finite q_i."
+    subject$explanation[subject$mechanism == "omega_near_zero"] <-
+      "Subject removed: estimated omega is close to zero, so restoring-force dynamics are weakly identified."
+    subject$explanation[subject$mechanism == "xi_extreme"] <-
+      "Subject removed: estimated damping ratio is near zero or extremely large, making damping dynamics weakly identified."
+    subject$explanation[subject$mechanism == "omega_near_zero_and_xi_extreme"] <-
+      "Subject removed: estimated omega is close to zero and damping is extreme, so second-order dynamics are weakly identified."
+    drop_ids <- subject[[id]][!keep_q]
+  }
   keep_ids <- setdiff(ids, drop_ids)
   summary <- data.frame(
     n_subjects = length(ids),
@@ -80,10 +117,8 @@ diagnose <- function(
       filtered_data = data[data[[id]] %in% keep_ids, , drop = FALSE],
       keep_ids = keep_ids,
       drop_ids = drop_ids,
-      hessian_condition = hessian_condition,
+      q_threshold = q_threshold,
       scales = list(time = time_scale),
-      sigma_e = attr(subject, "sigma_e"),
-      sigma_b = attr(subject, "sigma_b"),
       call = cl
     ),
     class = "JointODEDiagnose"
@@ -95,220 +130,116 @@ diagnose <- function(
   data <- data[order(data[[time]]), , drop = FALSE]
   t <- data[[time]] / time_scale
   y <- data[[response]]
-  theta0 <- .diagnose_start(t, y)
+  parameter_names <- c("m0", "log_omega2", "log_2xi_omega", "forcing")
+  theta0 <- c(y[[1]], 0, log(0.8), mean(y, na.rm = TRUE))
 
-  obj <- tryCatch(
-    TMB::MakeADFun(
-      data = list(model_type = 2L, time = t, y = y),
-      parameters = list(theta = theta0),
-      DLL = "JointODE",
-      silent = TRUE
-    ),
-    error = identity
+  obj <- TMB::MakeADFun(
+    data = list(model_type = 2L, time = t, y = y),
+    parameters = list(theta = theta0),
+    DLL = "JointODE",
+    silent = TRUE
   )
-  if (inherits(obj, "error")) {
-    return(.diagnose_row(data[[id]][[1]], id, nrow(data), theta0))
-  }
 
-  opt <- tryCatch(stats::nlminb(obj$par, obj$fn, obj$gr), error = identity)
-  if (inherits(opt, "error")) {
-    return(.diagnose_row(data[[id]][[1]], id, nrow(data), theta0))
-  }
+  opt <- stats::nlminb(obj$par, obj$fn, obj$gr)
 
-  gradient <- tryCatch(obj$gr(opt$par), error = function(e) rep(NA_real_, 5))
-  hessian <- tryCatch(obj$he(opt$par), error = function(e) NULL)
-  fitted <- tryCatch(as.numeric(obj$report(opt$par)$fitted), error = function(e) {
-    rep(NA_real_, length(y))
-  })
-  rmse <- sqrt(mean((y - fitted)^2, na.rm = TRUE))
-
-  .diagnose_row(
-    data[[id]][[1]], id, nrow(data), opt$par,
-    convergence = opt$convergence,
-    objective = opt$objective,
-    gradient = gradient,
-    hessian = hessian,
-    rmse = rmse
-  )
-}
-
-#' @noRd
-.diagnose_start <- function(t, y) {
-  dt <- diff(t)
-  dy <- diff(y)
-  slope <- if (any(dt > 0)) dy[which(dt > 0)[1]] / dt[which(dt > 0)[1]] else 0
-  c(
-    y[[1]],
-    if (is.finite(slope)) slope else 0,
-    0,
-    log(0.8),
-    mean(y, na.rm = TRUE)
-  )
-}
-
-#' @noRd
-.diagnose_row <- function(
-  subject_id, id, n_obs, par,
-  convergence = NA_integer_, objective = NA_real_,
-  gradient = rep(NA_real_, 5), hessian = NULL, rmse = NA_real_
-) {
-  parameter_names <- .diagnose_parameter_names()
-  hessian <- if (is.null(hessian)) matrix(NA_real_, 5, 5) else hessian
+  gradient <- obj$gr(opt$par)
+  hessian <- obj$he(opt$par)
   hessian <- (hessian + t(hessian)) / 2
-  metrics <- .diagnose_hessian_metrics(hessian, parameter_names)
-
-  out <- data.frame(
-    n_obs = n_obs,
-    convergence = convergence,
-    objective = objective,
-    rmse = rmse,
-    max_abs_gradient = suppressWarnings(max(abs(gradient), na.rm = TRUE)),
-    m0 = par[[1]],
-    v0 = par[[2]],
-    log_omega2 = par[[3]],
-    log_2xi_omega = par[[4]],
-    forcing = par[[5]],
-    omega = sqrt(exp(par[[3]])),
-    xi = exp(par[[4]]) / (2 * sqrt(exp(par[[3]]))),
-    raw_min_eigen = metrics$min_eigen,
-    raw_condition_number = metrics$condition_number,
-    raw_weakest_direction = metrics$weakest_direction,
-    raw_loading_m0 = metrics$loading[[1]],
-    raw_loading_v0 = metrics$loading[[2]],
-    raw_loading_log_omega2 = metrics$loading[[3]],
-    raw_loading_log_2xi_omega = metrics$loading[[4]],
-    raw_loading_forcing = metrics$loading[[5]],
-    min_eigen = metrics$min_eigen,
-    condition_number = metrics$condition_number,
-    weakest_direction = metrics$weakest_direction,
-    loading_m0 = metrics$loading[[1]],
-    loading_v0 = metrics$loading[[2]],
-    loading_log_omega2 = metrics$loading[[3]],
-    loading_log_2xi_omega = metrics$loading[[4]],
-    loading_forcing = metrics$loading[[5]],
-    status = "not_identifiable",
-    reason = "hessian_unavailable",
-    stringsAsFactors = FALSE
-  )
-  out[.diagnose_hessian_names(parameter_names)] <-
-    as.list(as.numeric(hessian[lower.tri(hessian, diag = TRUE)]))
-  out[[id]] <- subject_id
-  out[c(id, setdiff(names(out), id))]
-}
-
-#' @noRd
-.diagnose_mixed_hessian <- function(subject, id, hessian_condition) {
-  parameter_names <- .diagnose_parameter_names()
-  ok <- is.finite(subject$objective) &
-    is.finite(subject$max_abs_gradient) &
-    Reduce(`&`, lapply(parameter_names, function(nm) {
-      is.finite(subject[[nm]])
-    }))
-
-  if (sum(ok) < length(parameter_names) + 2L) {
-    attr(subject, "sigma_e") <- NA_real_
-    attr(subject, "sigma_b") <- matrix(NA_real_, 5, 5)
-    return(subject)
+  if (any(!is.finite(hessian))) {
+    values <- rep(NA_real_, length(parameter_names))
+    loading <- rep(NA_real_, length(parameter_names))
+  } else {
+    eig <- eigen(hessian, symmetric = TRUE)
+    values <- eig$values
+    loading <- eig$vectors[, which.min(values)]
   }
-
-  theta <- as.matrix(subject[ok, parameter_names, drop = FALSE])
-  sigma_b <- stats::cov(theta) + diag(1e-6, length(parameter_names))
-  precision_b <- solve(sigma_b)
-  sigma_e <- sqrt(sum(subject$objective[ok]) / sum(subject$n_obs[ok]))
-
-  for (i in seq_len(nrow(subject))) {
-    if (!isTRUE(ok[[i]])) next
-    raw_hessian <- .diagnose_subject_hessian(subject[i, ], parameter_names)
-    if (any(!is.finite(raw_hessian))) next
-
-    hessian <- raw_hessian / (2 * sigma_e^2) + precision_b
-    metrics <- .diagnose_hessian_metrics(hessian, parameter_names)
-    reason <- .diagnose_hessian_reason(
-      metrics$min_eigen, metrics$condition_number, hessian_condition
-    )
-
-    subject$min_eigen[[i]] <- metrics$min_eigen
-    subject$condition_number[[i]] <- metrics$condition_number
-    subject$weakest_direction[[i]] <- metrics$weakest_direction
-    subject$loading_m0[[i]] <- metrics$loading[[1]]
-    subject$loading_v0[[i]] <- metrics$loading[[2]]
-    subject$loading_log_omega2[[i]] <- metrics$loading[[3]]
-    subject$loading_log_2xi_omega[[i]] <- metrics$loading[[4]]
-    subject$loading_forcing[[i]] <- metrics$loading[[5]]
-    subject$reason[[i]] <- reason
-    subject$status[[i]] <- if (reason == "hessian_positive_definite") {
-      "identifiable"
-    } else {
-      "not_identifiable"
-    }
-  }
-
-  attr(subject, "sigma_e") <- sigma_e
-  attr(subject, "sigma_b") <- sigma_b
-  subject
-}
-
-#' @noRd
-.diagnose_parameter_names <- function() {
-  c("m0", "v0", "log_omega2", "log_2xi_omega", "forcing")
-}
-
-#' @noRd
-.diagnose_hessian_names <- function(parameter_names) {
-  hessian_names <- outer(parameter_names, parameter_names, paste, sep = "__")
-  paste0("raw_hessian_", hessian_names[lower.tri(hessian_names, diag = TRUE)])
-}
-
-#' @noRd
-.diagnose_subject_hessian <- function(row, parameter_names) {
-  values <- unlist(row[.diagnose_hessian_names(parameter_names)], use.names = FALSE)
-  if (any(!is.finite(values))) return(matrix(NA_real_, 5, 5))
-  hessian <- matrix(0, 5, 5, dimnames = list(parameter_names, parameter_names))
-  hessian[lower.tri(hessian, diag = TRUE)] <- values
-  hessian[upper.tri(hessian)] <- t(hessian)[upper.tri(hessian)]
-  hessian
-}
-
-#' @noRd
-.diagnose_hessian_metrics <- function(hessian, parameter_names) {
-  eig <- tryCatch(eigen(hessian, symmetric = TRUE), error = function(e) NULL)
-  values <- if (is.null(eig)) rep(NA_real_, length(parameter_names)) else eig$values
   min_eigen <- suppressWarnings(min(values, na.rm = TRUE))
-  condition <- if (all(is.finite(values)) && min(abs(values)) > 0) {
+  condition_number <- if (all(is.finite(values)) && min(abs(values)) > 0) {
     max(abs(values)) / min(abs(values))
   } else {
     Inf
-  }
-  loading <- if (is.null(eig) || any(!is.finite(values))) {
-    rep(NA_real_, length(parameter_names))
-  } else {
-    eig$vectors[, which.min(values)]
   }
   weakest_direction <- if (all(is.na(loading))) {
     NA_character_
   } else {
     parameter_names[which.max(abs(loading))]
   }
-  list(
-    min_eigen = min_eigen,
-    condition_number = condition,
-    weakest_direction = weakest_direction,
-    loading = loading
-  )
-}
+  hessian_reason <- if (!is.finite(min_eigen)) {
+    "hessian_nonfinite"
+  } else if (min_eigen <= 0) {
+    "hessian_not_positive_definite"
+  } else {
+    "hessian_positive_definite"
+  }
 
-#' @noRd
-.diagnose_hessian_reason <- function(min_eigen, condition, hessian_condition) {
-  if (!is.finite(min_eigen) || !is.finite(condition)) {
-    return("hessian_nonfinite")
+  fitted <- as.numeric(obj$report(opt$par)$fitted)
+  rmse <- sqrt(mean((y - fitted)^2, na.rm = TRUE))
+  q_i <- NA_real_
+  if (length(t) >= length(theta0) && all(is.finite(opt$par))) {
+    fitted_at <- function(par) {
+      m <- par[[1]]
+      b1 <- -exp(par[[2]])
+      b2 <- -exp(par[[3]])
+      forcing <- par[[4]]
+      v <- (forcing + b1 * m) / (-b2)
+      out <- numeric(length(t))
+      previous <- 0
+      for (j in seq_along(t)) {
+        z <- .ode_step_r(m, v, b1, b2, forcing, t[[j]] - previous)
+        m <- z[[1]]
+        v <- z[[2]]
+        out[[j]] <- m
+        previous <- t[[j]]
+      }
+      out
+    }
+    jac <- matrix(NA_real_, length(t), length(opt$par))
+    for (j in seq_along(opt$par)) {
+      h <- 1e-4 * max(1, abs(opt$par[[j]]))
+      plus <- minus <- opt$par
+      plus[[j]] <- plus[[j]] + h
+      minus[[j]] <- minus[[j]] - h
+      jac[, j] <- (fitted_at(plus) - fitted_at(minus)) / (2 * h)
+    }
+    eig <- eigen(crossprod(jac), symmetric = TRUE, only.values = TRUE)$values
+    tr <- sum(eig)
+    if (is.finite(tr) && tr > 0) q_i <- min(eig) / tr
   }
-  if (min_eigen <= 0) {
-    return("hessian_not_positive_definite")
-  }
-  if (condition > hessian_condition) {
-    return("hessian_ill_conditioned")
-  }
-  "hessian_positive_definite"
+
+  par_out <- opt$par
+  par_out[[2]] <- par_out[[2]] - 2 * log(time_scale)
+  par_out[[3]] <- par_out[[3]] - log(time_scale)
+  par_out[[4]] <- par_out[[4]] / time_scale^2
+
+  out <- data.frame(
+    n_obs = nrow(data),
+    convergence = opt$convergence,
+    objective = opt$objective,
+    rmse = rmse,
+    max_abs_gradient = suppressWarnings(max(abs(gradient), na.rm = TRUE)),
+    q_i = q_i,
+    m0 = par_out[[1]],
+    log_omega2 = par_out[[2]],
+    log_2xi_omega = par_out[[3]],
+    forcing = par_out[[4]],
+    initial_velocity = (par_out[[4]] - exp(par_out[[2]]) * par_out[[1]]) /
+      exp(par_out[[3]]),
+    omega = sqrt(exp(par_out[[2]])),
+    xi = exp(par_out[[3]]) / (2 * sqrt(exp(par_out[[2]]))),
+    min_eigen = min_eigen,
+    condition_number = condition_number,
+    weakest_direction = weakest_direction,
+    loading_m0 = loading[[1]],
+    loading_log_omega2 = loading[[2]],
+    loading_log_2xi_omega = loading[[3]],
+    loading_forcing = loading[[4]],
+    status = "not_identifiable",
+    reason = "hessian_unavailable",
+    hessian_reason = hessian_reason,
+    stringsAsFactors = FALSE
+  )
+  out[[id]] <- data[[id]][[1]]
+  out[c(id, setdiff(names(out), id))]
 }
 
 #' @export
@@ -320,8 +251,37 @@ print.JointODEDiagnose <- function(
   print(x$call)
   cat("\n")
   print(x$summary, digits = digits, row.names = FALSE)
+  if (!is.null(x$q_threshold)) {
+    cat(
+      "\nFiltering: q_i >= ",
+      format(x$q_threshold, digits = digits),
+      "\n",
+      sep = ""
+    )
+  }
   reasons <- sort(table(x$subject$reason), decreasing = TRUE)
-  cat("\nHessian reasons:\n")
+  cat("\nFiltering reasons:\n")
   print(reasons)
+  hessian_reasons <- sort(table(x$subject$hessian_reason), decreasing = TRUE)
+  cat("\nHessian diagnostics:\n")
+  print(hessian_reasons)
+  if (!is.null(x$q_threshold) && length(x$drop_ids) > 0) {
+    mechanisms <- sort(table(x$subject$mechanism[x$subject$status == "not_identifiable"]),
+      decreasing = TRUE
+    )
+    cat("\nRemoval mechanisms:\n")
+    print(mechanisms)
+    examples <- x$subject[x$subject$status == "not_identifiable", , drop = FALSE]
+    examples <- examples[order(examples$q_i, na.last = TRUE), , drop = FALSE]
+    examples <- head(examples, 5)
+    id_name <- names(x$subject)[1]
+    cat("\nRemoved subject examples:\n")
+    print(
+      examples[, c(id_name, "n_obs", "q_i", "omega", "xi", "mechanism", "explanation"),
+        drop = FALSE
+      ],
+      row.names = FALSE
+    )
+  }
   invisible(x)
 }
