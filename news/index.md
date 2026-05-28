@@ -71,7 +71,31 @@
 
 ------------------------------------------------------------------------
 
-### Development Roadmap
+### Development Notes
+
+#### Subject-level identifiability
+
+Real-data experiments showed that full second-order heterogeneity can be
+weakly identified for subjects with short, nearly linear, or abrupt
+trajectories. In the current model this appears as flat directions among
+initial velocity, dynamic log-coefficients, and forcing terms. These
+cases are not necessarily data errors; they indicate that the observed
+window may not contain enough curvature to estimate every
+subject-specific ODE component.
+
+The package therefore keeps the main model simple and explicit:
+
+``` r
+
+observed ~ biomarker + velocity + covariates +
+  (1 + biomarker + velocity | id)
+```
+
+where `biomarker` is `log_omega2`, `velocity` is `log_2xi_omega`, and
+`1` inside the random-effects term is the subject-specific forcing
+intercept. Future work should focus on principled model-selection and
+identifiability diagnostics for deciding when the full correlated
+covariance structure is supported by a given biomarker.
 
 ### Version 0.2.0 (Planned - Q2 2025)
 

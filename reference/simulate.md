@@ -13,10 +13,10 @@ damping ratio, natural period, and excitation amplitude.
 ``` r
 simulate(
   n_subjects = 500,
-  longitudinal = list(xi = c(mean = 0.4, sd = 0.1), period = c(mean = 6, sd = 0.1),
-    excitation = list(offset = 0, covariates = c(x1 = 0.5, x2 = -0.45)), initial =
-    list(biomarker = c(mean = -0.5, sd = 0.1), velocity = c(mean = -0.1, sd = 0.1)),
-    error_sd = 0.1, n_measurements = 100),
+  longitudinal = list(xi = c(mean = 0.4, sd = 0.1), period = c(mean = 6, sd = 0.8),
+    excitation = list(offset = 0, covariates = c(x1 = 0.5, x2 = -0.45),
+    random_intercept_sd = 0.2), initial = list(biomarker = c(mean = -0.5, sd = 0.1),
+    velocity = c(mean = 0, sd = 0.1)), error_sd = 0.1, n_measurements = 100),
   survival = list(baseline = list(type = "weibull", shape = 2, scale = 15), value = 0.8,
     slope = 2, gamma = 1, covariates = c(w1 = 0.6, w2 = -0.8)),
   covariates = list(x1 = list(type = "normal", mean = 0, sd = 1), x2 = list(type =
@@ -50,7 +50,7 @@ simulate(
   :   Natural period \\T\\ of oscillation in time units, related to
       natural frequency as \\\omega = 2\pi/T\\. Specified as c(mean =
       ..., sd = ...) for population mean and standard deviation.
-      Default: c(mean = 6, sd = 0.1)
+      Default: c(mean = 6, sd = 0.8)
 
   excitation
 
@@ -66,6 +66,11 @@ simulate(
           \\\boldsymbol{\beta}\_{exc}\\ on excitation (default: c(x1 =
           0.5, x2 = -0.45))
 
+      random_intercept_sd
+
+      :   Standard deviation of subject-specific forcing intercepts
+          (default: 0.2)
+
   initial
 
   :   List specifying initial condition parameters:
@@ -79,8 +84,8 @@ simulate(
       velocity
 
       :   Population distribution of initial velocity \\\dot{m}\_i(0)\\,
-          specified as `c(mean = ..., sd = ...)`. (default: c(mean =
-          -0.1, sd = 0.1))
+          specified as `c(mean = ..., sd = ...)`. (default: c(mean = 0,
+          sd = 0.1))
 
   error_sd
 
@@ -212,11 +217,12 @@ A list with two elements:
 
   `random_effects`
 
-  :   An \\n \times 4\\ matrix of subject-specific random effects
-      (centered at zero). Columns `init_biomarker` and `init_velocity`
-      capture initial state variability; `dyn_biomarker` and
-      `dyn_velocity` capture ODE coefficient variability corresponding
-      to the formula term `(biomarker + velocity | id)`.
+  :   An \\n \times 5\\ matrix of subject-specific random effects
+      (centered at zero). Columns `initial_biomarker` and
+      `initial_velocity` capture initial state variability; `log_omega2`
+      and `log_2xi_omega` capture latent ODE parameter variability;
+      `forcing_(Intercept)` matches the lme-style random intercept in
+      `(1 + biomarker + velocity | id)`.
 
 - `init`:
 
@@ -269,14 +275,14 @@ harmonic oscillator with external forcing: \$\$\ddot{m}\_i(t) +
 - \\\boldsymbol{\beta}\_{exc}\\ represents covariate effects on
   excitation
 
-Initial conditions are drawn from population distributions:
+The initial biomarker is drawn from a population distribution:
 
 - \\m_i(0) \sim \mathcal{N}(\mu\_{m,0}, \sigma\_{m,0}^2)\\
 
 - \\\dot{m}\_i(0) \sim \mathcal{N}(\mu\_{v,0}, \sigma\_{v,0}^2)\\
 
 The observed longitudinal measurements incorporate additive Gaussian
-noise: \$\$y\_{ij} = m_i(t\_{ij}) + b_i + \epsilon\_{ij}\$\$ where
+noise: \$\$y\_{ij} = m_i(t\_{ij}) + \epsilon\_{ij}\$\$ where
 \\\epsilon\_{ij} \sim \mathcal{N}(0, \sigma\_\epsilon^2)\\ represents
 independent measurement error.
 
@@ -313,8 +319,9 @@ to ODE parameters via: \$\$\omega_i = 2\pi/T_i, \quad \beta\_{1,i} =
 uses the Delta method to preserve the correct covariance structure in
 the ODE parameter space.
 
-Only \\\beta\_{1,i}\\ and \\\beta\_{2,i}\\ vary across subjects; the
-offset and covariate coefficients are shared fixed effects.
+The default simulation includes random effects on initial biomarker,
+initial velocity, the two dynamic log-coefficients, and the forcing
+intercept; forcing covariate coefficients are shared fixed effects.
 
 ## Examples
 
@@ -327,38 +334,48 @@ names(sim_basic)
 #> [1] "longitudinal_data" "survival_data"     "random_effects"
 head(sim_basic$longitudinal_data)
 #>   id time  biomarker   velocity acceleration   observed         x1        x2
-#> 1  1  0.0 -0.5575347 0.04445509    0.7775724 -0.6043193 -0.5604756 -1.067824
-#> 2  1  0.1 -0.5493074 0.11903932    0.7135863 -0.5364070 -0.5604756 -1.067824
-#> 3  1  0.2 -0.5339453 0.18708254    0.6468857 -0.3797485 -0.5604756 -1.067824
-#> 4  1  0.3 -0.5121163 0.24835639    0.5783474 -0.3657800 -0.5604756 -1.067824
-#> 5  1  0.4 -0.4845043 0.30271866    0.5088018 -0.4791397 -0.5604756 -1.067824
-#> 6  1  0.5 -0.4518045 0.35010838    0.4390307 -0.5044062 -0.5604756 -1.067824
+#> 1  1  0.0 -0.3555449 0.07877388    0.3465426 -0.4394285 -0.5604756 -1.067824
+#> 2  1  0.1 -0.3459894 0.11182253    0.3143598 -0.5155927 -0.5604756 -1.067824
+#> 3  1  0.2 -0.3332881 0.14163673    0.2818890 -0.3080600 -0.5604756 -1.067824
+#> 4  1  0.3 -0.3177691 0.16820137    0.2494177 -0.3568550 -0.5604756 -1.067824
+#> 5  1  0.4 -0.2997557 0.19152952    0.2172084 -0.4766036 -0.5604756 -1.067824
+#> 6  1  0.5 -0.2795697 0.21165975    0.1855044 -0.2760971 -0.5604756 -1.067824
 head(sim_basic$survival_data)
 #>   id      time status         w1 w2
 #> 1  1 10.000000      0 -0.6947070  1
 #> 2  2 10.000000      0 -0.2079173  0
-#> 3  3  4.584052      1 -1.2653964  0
-#> 4  4 10.000000      0  2.1689560  0
-#> 5  5  9.142940      1  1.2079620  0
-#> 6  6 10.000000      0 -1.1231086  1
+#> 3  3 10.000000      0 -1.2653964  0
+#> 4  4  5.872357      1  2.1689560  0
+#> 5  5  7.995048      1  1.2079620  0
+#> 6  6  9.898148      1 -1.1231086  1
 
 # Check patient-specific dynamics
 # Each patient has unique dynamics drawn from population distribution
 head(sim_basic$random_effects)
-#>      init_biomarker init_velocity dyn_biomarker dyn_velocity
-#> [1,]   -0.057534696   0.144455086  -0.034149079   -0.1227326
-#> [2,]    0.060796432   0.045150405  -0.023449893   -0.5784090
-#> [3,]   -0.161788271   0.004123292  -0.005669442    0.2520641
-#> [4,]   -0.005556197  -0.042249683   0.019281452   -0.1778817
-#> [5,]    0.051940720  -0.205324722  -0.046803869   -0.1719762
-#> [6,]    0.030115336   0.113133721   0.022277514    0.2567820
+#>      initial_biomarker initial_velocity  log_omega2 log_2xi_omega
+#> [1,]       0.144455086       0.07877388 -0.26376808    -0.1373538
+#> [2,]       0.045150405       0.07690422 -0.14559542    -0.6459329
+#> [3,]       0.004123292       0.03322026 -0.06338155     0.2813305
+#> [4,]      -0.042249683      -0.10083766  0.16670452    -0.1983814
+#> [5,]      -0.205324722      -0.01194526 -0.36124337    -0.1924534
+#> [6,]       0.113133721      -0.02803953  0.15936457     0.2868782
+#>      forcing_(Intercept)
+#> [1,]         -0.11506939
+#> [2,]          0.12159286
+#> [3,]         -0.32357654
+#> [4,]         -0.01111239
+#> [5,]          0.10388144
+#> [6,]          0.06023067
 
 # Random effects structure
 colnames(sim_basic$random_effects)
-#> [1] "init_biomarker" "init_velocity"  "dyn_biomarker"  "dyn_velocity"
+#> [1] "initial_biomarker"   "initial_velocity"    "log_omega2"
+#> [4] "log_2xi_omega"       "forcing_(Intercept)"
 apply(sim_basic$random_effects, 2, sd)
-#> init_biomarker  init_velocity  dyn_biomarker   dyn_velocity
-#>     0.07598365     0.13030015     0.03326469     0.21422580
+#>   initial_biomarker    initial_velocity          log_omega2       log_2xi_omega
+#>           0.1303001           0.0992504           0.2600702           0.2392747
+#> forcing_(Intercept)
+#>           0.1519673
 
 # Example 2: Custom dynamics and survival
 # \donttest{
@@ -367,10 +384,12 @@ sim_custom <- simulate(
   longitudinal = list(
     xi = c(mean = 0.5, sd = 0.1),
     period = c(mean = 8, sd = 1),
-    excitation = list(offset = 4.0, covariates = c(x1 = 0.8, x2 = -0.5)),
+    excitation = list(
+      offset = 4.0, covariates = c(x1 = 0.8, x2 = -0.5),
+      random_intercept_sd = 0.2
+    ),
     initial = list(
-      biomarker = c(mean = 3.8, sd = 0.2),
-      velocity = c(mean = -0.1, sd = 0.1)
+      biomarker = c(mean = 3.8, sd = 0.2)
     ),
     error_sd = 0.1,
     n_measurements = 20
@@ -385,6 +404,6 @@ sim_custom <- simulate(
 table(sim_custom$survival_data$status) # event vs censored
 #>
 #>  0  1
-#> 45  5
+#> 32 18
 # }
 ```

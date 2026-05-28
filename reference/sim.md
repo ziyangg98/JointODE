@@ -21,7 +21,7 @@ A list with two components:
 
   longitudinal_data
 
-  :   Data frame with 17,347 longitudinal measurements from 200
+  :   Data frame with 17,222 longitudinal measurements from 200
       subjects:
 
       - id: Patient identifier (1-200)
@@ -52,15 +52,17 @@ A list with two components:
 
   random_effects
 
-  :   Matrix (200 x 4) with subject-specific random effects:
+  :   Matrix (200 x 5) with subject-specific random effects:
 
-      - init_biomarker: Initial biomarker value
+      - initial_biomarker: Initial biomarker value
 
-      - init_velocity: Initial velocity
+      - initial_velocity: Initial biomarker velocity
 
-      - dyn_biomarker: ODE biomarker coefficient (\\-\omega^2\\)
+      - log_omega2: Random effect on \\\log \omega_i^2\\
 
-      - dyn_velocity: ODE velocity coefficient (\\-2\xi\omega\\)
+      - log_2xi_omega: Random effect on \\\log(2\xi_i\omega_i)\\
+
+      - forcing\_(Intercept): Random forcing intercept
 
 - init:
 
@@ -72,16 +74,17 @@ A list with two components:
 
       - baseline: B-spline coefficients for log baseline hazard
 
-      - longitudinal: Fixed effects for ODE dynamics (dyn_offset,
-        dyn_biomarker, dyn_velocity, covariate effects)
+      - longitudinal: Fixed effects for ODE dynamics (log_omega2,
+        log_2xi_omega, forcing intercept, covariate effects)
 
       - hazard: Association parameters (value, slope) and survival
         covariate effects
 
       - measurement_error_sd: Measurement error SD (0.1)
 
-      - random_effect_sigma: 4x4 covariance matrix for random effects
-        (init_biomarker, init_velocity, dyn_biomarker, dyn_velocity)
+      - random_effect_sigma: 5x5 covariance matrix for random effects
+        (initial_biomarker, initial_velocity, log_omega2, log_2xi_omega,
+        forcing intercept)
 
   configurations
 
@@ -98,10 +101,9 @@ Generated using `.create_example_data(n_subjects = 200, seed = 123)`
 ## Details
 
 The dataset contains 200 subjects with heterogeneous ODE dynamics.
-Subject-specific dynamics are characterized by random effects on
-dyn_biomarker (\\-\omega^2\\) and dyn_velocity (\\-2\xi\omega\\)
-parameters. Population means: damping ratio \\\xi \approx 0.4\\, period
-\\T \approx 6\\.
+Subject-specific dynamics are characterized by random effects on latent
+ODE log-coefficients. Population means: damping ratio \\\xi \approx
+0.4\\, period \\T \approx 6\\.
 
 ## See also
 
@@ -120,9 +122,9 @@ data(sim)
 str(sim, max.level = 2)
 #> List of 2
 #>  $ data:List of 3
-#>   ..$ longitudinal_data:'data.frame':    17319 obs. of  8 variables:
+#>   ..$ longitudinal_data:'data.frame':    17222 obs. of  8 variables:
 #>   ..$ survival_data    :'data.frame':    200 obs. of  5 variables:
-#>   ..$ random_effects   : num [1:200, 1:4] -0.065 -0.1003 -0.0535 -0.011 0.06 ...
+#>   ..$ random_effects   : num [1:200, 1:5] -0.075 -0.0322 -0.1148 0.0354 0.0425 ...
 #>   .. ..- attr(*, "dimnames")=List of 2
 #>  $ init:List of 2
 #>   ..$ coefficients  :List of 6
@@ -130,46 +132,56 @@ str(sim, max.level = 2)
 
 # Access longitudinal data
 head(sim$data$longitudinal_data)
-#>   id time  biomarker   velocity acceleration   observed       x1        x2
-#> 1  1  0.0 -0.5650284 -0.2185547     2.537227 -0.5970006 1.370958 -2.000929
-#> 2  1  0.1 -0.5745436  0.0247568     2.327828 -0.4739660 1.370958 -2.000929
-#> 3  1  0.2 -0.5607854  0.2468262     2.112843 -0.5053470 1.370958 -2.000929
-#> 4  1  0.3 -0.5259008  0.4472288     1.894937 -0.3926945 1.370958 -2.000929
-#> 5  1  0.4 -0.4720671  0.6257977     1.676578 -0.3919803 1.370958 -2.000929
-#> 6  1  0.5 -0.4014663  0.7826035     1.460021 -0.3512690 1.370958 -2.000929
+#>   id time  biomarker    velocity acceleration   observed         x1      x2
+#> 1  1  0.0 -0.5749726 -0.08209867   -0.3277411 -0.7508544 -0.5604756 2.19881
+#> 2  1  0.1 -0.5847617 -0.11312631   -0.2924862 -0.5713544 -0.5604756 2.19881
+#> 3  1  0.2 -0.5974767 -0.14053847   -0.2555021 -0.7562703 -0.5604756 2.19881
+#> 4  1  0.3 -0.6127449 -0.16419177   -0.2174216 -0.6317456 -0.5604756 2.19881
+#> 5  1  0.4 -0.6301871 -0.18400663   -0.1788435 -0.5694431 -0.5604756 2.19881
+#> 6  1  0.5 -0.6494179 -0.19996219   -0.1403353 -0.6157630 -0.5604756 2.19881
 
 # Summary of survival outcomes
 summary(sim$data$survival_data$time)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.
-#>   0.665   8.920  10.000   8.644  10.000  10.000
+#>  0.5283  7.7731 10.0000  8.5946 10.0000 10.0000
 table(sim$data$survival_data$status)
 #>
 #>   0   1
-#> 142  58
+#> 135  65
 
 # Population parameters
 sim$init$coefficients$longitudinal
-#> dyn_biomarker  dyn_velocity    dyn_offset        dyn_x1        dyn_x2
+#>    log_omega2 log_2xi_omega    dyn_offset        dyn_x1        dyn_x2
 #>    0.09223519   -0.17702595    0.00000000    0.54831136   -0.49348022
 sim$init$coefficients$random_effect_sigma
-#>      [,1] [,2]         [,3]         [,4]
-#> [1,] 0.01 0.00 0.0000000000 0.0000000000
-#> [2,] 0.00 0.01 0.0000000000 0.0000000000
-#> [3,] 0.00 0.00 0.0011111111 0.0005555556
-#> [4,] 0.00 0.00 0.0005555556 0.0627777778
+#>                     initial_biomarker initial_velocity log_omega2 log_2xi_omega
+#> initial_biomarker                0.01             0.00 0.00000000    0.00000000
+#> initial_velocity                 0.00             0.01 0.00000000    0.00000000
+#> log_omega2                       0.00             0.00 0.07048641    0.00000000
+#> log_2xi_omega                    0.00             0.00 0.00000000    0.07824622
+#> forcing_(Intercept)              0.00             0.00 0.00000000    0.00000000
+#>                     forcing_(Intercept)
+#> initial_biomarker                  0.00
+#> initial_velocity                   0.00
+#> log_omega2                         0.00
+#> log_2xi_omega                      0.00
+#> forcing_(Intercept)                0.04
 
 # Random effects structure
 colnames(sim$data$random_effects)
-#> [1] "init_biomarker" "init_velocity"  "dyn_biomarker"  "dyn_velocity"
+#> [1] "initial_biomarker"   "initial_velocity"    "log_omega2"
+#> [4] "log_2xi_omega"       "forcing_(Intercept)"
 apply(sim$data$random_effects, 2, sd)
-#> init_biomarker  init_velocity  dyn_biomarker   dyn_velocity
-#>     0.09744381     0.09336398     0.03668010     0.24254412
+#>   initial_biomarker    initial_velocity          log_omega2       log_2xi_omega
+#>          0.10005173          0.09961304          0.27385366          0.28770989
+#> forcing_(Intercept)
+#>          0.19221629
 
 if (FALSE) { # \dontrun{
 # Fit a Joint ODE model using this data
 fit <- JointODE(
   longitudinal_formula = observed ~
-    biomarker + velocity + x1 + x2 + (biomarker + velocity | id),
+    biomarker + velocity + x1 + x2 + (1 + biomarker + velocity | id),
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = sim$data$longitudinal_data,
   survival_data = sim$data$survival_data,
