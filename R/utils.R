@@ -70,6 +70,7 @@
   list(corr_par = factor(rep(NA, length(tmb_params$corr_par))))
 }
 
+#' @importFrom stats median
 #' @noRd
 .estimate_time_scale <- function(data_list) {
   y <- unlist(lapply(data_list, function(d) d$longitudinal$measurements))
@@ -129,7 +130,7 @@
 
 .reserved_words <- c("biomarker", "velocity")
 
-.init_state_names <- "initial_biomarker"
+.init_state_names <- c("initial_biomarker", "initial_velocity")
 
 # Formula Parsing ==============================================================
 
@@ -275,7 +276,7 @@
 
   list(
     n_longitudinal_coef = n_longitudinal_fixed + n_ode_fixed,
-    n_random_effects = n_longitudinal_random + n_ode_random + 1,
+    n_random_effects = n_longitudinal_random + n_ode_random + 2,
     n_survival_covariates = n_survival_covariates,
     n_spline_basis = spline_config$degree + spline_config$n_knots + 1,
     spline_config = spline_config
@@ -414,11 +415,12 @@
 
     bi <- re[i, ]
     m <- cf$initial_state[1] + bi[1]
+    v <- cf$initial_state[2] + bi[2]
 
     log_omega2 <- 0
     log_2xi_omega <- 0
     fi <- 1
-    ri <- 2
+    ri <- 3
     if (configs$biomarker$fixed) {
       log_omega2 <- log_omega2 + lc[fi]
       fi <- fi + 1
@@ -439,16 +441,6 @@
     b2 <- -exp(log_2xi_omega)
     ffs <- fi
     rfs <- ri
-
-    ci0 <- max(1, min(findInterval(0, obs_t), nrow(fcov)))
-    eta0 <- 0
-    if (ncol(fcov) > 0) {
-      eta0 <- eta0 + sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci0, ])
-    }
-    if (ncol(rcov) > 0) {
-      eta0 <- eta0 + sum(bi[rfs:(rfs + ncol(rcov) - 1)] * rcov[ci0, ])
-    }
-    v <- (eta0 - exp(log_omega2) * m) / exp(log_2xi_omega)
 
     bio <- vel <- numeric(n_times)
     prev_t <- 0
@@ -534,11 +526,12 @@
 
     bi <- re[i, ]
     m <- cf$initial_state[1] + bi[1]
+    v <- cf$initial_state[2] + bi[2]
 
     log_omega2 <- 0
     log_2xi_omega <- 0
     fi <- 1
-    ri <- 2
+    ri <- 3
     if (configs$biomarker$fixed) {
       log_omega2 <- log_omega2 + lc[fi]
       fi <- fi + 1
@@ -559,16 +552,6 @@
     b2 <- -exp(log_2xi_omega)
     ffs <- fi
     rfs <- ri
-
-    ci0 <- max(1, min(findInterval(0, obs_t), nrow(fcov)))
-    eta0 <- 0
-    if (ncol(fcov) > 0) {
-      eta0 <- eta0 + sum(lc[ffs:(ffs + ncol(fcov) - 1)] * fcov[ci0, ])
-    }
-    if (ncol(rcov) > 0) {
-      eta0 <- eta0 + sum(bi[rfs:(rfs + ncol(rcov) - 1)] * rcov[ci0, ])
-    }
-    v <- (eta0 - exp(log_omega2) * m) / exp(log_2xi_omega)
 
     bio <- vel <- cumhaz <- numeric(n_times)
     ch <- 0

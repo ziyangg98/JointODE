@@ -9,10 +9,11 @@
 #' shared random effects and flexible hazard specifications.
 #'
 #' @param longitudinal_formula A formula specifying the longitudinal submodel.
-#'   The left-hand side defines the response variable, while the right-hand
-#'   side specifies fixed effects including time-varying and baseline
-#'   covariates
-#'   (e.g., \code{biomarker ~ time + treatment + age}).
+#'   The left-hand side defines the observed biomarker. On the right-hand side,
+#'   \code{biomarker} and \code{velocity} are reserved ODE terms for
+#'   \eqn{\log\omega_i^2} and \eqn{\log(2\xi_i\omega_i)}; all other fixed terms
+#'   enter the forcing function. Random effects use lme-style syntax:
+#'   \code{|} for full covariance and \code{||} for diagonal covariance.
 #' @param survival_formula A formula for the survival submodel using
 #'   \code{Surv(time, status)} notation on the left-hand side. The right-hand
 #'   side specifies baseline hazard covariates
@@ -66,7 +67,7 @@
 #' data(sim)
 #' fit <- JointODE(
 #'   longitudinal_formula = observed ~
-#'     biomarker + velocity + x1 + x2 + (biomarker + velocity | id),
+#'     biomarker + velocity + x1 + x2 + (1 + biomarker + velocity | id),
 #'   survival_formula = Surv(time, status) ~ w1 + w2,
 #'   longitudinal_data = sim$data$longitudinal_data,
 #'   survival_data = sim$data$survival_data,
@@ -188,7 +189,7 @@ JointODE <- function(
   # (prevents inner Newton divergence when init = "default")
   cf <- parameters$coefficients
   if (is.null(cf$initial_state)) {
-    cf$initial_state <- mean(all_y)
+    cf$initial_state <- c(mean(all_y), 0)
   }
   if (is.null(cf$measurement_error_sd)) {
     cf$measurement_error_sd <- sd(all_y)
@@ -241,6 +242,8 @@ JointODE <- function(
       idx:length(parameters_fit$coefficients$longitudinal)
     ] * scales$time^2
   }
+  parameters_fit$coefficients$initial_state[2] <-
+    parameters_fit$coefficients$initial_state[2] * scales$time
   parameters_fit$coefficients$baseline <-
     parameters_fit$coefficients$baseline + log(scales$time)
   if (length(parameters_fit$coefficients$hazard) >= 2) {
@@ -248,7 +251,8 @@ JointODE <- function(
       parameters_fit$coefficients$hazard[2] / scales$time^gamma
   }
   re_scale <- rep(1, ncol(parameters_fit$random_effects_init))
-  forcing_start <- 2L + sum(
+  re_scale[2] <- scales$time
+  forcing_start <- 3L + sum(
     parsed_long$biomarker$random, parsed_long$velocity$random
   )
   if (forcing_start <= length(re_scale)) {
@@ -309,8 +313,11 @@ JointODE <- function(
     cf$longitudinal[idx:length(cf$longitudinal)] <-
       cf$longitudinal[idx:length(cf$longitudinal)] / scales$time^2
   }
+  cf$initial_state["initial_velocity"] <-
+    cf$initial_state["initial_velocity"] / scales$time
   re_scale <- rep(1, ncol(results$random_effects))
-  forcing_start <- 2L + sum(
+  re_scale[2] <- 1 / scales$time
+  forcing_start <- 3L + sum(
     parsed_long$biomarker$random, parsed_long$velocity$random
   )
   if (forcing_start <= length(re_scale)) {
@@ -332,7 +339,8 @@ JointODE <- function(
     rep(1, n_baseline),
     c(1, scales$time^gamma, rep(1, max(0, n_hazard - 2L))),
     long_scale,
-    1
+    1,
+    1 / scales$time
   )
   results$vcov <- results$vcov * outer(vcov_scale, vcov_scale)
   bc <- results$parameters$configurations$baseline

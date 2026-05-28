@@ -342,7 +342,7 @@
   list(
     coefficients = list(
       longitudinal = longitudinal,
-      initial_state = 0,
+      initial_state = setNames(c(0, 0), .init_state_names),
       measurement_error_sd = 1,
       random_effect_sigma = diag(1, model_config$n_re)
     ),

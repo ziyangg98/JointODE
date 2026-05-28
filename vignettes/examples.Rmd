@@ -17,12 +17,13 @@ knitr::opts_chunk$set(
 
 This vignette demonstrates a complete JointODE workflow using PBC
 (Primary Biliary Cirrhosis) serum albumin data from the JMbayes2
-package. The workflow has four steps:
+package. The goal is to show the modeling sequence rather than to claim a
+single definitive clinical model. The workflow has four steps:
 
-1. Prepare and standardize data
-2. Select random effects structure via `MarginalODE`
-3. Fit the joint model via `JointODE`
-4. Interpret and compare results
+1. Prepare longitudinal and survival data
+2. Select a stable longitudinal random-effects structure with `MarginalODE`
+3. Fit the joint model with the selected longitudinal structure
+4. Compare the fitted association estimates with common alternatives
 
 # Step 1: Data Preparation
 
@@ -32,6 +33,7 @@ library(JMbayes2)
 library(survival)
 library(dplyr)
 library(ggplot2)
+library(splines)
 
 survival_data <- pbc2.id |>
   transmute(
@@ -45,7 +47,7 @@ longitudinal_data <- pbc2 |>
   transmute(id = as.integer(id), time = year, observed = log(albumin)) |>
   left_join(survival_data |> select(id, drug, age, sex), by = "id")
 
-# Standardize: ODE parameters scale with the response
+# Standardize the response; the input time scale remains the observed years.
 alb_mean <- mean(longitudinal_data$observed)
 alb_sd <- sd(longitudinal_data$observed)
 longitudinal_data$observed <- (longitudinal_data$observed - alb_mean) / alb_sd
@@ -78,68 +80,68 @@ longitudinal_data |>
 # Step 2: Random Effects Selection with MarginalODE
 
 The ODE is $m''(t) + 2\xi\omega\, m'(t) + \omega^2 m(t) = f(t)$,
-with $m(0) = m_0$ and quasi-steady initial velocity
-$m'(0)=\{f(0)-\omega^2m_0\}/(2\xi\omega)$. The formula uses two reserved
+with initial conditions $m(0)=m_0$ and $m'(0)=v_0$. The formula uses two reserved
 keywords:
 
-- `biomarker`: latent $\log \omega_i^2$ parameter
-- `velocity`: latent $\log(2\xi_i\omega_i)$ parameter
+- `biomarker`: the latent $\log \omega_i^2$ parameter
+- `velocity`: the latent $\log(2\xi_i\omega_i)$ parameter
 
-Random effects on the initial biomarker level are always included. We fit
-models at increasing complexity to find the right RE structure.
+Random effects on the initial biomarker level and initial velocity are always
+included internally. Formula random effects add heterogeneity in the forcing
+function or in the ODE parameters. As in `lme4`, `|` requests a correlated
+covariance block and `||` requests independent random effects.
+
+For real data, a practical first pass is to start with independent random
+effects on forcing, frequency, and damping. If that model is not numerically
+stable, remove one dynamic random effect at a time before falling back to a
+random forcing intercept only.
 
 ```{r marginal-fits}
 ctrl <- list(parallel = TRUE, verbose = 1)
 
-# Level 0: fixed dynamics, random initial state only
-mfit0 <- MarginalODE(
-  observed ~ biomarker + velocity + drug,
+# Full diagonal: random forcing, frequency, and damping
+mfit_full <- MarginalODE(
+  observed ~ biomarker + velocity + drug + (1 + biomarker + velocity || id),
   longitudinal_data,
   control = ctrl
 )
 
-# Level 1: + random forcing intercept
-mfit1 <- MarginalODE(
-  observed ~ biomarker + velocity + drug + (1 | id),
+# Drop random damping
+mfit_no_velocity <- MarginalODE(
+  observed ~ biomarker + velocity + drug + (1 + biomarker || id),
   longitudinal_data,
   control = ctrl
 )
 
-# Level 2a: + random frequency
-mfit2a <- MarginalODE(
-  observed ~ biomarker + velocity + drug + (biomarker | id),
+# Drop random frequency
+mfit_no_biomarker <- MarginalODE(
+  observed ~ biomarker + velocity + drug + (1 + velocity || id),
   longitudinal_data,
   control = ctrl
 )
 
-# Level 2b: + random damping
-mfit2b <- MarginalODE(
-  observed ~ biomarker + velocity + drug + (velocity | id),
-  longitudinal_data,
-  control = ctrl
-)
-
-# Level 2c: + random frequency & damping
-mfit2c <- MarginalODE(
-  observed ~ biomarker + velocity + drug + (biomarker + velocity | id),
+# Random forcing only
+mfit_forcing <- MarginalODE(
+  observed ~ biomarker + velocity + drug + (1 || id),
   longitudinal_data,
   control = ctrl
 )
 ```
 
 ```{r compare-marginal}
-fits <- list(mfit0, mfit1, mfit2a, mfit2b, mfit2c)
+fits <- list(mfit_full, mfit_no_velocity, mfit_no_biomarker, mfit_forcing)
 knitr::kable(data.frame(
   Model = c(
-    "Level 0: fixed dynamics",
-    "Level 1: + random forcing",
-    "Level 2a: + random frequency",
-    "Level 2b: + random damping",
-    "Level 2c: + random freq & damp"
+    "Full diagonal",
+    "No random damping",
+    "No random frequency",
+    "Random forcing only"
   ),
   RE = c(
-    "(none)", "(1|id)", "(biomarker|id)",
-    "(velocity|id)", "(biomarker+velocity|id)"
+    "(1+biomarker+velocity||id)",
+    "(1+biomarker||id)",
+    "(1+velocity||id)",
+    "(1||id)"
   ),
   n_RE = sapply(fits, function(f) ncol(f$random_effects)),
   logLik = sapply(fits, `[[`, "logLik"),
@@ -152,12 +154,13 @@ knitr::kable(data.frame(
 
 ```{r decision}
 converged_idx <- which(sapply(fits, function(f) f$convergence$converged))
-aics <- sapply(fits[converged_idx], `[[`, "AIC")
-best_idx <- converged_idx[which.min(aics)]
+best_idx <- converged_idx[1]
 best_marginal <- fits[[best_idx]]
 cat(sprintf(
-  "Selected: Level %s (AIC = %.1f)\n",
-  c("0", "1", "2a", "2b", "2c")[best_idx], best_marginal$AIC
+  "Selected: %s (AIC = %.1f)\n",
+  c("full diagonal", "no random damping", "no random frequency",
+    "random forcing only")[best_idx],
+  best_marginal$AIC
 ))
 ```
 
@@ -165,9 +168,10 @@ cat(sprintf(
 summary(best_marginal)
 ```
 
-The best model (Level 2b) adds random damping. The large damping
-ratio ($\xi \gg 1$) indicates overdamped dynamics: albumin declines
-monotonically rather than oscillating, consistent with PBC biology.
+The selected model is the first cleanly converged model along the prespecified
+simplification path. A large damping ratio ($\xi \gg 1$), when present,
+indicates overdamped dynamics: albumin changes monotonically rather than
+oscillating.
 
 ## RE Variance Diagnostics
 
@@ -187,11 +191,10 @@ The `init = "marginal"` option warm-starts from the MarginalODE fit.
 ```{r fit-joint}
 # Use the formula from the best marginal model
 selected_formula <- list(
-  observed ~ biomarker + velocity + drug,
-  observed ~ biomarker + velocity + drug + (1 | id),
-  observed ~ biomarker + velocity + drug + (biomarker | id),
-  observed ~ biomarker + velocity + drug + (velocity | id),
-  observed ~ biomarker + velocity + drug + (biomarker + velocity | id)
+  observed ~ biomarker + velocity + drug + (1 + biomarker + velocity || id),
+  observed ~ biomarker + velocity + drug + (1 + biomarker || id),
+  observed ~ biomarker + velocity + drug + (1 + velocity || id),
+  observed ~ biomarker + velocity + drug + (1 || id)
 )[[best_idx]]
 
 fit <- JointODE(

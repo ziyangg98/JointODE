@@ -7,8 +7,11 @@
 MarginalODE(formula, data, time = "time", id = "id", control = list())
 }
 \arguments{
-\item{formula}{Response and covariates
-(e.g., \code{biomarker ~ x1 + x2})}
+\item{formula}{Longitudinal formula. The left-hand side is the observed
+response. On the right-hand side, \code{biomarker} and \code{velocity}
+activate the ODE dynamic parameters; other terms enter the forcing
+function. Random effects use lme-style syntax: \code{|} for full
+covariance and \code{||} for diagonal covariance.}
 
 \item{data}{Data frame with longitudinal measurements}
 
@@ -23,14 +26,19 @@ See \code{\link{MarginalODE.control}}.}
 S3 object of class \code{MarginalODE}
 }
 \description{
-Estimates population-level ODE parameters for longitudinal
-biomarker trajectories:
-\eqn{\ddot{m}(t) = \beta_1 m(t) + \beta_2 \dot{m}(t) + X\beta}
+Estimates the longitudinal part of a second-order ODE model:
+\deqn{\ddot{m}_i(t) + 2\xi_i\omega_i\dot{m}_i(t) +
+  \omega_i^2m_i(t) = f_i(t).}
+The reserved formula terms \code{biomarker} and \code{velocity} represent
+the latent log-coefficients \eqn{\log\omega_i^2} and
+\eqn{\log(2\xi_i\omega_i)}, respectively.
 }
 \examples{
 \dontrun{
+data(sim)
 fit <- MarginalODE(
-  formula = observed ~ x1 + x2,
+  formula = observed ~ biomarker + velocity + x1 + x2 +
+    (1 + biomarker + velocity || id),
   data = sim$data$longitudinal_data
 )
 }

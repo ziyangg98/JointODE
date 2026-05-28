@@ -126,9 +126,9 @@ test_that("validate rejects invalid longitudinal formulas", {
   )
 })
 
-test_that("validate rejects reserved words in data", {
+test_that("validate allows reserved words in data", {
   d <- data.frame(y = 1:10, biomarker = 1:10, id = rep(1:2, each = 5))
-  expect_error(.validate_longitudinal_formula(y ~ 1 + (1 | id), d), "Reserved")
+  expect_no_error(.validate_longitudinal_formula(y ~ 1 + (1 | id), d))
 })
 
 test_that("validate rejects nested random effects", {

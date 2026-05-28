@@ -398,7 +398,7 @@ test_that("simulate handles covariates correctly", {
 })
 
 test_that(".create_example_data works", {
-  example <- .create_example_data(n_subjects = 20, seed = 123)
+  example <- JointODE:::.create_example_data(n_subjects = 20, seed = 123)
 
   expect_named(example, c("data", "init"))
   expect_named(example$init, c("coefficients", "configurations"))
@@ -415,7 +415,7 @@ test_that(".create_example_data works", {
 
   expect_equal(example$init$configurations$gamma, 1)
 
-  example2 <- .create_example_data(n_subjects = 20, seed = 123)
+  example2 <- JointODE:::.create_example_data(n_subjects = 20, seed = 123)
   expect_identical(
     example$data$survival_data$time,
     example2$data$survival_data$time

@@ -24,6 +24,7 @@
 ^\.editorconfig$
 ^cran-comments\.md$
 ^scripts$
+^analysis$
 ^src/symbols\.rds$
 ^src/.*\.(o|so|dll)$
 ^src/.*\.tmp$

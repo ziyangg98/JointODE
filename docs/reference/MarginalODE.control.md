@@ -11,8 +11,7 @@ MarginalODE.control(
   verbose = FALSE,
   parallel = FALSE,
   n_cores = 0,
-  .list = NULL,
-  ...
+  .list = NULL
 )
 ```
 
@@ -20,11 +19,11 @@ MarginalODE.control(
 
 - maxit:
 
-  Maximum number of alternating optimization iterations (default: 200)
+  Maximum number of `nlminb` iterations (default: 200)
 
 - tol:
 
-  Convergence tolerance on max absolute parameter change (default: 1e-4)
+  Relative convergence tolerance passed to `nlminb` (default: 1e-4)
 
 - verbose:
 
@@ -42,10 +41,6 @@ MarginalODE.control(
 - .list:
 
   Optional list of control parameters to process
-
-- ...:
-
-  Additional control parameters
 
 ## Value
 

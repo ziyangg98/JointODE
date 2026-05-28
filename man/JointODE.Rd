@@ -18,10 +18,11 @@ JointODE(
 }
 \arguments{
 \item{longitudinal_formula}{A formula specifying the longitudinal submodel.
-The left-hand side defines the response variable, while the right-hand
-side specifies fixed effects including time-varying and baseline
-covariates
-(e.g., \code{biomarker ~ time + treatment + age}).}
+The left-hand side defines the observed biomarker. On the right-hand side,
+\code{biomarker} and \code{velocity} are reserved ODE terms for
+\eqn{\log\omega_i^2} and \eqn{\log(2\xi_i\omega_i)}; all other fixed terms
+enter the forcing function. Random effects use lme-style syntax:
+\code{|} for full covariance and \code{||} for diagonal covariance.}
 
 \item{survival_formula}{A formula for the survival submodel using
 \code{Surv(time, status)} notation on the left-hand side. The right-hand
@@ -86,7 +87,7 @@ shared random effects and flexible hazard specifications.
 data(sim)
 fit <- JointODE(
   longitudinal_formula = observed ~
-    biomarker + velocity + x1 + x2 + (biomarker + velocity | id),
+    biomarker + velocity + x1 + x2 + (1 + biomarker + velocity | id),
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = sim$data$longitudinal_data,
   survival_data = sim$data$survival_data,

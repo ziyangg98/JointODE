@@ -100,12 +100,13 @@ utils::globalVariables(c(
 #' \strong{Association plots} visualize how biomarker features (value and
 #' slope) relate to hazard ratios.
 #'
-#' @importFrom ggplot2 ggplot aes geom_line geom_point geom_smooth
-#'   geom_ribbon geom_abline geom_hline facet_wrap scale_color_manual
-#'   scale_fill_manual scale_color_viridis_c theme_bw theme element_text
-#'   element_blank element_rect labs coord_cartesian xlim ylim stat_qq
-#'   stat_qq_line geom_density alpha geom_path geom_contour_filled
-#'   guides guide_legend
+#' @importFrom ggplot2 ggplot aes geom_line geom_point geom_smooth geom_ribbon
+#' @importFrom ggplot2 geom_abline geom_hline facet_wrap scale_color_manual
+#' @importFrom ggplot2 scale_fill_manual scale_color_viridis_c theme_bw theme
+#' @importFrom ggplot2 element_text element_blank element_rect labs
+#' @importFrom ggplot2 coord_cartesian xlim ylim stat_qq stat_qq_line
+#' @importFrom ggplot2 geom_density alpha geom_path geom_contour_filled
+#' @importFrom ggplot2 guides guide_legend
 #' @importFrom patchwork wrap_plots plot_layout
 #' @importFrom dplyr group_by summarise mutate filter ungroup .data left_join
 #' @importFrom tidyr pivot_longer
@@ -122,7 +123,7 @@ utils::globalVariables(c(
 #' # Fit joint ODE model
 #' fit <- JointODE(
 #'   longitudinal_formula = observed ~ biomarker + velocity + x1 + x2 +
-#'     (biomarker + velocity | id),
+#'     (1 + biomarker + velocity | id),
 #'   survival_formula = Surv(time, status) ~ w1 + w2,
 #'   longitudinal_data = sim$data$longitudinal_data,
 #'   survival_data = sim$data$survival_data,

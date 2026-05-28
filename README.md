@@ -31,14 +31,13 @@ second-order ODE:
 
 $$\ddot{m}_i(t) + 2 \xi_i \omega_i \dot{m}_i(t) + \omega_i^2 m_i(t) = f_i(t)$$
 
-with $m_i(0) = m_{0,i}$ and a quasi-steady initial velocity
-$\dot{m}_i(0)=\{f_i(0)-\omega_i^2m_{0,i}\}/(2\xi_i\omega_i)$. Here
-$\omega_i$ is the natural frequency, $\xi_i$ is the damping ratio, and
-$f_i(t)$ is covariate-driven forcing. The dynamic parameters are
+with initial conditions $m_i(0) = m_{0,i}$ and $\dot{m}_i(0)=v_{0,i}$.
+Here $\omega_i$ is the natural frequency, $\xi_i$ is the damping ratio,
+and $f_i(t)$ is covariate-driven forcing. The dynamic parameters are
 estimated on log-coefficient scales: `biomarker` is $\log \omega_i^2$
 and `velocity` is $\log(2\xi_i\omega_i)$. Individual heterogeneity is
-captured through random effects on initial biomarker level, ODE
-parameters, and optional forcing terms.
+captured through random effects on initial biomarker level, initial
+velocity, ODE parameters, and optional forcing terms.
 
 **Survival Model:** The hazard function incorporates biomarker dynamics:
 
@@ -98,7 +97,7 @@ fit <- JointODE(
   init = "marginal"
 )
 cat(sprintf("Elapsed: %.1f s\n", (proc.time() - t0)["elapsed"]))
-#> Elapsed: 87.2 s
+#> Elapsed: 87.4 s
 ```
 
 ``` r
@@ -113,64 +112,67 @@ summary(fit)
 #>
 #> Data Descriptives:
 #> Longitudinal Process            Survival Process
-#> Number of Observations: 16894   Number of Events: 67 (34%)
+#> Number of Observations: 17222   Number of Events: 65 (32%)
 #> Number of Subjects: 200
 #>
 #>        AIC        BIC     logLik
-#> -26764.725 -26682.267  13407.362
+#> -27481.997 -27379.749  13771.999
 #>
 #> Coefficients:
 #> Longitudinal Process: Second-Order ODE Model
 #>               Estimate Std. Error z value Pr(>|z|)
-#> log_omega2      0.0949     0.0225   4.212 2.53e-05 ***
-#> log_2xi_omega  -0.1369     0.0236  -5.793 6.93e-09 ***
-#> (Intercept)    -0.0158     0.0146  -1.083    0.279
-#> x1              0.5380     0.0165  32.652  < 2e-16 ***
-#> x2             -0.4830     0.0152 -31.780  < 2e-16 ***
+#> log_omega2      0.0903     0.0228   3.965 7.34e-05 ***
+#> log_2xi_omega  -0.1420     0.0253  -5.610 2.02e-08 ***
+#> (Intercept)    -0.0091     0.0144  -0.632    0.527
+#> x1              0.5441     0.0164  33.215  < 2e-16 ***
+#> x2             -0.4821     0.0151 -31.942  < 2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> ODE System Characteristics:
 #>                           Estimate Std. Error z value Pr(>|z|)
-#> omega (natural frequency)   1.0486     0.0118   88.76   <2e-16 ***
-#> xi (damping ratio)          0.4158     0.0100   41.55   <2e-16 ***
+#> omega (natural frequency)   1.0462     0.0119   87.84   <2e-16 ***
+#> xi (damping ratio)          0.4147     0.0109   37.98   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Survival Process: Proportional Hazards Model
 #>          Estimate Std. Error z value Pr(>|z|)
-#> value      0.7728     0.1808   4.273 1.93e-05 ***
-#> velocity   1.7008     0.3848   4.420 9.85e-06 ***
-#> w1         0.6337     0.1464   4.329 1.49e-05 ***
-#> w2        -0.9578     0.2672  -3.585 0.000337 ***
+#> value      1.1387     0.2090   5.449 5.07e-08 ***
+#> velocity   2.5307     0.7130   3.550 0.000386 ***
+#> w1         0.9854     0.1621   6.078 1.22e-09 ***
+#> w2        -1.0904     0.2726  -4.001 6.32e-05 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Baseline Hazard: B-spline with 4 basis functions
-#> (Coefficients range: [-5.253, -2.394] )
+#> (Coefficients range: [-5.532, -2.453] )
 #>
 #> Initial State: Population Mean
 #>                   Estimate Std. Error z value Pr(>|z|)
-#> initial_biomarker  -0.5016     0.0075  -66.98   <2e-16 ***
+#> initial_biomarker  -0.5069     0.0079 -63.785   <2e-16 ***
+#> initial_velocity    0.0169     0.0110   1.534    0.125
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
 #> Variance Components:
-#> Measurement Error SD: 0.099662
+#> Measurement Error SD: 0.099639
 #> Random Effect Covariance Matrix:
-#>                     initial_biomarker log_omega2 log_2xi_omega
-#> initial_biomarker           0.0087971  -0.006464     0.0001618
-#> log_omega2                 -0.0064640   0.075953     0.0070495
-#> log_2xi_omega               0.0001618   0.007049     0.0862564
-#> forcing_(Intercept)         0.0012301   0.001358     0.0043238
+#>                     initial_biomarker initial_velocity log_omega2 log_2xi_omega
+#> initial_biomarker           0.0099902        0.0003266 -0.0017520    -0.0012379
+#> initial_velocity            0.0003266        0.0108382 -0.0067544     0.0002496
+#> log_omega2                 -0.0017520       -0.0067544  0.0703016     0.0002162
+#> log_2xi_omega              -0.0012379        0.0002496  0.0002162     0.0824629
+#> forcing_(Intercept)         0.0005011        0.0019067  0.0057967     0.0074494
 #>                     forcing_(Intercept)
-#> initial_biomarker              0.001230
-#> log_omega2                     0.001358
-#> log_2xi_omega                  0.004324
-#> forcing_(Intercept)            0.034458
+#> initial_biomarker             0.0005011
+#> initial_velocity              0.0019067
+#> log_omega2                    0.0057967
+#> log_2xi_omega                 0.0074494
+#> forcing_(Intercept)           0.0333415
 #>
 #> Model Diagnostics:
-#> C-index (Concordance): 0.631
+#> C-index (Concordance): 0.727
 #> Convergence: Converged (relative convergence (4))
 
 # Plot results
@@ -190,31 +192,9 @@ The formula uses two reserved keywords (not data columns):
 
 ## Learn More
 
-- **Getting Started**: See `vignette("JointODE")` for a detailed
-  tutorial
-- **Technical Details**: See `vignette("technical-details")` for
-  mathematical formulations
-- **Model Comparison**: See `vignette("comparison")` for comparisons
-  with traditional joint models
-
-## Performance Baseline
-
-Use the helper scripts in `scripts/` to generate reproducible runtime
-baselines and compare two runs:
-
-``` bash
-# Generate baseline CSV (sequential + optional parallel case)
-Rscript scripts/perf-baseline.R --n=20 --reps=3 --maxit=10 --tol=1e-2 --out=perf-base.csv
-
-# Generate candidate CSV after code changes
-Rscript scripts/perf-baseline.R --n=20 --reps=3 --maxit=10 --tol=1e-2 --out=perf-new.csv
-
-# Compare elapsed_mean and fail if slowdown > 10%
-Rscript scripts/perf-compare.R --base=perf-base.csv --new=perf-new.csv --metric=elapsed_mean --fail_pct=10
-```
-
-These scripts are intended for quick engineering checks, not
-publication-grade benchmarking.
+- **PBC example workflow**: See `vignette("examples")`
+- **Model illustration**: See `vignette("illustration")`
+- **Technical details**: See `vignette("technical-details")`
 
 ## Code of Conduct
 

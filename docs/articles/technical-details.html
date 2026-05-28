@@ -8,8 +8,8 @@
 <title>Technical Details • JointODE</title>
 <!-- katex math --><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script><script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous" onload="renderMathInElement(document.body);"></script><script src="../katex-auto.js"></script><script src="../lightswitch.js"></script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Technical Details">
 </head>
@@ -90,9 +90,8 @@
 a second-order linear ODE:</p>
 <p><span class="math display">\ddot{m}_i(t) +
 2\xi_i\omega_i\,\dot{m}_i(t) + \omega_i^2\,m_i(t) = f_i(t)</span></p>
-<p>with initial conditions <span class="math inline">m_i(0) =
-m_{0,i}</span> and <span class="math inline">\dot{m}_i(0) =
-v_{0,i}</span>, where:</p>
+<p>with initial conditions <span class="math inline">m_i(0)=m_{0,i}</span> and <span class="math inline">\dot{m}_i(0)=v_{0,i}</span>.</p>
+<p>Here:</p>
 <ul>
 <li>
 <span class="math inline">\omega_i &gt; 0</span>: natural frequency
@@ -112,26 +111,43 @@ b_{1,i}\,m_i(t) + b_{2,i}\,\dot{m}_i(t) + f_i(t)</span>, the ODE
 coefficients are:</p>
 <p><span class="math display">b_{1,i} = -\omega_i^2, \quad b_{2,i} =
 -2\xi_i\omega_i</span></p>
-<p>Stability requires <span class="math inline">b_{1,i} &lt; 0</span>
-and <span class="math inline">b_{2,i} &lt; 0</span> (both eigenvalues of
-the characteristic equation have negative real parts). This is enforced
-through a log parameterization with multiplicative random effects:</p>
-<p><span class="math display">b_{1,i} = -\exp(\theta_1 + u_{1,i}), \quad
-b_{2,i} = -\exp(\theta_2 + u_{2,i})</span></p>
-<p>where <span class="math inline">\theta_1 = \log(\omega^2)</span> and
-<span class="math inline">\theta_2 = \log(2\xi\omega)</span> are
-population-level parameters, and <span class="math inline">u_{1,i},
-u_{2,i}</span> are zero-mean random effects. Since <span class="math inline">\exp(\cdot) &gt; 0</span>, we have <span class="math inline">b_{1,i} &lt; 0</span> and <span class="math inline">b_{2,i} &lt; 0</span> for all subjects regardless of
-random effect values. The multiplicative structure preserves the sign
-while allowing subject-specific variation: <span class="math inline">\omega_i^2 = \omega^2 e^{u_{1,i}}</span>.</p>
-<p>The complete random effects vector for subject <span class="math inline">i</span> is:</p>
-<p><span class="math display">\mathbf{b}_i = \begin{pmatrix} m_{0,i} -
-\bar{m}_0 \\ v_{0,i} - \bar{v}_0 \\ u_{1,i} \\ u_{2,i} \\ \vdots
-\end{pmatrix} \sim \mathcal{N}(\mathbf{0},
-\boldsymbol{\Sigma}_b)</span></p>
-<p>where the first two components capture initial-state heterogeneity
-(additive), followed by dynamics RE (multiplicative on log scale), and
-optional forcing RE.</p>
+<p>Stability is enforced by modeling the log-coefficients with Gaussian
+fixed and random effects:</p>
+<p><span class="math display">\theta_{\omega i}=\log\omega_i^2,\quad
+\theta_{d i}=\log(2\xi_i\omega_i)</span></p>
+<p>so the ODE coefficients are</p>
+<p><span class="math display">b_{1,i} = -\exp(\theta_{\omega i}), \quad
+b_{2,i} = -\exp(\theta_{d i}).</span></p>
+<p>The formula keywords are <code>biomarker</code> for <span class="math inline">\theta_{\omega i}</span> and <code>velocity</code>
+for <span class="math inline">\theta_{d i}</span>.</p>
+<p>The initial biomarker level and initial velocity are subject-specific
+random effects in all fitted models. Formula random effects then add
+heterogeneity in the dynamic log-coefficients and/or in the forcing
+function. For example, <code>(1 + biomarker + velocity | id)</code>
+uses</p>
+<p><span class="math display">
+\mathbf{b}_i =
+\begin{pmatrix}
+b_{m0,i} &amp;
+b_{v0,i} &amp;
+b_{\omega,i} &amp;
+b_{d,i} &amp;
+b_{f0,i}
+\end{pmatrix}^{\top}
+\sim \mathcal{N}(\mathbf{0}, \boldsymbol{\Sigma}_b),
+</span></p>
+<p>where <span class="math inline">b_{m0,i}</span> and <span class="math inline">b_{v0,i}</span> perturb the initial state, <span class="math inline">b_{\omega,i}</span> perturbs <span class="math inline">\theta_{\omega i}</span>, <span class="math inline">b_{d,i}</span> perturbs <span class="math inline">\theta_{d i}</span>, and <span class="math inline">b_{f0,i}</span> is a random forcing intercept. The
+formula operator controls the covariance structure: <code>|</code>
+estimates the full covariance matrix and <code>||</code> estimates an
+independent diagonal covariance.</p>
+<p>Thus, for formulas that include random effects on
+<code>biomarker</code> and <code>velocity</code>,</p>
+<p><span class="math display">
+\theta_{\omega i} =
+\theta_{\omega} + b_{\omega,i}, \qquad
+\theta_{d i} =
+\theta_d + b_{d,i}.
+</span></p>
 </div>
 <div class="section level3">
 <h3 id="survival-sub-model">1.3 Survival Sub-Model<a class="anchor" aria-label="anchor" href="#survival-sub-model"></a>
@@ -184,9 +200,10 @@ p(\mathbf{b}_i) &amp;= \mathcal{N}(\mathbf{0}, \boldsymbol{\Sigma}_b)
 \end{aligned}</span></p>
 <p>where <span class="math inline">\boldsymbol{\theta}</span> collects
 all fixed parameters: <span class="math inline">(\boldsymbol{\eta},
-\alpha_\text{value}, \alpha_\text{velocity}, \boldsymbol{\phi},
-\theta_1, \theta_2, \boldsymbol{\beta}_X, \bar{m}_0, \bar{v}_0,
-\sigma_e, \text{vech}(\boldsymbol{\Sigma}_b))</span>.</p>
+\alpha_\text{value}, \alpha_\text{velocity},
+\boldsymbol{\phi}, \theta_{\omega}, \theta_d, \boldsymbol{\beta}_X,
+\bar{m}_0, \bar{v}_0, \sigma_e,
+\text{vech}(\boldsymbol{\Sigma}_b))</span>.</p>
 </div>
 </div>
 <div class="section level2">
@@ -285,7 +302,7 @@ finite value with finite gradient.</p>
 <p><strong>Forcing integral singularity</strong>: <span class="math inline">J_1 = (a_0 - 1)/b_1</span> has a removable
 singularity at <span class="math inline">b_1 = 0</span>. The limit <span class="math inline">\lim_{b_1 \to 0} J_1 = \Delta
 t^2\,\text{expm1c2}(b_2\Delta t)</span> where <span class="math inline">\text{expm1c2}(x) = (e^x - 1 - x)/x^2</span> is used
-as a Taylor fallback.</p>
+as a Taylor expansion.</p>
 </div>
 <div class="section level3">
 <h3 id="physical-stability-guarantee">2.3 Physical Stability Guarantee<a class="anchor" aria-label="anchor" href="#physical-stability-guarantee"></a>
@@ -301,17 +318,12 @@ parameter values. This provides:</p>
 negative real parts (underdamped: <span class="math inline">\text{Re}(\lambda) = b_2/2 &lt; 0</span>;
 overdamped: <span class="math inline">\lambda_{1,2} &lt; 0</span> since
 <span class="math inline">\sqrt{D} &lt; |b_2|</span>), so trajectories
-decay rather than grow. The factor <span class="math inline">e^\mu =
-e^{b_2\Delta t/2} &lt; 1</span> prevents overflow in the matrix
+decay rather than grow.</li>
+<li>
+<strong>Stable numerical propagation</strong>: The solver uses
+Taylor expansions near removable singularities and a root-based
+transition in extreme overdamped cases to avoid overflow in the matrix
 exponential.</li>
-<li>
-<strong>Convex inner optimization</strong>: With stable dynamics,
-the negative log-likelihood as a function of random effects is unimodal,
-ensuring the Laplace approximation (Section 3) is valid.</li>
-<li>
-<strong>Well-conditioned Hessian</strong>: The inner Hessian
-eigenvalues remain bounded, enabling fast Newton convergence for the
-random effects mode.</li>
 </ul>
 </div>
 </div>
@@ -365,23 +377,13 @@ effects <span class="math inline">\boldsymbol{\theta}</span> are:</p>
 \sqrt{[\mathcal{I}(\hat{\boldsymbol{\theta}})^{-1}]_{kk}}</span></p>
 </div>
 <div class="section level3">
-<h3 id="warm-start-strategy">3.4 Warm Start Strategy<a class="anchor" aria-label="anchor" href="#warm-start-strategy"></a>
+<h3 id="joint-model-initialization">3.4 Joint-Model Initialization<a class="anchor" aria-label="anchor" href="#joint-model-initialization"></a>
 </h3>
-<p>For models with dynamics random effects, a two-phase approach
-improves convergence:</p>
-<ol style="list-style-type: decimal">
-<li>
-<strong>Phase 1</strong>: Fit a reduced model without dynamics RE
-(only initial-state RE). This converges quickly because the inner
-optimization is low-dimensional.</li>
-<li>
-<strong>Phase 2</strong>: Use Phase 1 estimates as starting values
-for the full model. The inner Newton starts near the mode, accelerating
-convergence.</li>
-</ol>
-<p>For the joint model, <code>MarginalODE</code> (longitudinal only)
-provides initial values, followed by time-dependent Cox regression for
-survival parameters.</p>
+<p>For the joint model, <code>MarginalODE</code> (longitudinal only) can
+provide initial values when <code>init = "marginal"</code>, followed by
+time-dependent Cox regression for survival parameters. Both
+<code>MarginalODE</code> and <code>JointODE</code> optimize the direct
+TMB Laplace objective with <code>nlminb</code>.</p>
 </div>
 </div>
 <div class="section level2">
@@ -404,15 +406,17 @@ survival parameters.</p>
 matrix.</p>
 <p><strong>Natural frequency:</strong></p>
 <p><span class="math display">\frac{\partial\omega}{\partial\theta_1} =
-\frac{\omega}{2}, \quad \text{SE}(\hat\omega) =
-\frac{\hat\omega}{2}\sqrt{V_{11}}</span></p>
+\frac{1}{2}\omega, \quad \text{SE}(\hat\omega) =
+\frac{1}{2}\hat\omega\sqrt{V_{11}}</span></p>
 <p><strong>Damping ratio:</strong></p>
-<p><span class="math display">\frac{\partial\xi}{\partial\theta_1} =
--\frac{\xi}{2}, \quad \frac{\partial\xi}{\partial\theta_2} =
-\xi</span></p>
-<p><span class="math display">\text{Var}(\hat\xi) =
-\frac{\hat\xi^2}{4}V_{11} + \hat\xi^2 V_{22} - \hat\xi^2
-V_{12}</span></p>
+<p><span class="math display">\xi = \frac{1}{2}\exp(\theta_2 -
+\theta_1/2)</span></p>
+<p>with gradient</p>
+<p><span class="math display">\nabla \xi = \left(-\frac{1}{2}\xi,\
+\xi\right)^\top.</span></p>
+<p>Thus</p>
+<p><span class="math display">\text{Var}(\hat\xi) \approx \nabla\xi^\top
+\mathbf{V}\nabla\xi.</span></p>
 </div>
 </div>
 <div class="section level2">

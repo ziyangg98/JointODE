@@ -9,7 +9,7 @@ A list with two components:
 \describe{
 \item{data}{A list containing the simulated data:
 \describe{
-\item{longitudinal_data}{Data frame with 17,347 longitudinal
+\item{longitudinal_data}{Data frame with 17,222 longitudinal
 measurements from 200 subjects:
 \itemize{
 \item id: Patient identifier (1-200)
@@ -29,10 +29,11 @@ measurements from 200 subjects:
 \item w1, w2: Survival covariates
 }
 }
-\item{random_effects}{Matrix (200 x 4) with subject-specific
+\item{random_effects}{Matrix (200 x 5) with subject-specific
 random effects:
 \itemize{
 \item initial_biomarker: Initial biomarker value
+\item initial_velocity: Initial biomarker velocity
 \item log_omega2: Random effect on \eqn{\log \omega_i^2}
 \item log_2xi_omega: Random effect on
 \eqn{\log(2\xi_i\omega_i)}
@@ -47,12 +48,13 @@ random effects:
 \itemize{
 \item baseline: B-spline coefficients for log baseline hazard
 \item longitudinal: Fixed effects for ODE dynamics
-(omega, xi, dyn_offset, covariate effects)
+(log_omega2, log_2xi_omega, forcing intercept, covariate
+effects)
 \item hazard: Association parameters (value, slope) and
 survival covariate effects
 \item measurement_error_sd: Measurement error SD (0.1)
-\item random_effect_sigma: 4x4 covariance matrix for
-random effects (initial_biomarker, log_omega2,
+\item random_effect_sigma: 5x5 covariance matrix for
+random effects (initial_biomarker, initial_velocity, log_omega2,
 log_2xi_omega, forcing intercept)
 }
 }
@@ -111,7 +113,7 @@ apply(sim$data$random_effects, 2, sd)
 # Fit a Joint ODE model using this data
 fit <- JointODE(
   longitudinal_formula = observed ~
-    biomarker + velocity + x1 + x2 + (biomarker + velocity | id),
+    biomarker + velocity + x1 + x2 + (1 + biomarker + velocity | id),
   survival_formula = Surv(time, status) ~ w1 + w2,
   longitudinal_data = sim$data$longitudinal_data,
   survival_data = sim$data$survival_data,

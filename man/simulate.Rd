@@ -8,8 +8,8 @@ simulate(
   n_subjects = 500,
   longitudinal = list(xi = c(mean = 0.4, sd = 0.1), period = c(mean = 6, sd = 0.8),
     excitation = list(offset = 0, covariates = c(x1 = 0.5, x2 = -0.45),
-    random_intercept_sd = 0.2), initial = list(biomarker = c(mean = -0.5, sd = 0.1)),
-    error_sd = 0.1, n_measurements = 100),
+    random_intercept_sd = 0.2), initial = list(biomarker = c(mean = -0.5, sd = 0.1),
+    velocity = c(mean = 0, sd = 0.1)), error_sd = 0.1, n_measurements = 100),
   survival = list(baseline = list(type = "weibull", shape = 2, scale = 15), value = 0.8,
     slope = 2, gamma = 1, covariates = c(w1 = 0.6, w2 = -0.8)),
   covariates = list(x1 = list(type = "normal", mean = 0, sd = 1), x2 = list(type =
@@ -49,6 +49,9 @@ forcing intercepts (default: 0.2)}
 \item{biomarker}{Population distribution of initial biomarker value
 \eqn{m_i(0)}, specified as \code{c(mean = ..., sd = ...)}.
 (default: c(mean = -0.5, sd = 0.1))}
+\item{velocity}{Population distribution of initial velocity
+\eqn{\dot{m}_i(0)}, specified as \code{c(mean = ..., sd = ...)}.
+(default: c(mean = 0, sd = 0.1))}
 }
 }
 \item{error_sd}{Standard deviation \eqn{\sigma_{\epsilon}} of the
@@ -133,12 +136,13 @@ with columns:
 Baseline survival covariates (if specified)
 }
 }
-\item{\code{random_effects}}{An \eqn{n \times 4} matrix of
+\item{\code{random_effects}}{An \eqn{n \times 5} matrix of
 subject-specific random effects (centered at zero). Columns
-\code{initial_biomarker} captures initial state variability;
-\code{log_omega2} and \code{log_2xi_omega} capture latent ODE
+\code{initial_biomarker} and \code{initial_velocity} capture initial
+state variability; \code{log_omega2} and \code{log_2xi_omega} capture latent ODE
 parameter variability; \code{forcing_(Intercept)} matches the
-lme-style random intercept in \code{(biomarker + velocity | id)}.}
+lme-style random intercept in
+\code{(1 + biomarker + velocity | id)}.}
 }}
 \item{\code{init}}{A list of initial parameter values suitable for
 passing to \code{JointODE()}, containing \code{$coefficients} and
@@ -193,12 +197,11 @@ excitation
 The initial biomarker is drawn from a population distribution:
 \itemize{
 \item \eqn{m_i(0) \sim \mathcal{N}(\mu_{m,0}, \sigma_{m,0}^2)}
+\item \eqn{\dot{m}_i(0) \sim \mathcal{N}(\mu_{v,0}, \sigma_{v,0}^2)}
 }
-The initial velocity is derived from the quasi-steady balance
-\eqn{\ddot{m}_i(0) \approx 0}.
 
 The observed longitudinal measurements incorporate additive Gaussian noise:
-\deqn{y_{ij} = m_i(t_{ij}) + b_i + \epsilon_{ij}}
+\deqn{y_{ij} = m_i(t_{ij}) + \epsilon_{ij}}
 where \eqn{\epsilon_{ij} \sim \mathcal{N}(0, \sigma_\epsilon^2)}
 represents independent measurement error.
 }
@@ -235,8 +238,9 @@ These are transformed to ODE parameters via:
 The transformation uses the Delta method to preserve the correct covariance
 structure in the ODE parameter space.
 
-Only \eqn{\beta_{1,i}} and \eqn{\beta_{2,i}} vary across subjects;
-the offset and covariate coefficients are shared fixed effects.
+The default simulation includes random effects on initial biomarker,
+initial velocity, the two dynamic log-coefficients, and the forcing
+intercept; forcing covariate coefficients are shared fixed effects.
 }
 }
 \examples{

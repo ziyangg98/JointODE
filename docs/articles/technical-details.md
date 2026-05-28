@@ -14,8 +14,9 @@ The true trajectory m_i(t) satisfies a second-order linear ODE:
 \ddot{m}\_i(t) + 2\xi_i\omega_i\\\dot{m}\_i(t) + \omega_i^2\\m_i(t) =
 f_i(t)
 
-with initial conditions m_i(0) = m\_{0,i} and \dot{m}\_i(0) = v\_{0,i},
-where:
+with initial conditions m_i(0)=m\_{0,i} and \dot{m}\_i(0)=v\_{0,i}.
+
+Here:
 
 - \omega_i \> 0: natural frequency (controls oscillation speed)
 - \xi_i \> 0: damping ratio (\xi \< 1: underdamped oscillation; \xi \>
@@ -30,29 +31,40 @@ b\_{2,i}\\\dot{m}\_i(t) + f_i(t), the ODE coefficients are:
 
 b\_{1,i} = -\omega_i^2, \quad b\_{2,i} = -2\xi_i\omega_i
 
-Stability requires b\_{1,i} \< 0 and b\_{2,i} \< 0 (both eigenvalues of
-the characteristic equation have negative real parts). This is enforced
-through a log parameterization with multiplicative random effects:
+Stability is enforced by modeling the log-coefficients with Gaussian
+fixed and random effects:
 
-b\_{1,i} = -\exp(\theta_1 + u\_{1,i}), \quad b\_{2,i} = -\exp(\theta_2 +
-u\_{2,i})
+\theta\_{\omega i}=\log\omega_i^2,\quad \theta\_{d
+i}=\log(2\xi_i\omega_i)
 
-where \theta_1 = \log(\omega^2) and \theta_2 = \log(2\xi\omega) are
-population-level parameters, and u\_{1,i}, u\_{2,i} are zero-mean random
-effects. Since \exp(\cdot) \> 0, we have b\_{1,i} \< 0 and b\_{2,i} \< 0
-for all subjects regardless of random effect values. The multiplicative
-structure preserves the sign while allowing subject-specific variation:
-\omega_i^2 = \omega^2 e^{u\_{1,i}}.
+so the ODE coefficients are
 
-The complete random effects vector for subject i is:
+b\_{1,i} = -\exp(\theta\_{\omega i}), \quad b\_{2,i} = -\exp(\theta\_{d
+i}).
 
-\mathbf{b}\_i = \begin{pmatrix} m\_{0,i} - \bar{m}\_0 \\ v\_{0,i} -
-\bar{v}\_0 \\ u\_{1,i} \\ u\_{2,i} \\ \vdots \end{pmatrix} \sim
-\mathcal{N}(\mathbf{0}, \boldsymbol{\Sigma}\_b)
+The formula keywords are `biomarker` for \theta\_{\omega i} and
+`velocity` for \theta\_{d i}.
 
-where the first two components capture initial-state heterogeneity
-(additive), followed by dynamics RE (multiplicative on log scale), and
-optional forcing RE.
+The initial biomarker level and initial velocity are subject-specific
+random effects in all fitted models. Formula random effects then add
+heterogeneity in the dynamic log-coefficients and/or in the forcing
+function. For example, `(1 + biomarker + velocity | id)` uses
+
+\mathbf{b}\_i = \begin{pmatrix} b\_{m0,i} & b\_{v0,i} & b\_{\omega,i} &
+b\_{d,i} & b\_{f0,i} \end{pmatrix}^{\top} \sim \mathcal{N}(\mathbf{0},
+\boldsymbol{\Sigma}\_b),
+
+where b\_{m0,i} and b\_{v0,i} perturb the initial state, b\_{\omega,i}
+perturbs \theta\_{\omega i}, b\_{d,i} perturbs \theta\_{d i}, and
+b\_{f0,i} is a random forcing intercept. The formula operator controls
+the covariance structure: `|` estimates the full covariance matrix and
+`||` estimates an independent diagonal covariance.
+
+Thus, for formulas that include random effects on `biomarker` and
+`velocity`,
+
+\theta\_{\omega i} = \theta\_{\omega} + b\_{\omega,i}, \qquad \theta\_{d
+i} = \theta_d + b\_{d,i}.
 
 ### 1.3 Survival Sub-Model
 
@@ -96,7 +108,7 @@ with components:
 
 where \boldsymbol{\theta} collects all fixed parameters:
 (\boldsymbol{\eta}, \alpha\_\text{value}, \alpha\_\text{velocity},
-\boldsymbol{\phi}, \theta_1, \theta_2, \boldsymbol{\beta}\_X,
+\boldsymbol{\phi}, \theta\_{\omega}, \theta_d, \boldsymbol{\beta}\_X,
 \bar{m}\_0, \bar{v}\_0, \sigma_e, \text{vech}(\boldsymbol{\Sigma}\_b)).
 
 ## 2. ODE Solver
@@ -191,7 +203,7 @@ a finite value with finite gradient.
 **Forcing integral singularity**: J_1 = (a_0 - 1)/b_1 has a removable
 singularity at b_1 = 0. The limit \lim\_{b_1 \to 0} J_1 = \Delta
 t^2\\\text{expm1c2}(b_2\Delta t) where \text{expm1c2}(x) = (e^x - 1 -
-x)/x^2 is used as a Taylor fallback.
+x)/x^2 is used as a Taylor expansion.
 
 ### 2.3 Physical Stability Guarantee
 
@@ -201,13 +213,10 @@ ensures b_1 \< 0 and b_2 \< 0 for all parameter values. This provides:
 - **Bounded trajectories**: Both eigenvalues have negative real parts
   (underdamped: \text{Re}(\lambda) = b_2/2 \< 0; overdamped:
   \lambda\_{1,2} \< 0 since \sqrt{D} \< \|b_2\|), so trajectories decay
-  rather than grow. The factor e^\mu = e^{b_2\Delta t/2} \< 1 prevents
-  overflow in the matrix exponential.
-- **Convex inner optimization**: With stable dynamics, the negative
-  log-likelihood as a function of random effects is unimodal, ensuring
-  the Laplace approximation (Section 3) is valid.
-- **Well-conditioned Hessian**: The inner Hessian eigenvalues remain
-  bounded, enabling fast Newton convergence for the random effects mode.
+  rather than grow.
+- **Stable numerical propagation**: The solver uses Taylor expansions
+  near removable singularities and a root-based transition in extreme
+  overdamped cases to avoid overflow in the matrix exponential.
 
 ## 3. Parameter Estimation
 
@@ -253,21 +262,12 @@ effects \boldsymbol{\theta} are:
 \text{SE}(\hat{\theta}\_k) =
 \sqrt{\[\mathcal{I}(\hat{\boldsymbol{\theta}})^{-1}\]\_{kk}}
 
-### 3.4 Warm Start Strategy
+### 3.4 Joint-Model Initialization
 
-For models with dynamics random effects, a two-phase approach improves
-convergence:
-
-1.  **Phase 1**: Fit a reduced model without dynamics RE (only
-    initial-state RE). This converges quickly because the inner
-    optimization is low-dimensional.
-2.  **Phase 2**: Use Phase 1 estimates as starting values for the full
-    model. The inner Newton starts near the mode, accelerating
-    convergence.
-
-For the joint model, `MarginalODE` (longitudinal only) provides initial
-values, followed by time-dependent Cox regression for survival
-parameters.
+For the joint model, `MarginalODE` (longitudinal only) can provide
+initial values when `init = "marginal"`, followed by time-dependent Cox
+regression for survival parameters. Both `MarginalODE` and `JointODE`
+optimize the direct TMB Laplace objective with `nlminb`.
 
 ## 4. Derived Physical Parameters
 
@@ -287,16 +287,20 @@ covariance from the information matrix.
 
 **Natural frequency:**
 
-\frac{\partial\omega}{\partial\theta_1} = \frac{\omega}{2}, \quad
-\text{SE}(\hat\omega) = \frac{\hat\omega}{2}\sqrt{V\_{11}}
+\frac{\partial\omega}{\partial\theta_1} = \frac{1}{2}\omega, \quad
+\text{SE}(\hat\omega) = \frac{1}{2}\hat\omega\sqrt{V\_{11}}
 
 **Damping ratio:**
 
-\frac{\partial\xi}{\partial\theta_1} = -\frac{\xi}{2}, \quad
-\frac{\partial\xi}{\partial\theta_2} = \xi
+\xi = \frac{1}{2}\exp(\theta_2 - \theta_1/2)
 
-\text{Var}(\hat\xi) = \frac{\hat\xi^2}{4}V\_{11} + \hat\xi^2 V\_{22} -
-\hat\xi^2 V\_{12}
+with gradient
+
+\nabla \xi = \left(-\frac{1}{2}\xi,\\ \xi\right)^\top.
+
+Thus
+
+\text{Var}(\hat\xi) \approx \nabla\xi^\top \mathbf{V}\nabla\xi.
 
 ## 5. Computational Details
 

@@ -57,11 +57,11 @@
   if (parsed_long$velocity$fixed) long_names <- c(long_names, "log_2xi_omega")
   long_names <- c(long_names, long_fixed_names)
 
-  # Random effects layout: [initial_biomarker, dyn_coefs..., forcing...]
-  n_re_total <- n_re + 1
+  # Random effects layout: [initial_biomarker, initial_velocity, dyn_coefs..., forcing...]
+  n_re_total <- n_re + 2
   random_effects <- matrix(0, nrow(survival_data), n_re_total)
 
-  re_names <- "initial_biomarker"
+  re_names <- c("initial_biomarker", "initial_velocity")
   if (parsed_long$biomarker$random) re_names <- c(re_names, "log_omega2")
   if (parsed_long$velocity$random) re_names <- c(re_names, "log_2xi_omega")
   if (length(random_terms) > 0) {
@@ -108,10 +108,10 @@
   } else {
     0L
   }
-  n_re <- 1L + n_long_random +
+  n_re <- 2L + n_long_random +
     sum(parsed_long$biomarker$random, parsed_long$velocity$random)
 
-  re_names <- "initial_biomarker"
+  re_names <- c("initial_biomarker", "initial_velocity")
   if (parsed_long$biomarker$random) re_names <- c(re_names, "log_omega2")
   if (parsed_long$velocity$random) re_names <- c(re_names, "log_2xi_omega")
   if (length(random_terms) > 0) {

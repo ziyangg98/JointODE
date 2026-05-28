@@ -116,8 +116,9 @@ Type joint_ode_nll(objective_function<Type>* obj) {
     int n_times = time_pts.size();
     // Dynamic parameters are constant across time steps.
     Type m = initial_state(0) + bi(0);
+    Type v = initial_state(1) + bi(1);
     Type log_omega2(0), log_2xi_omega(0);
-    int fixed_idx = 0, re_idx = 1;
+    int fixed_idx = 0, re_idx = 2;
     if (biomarker_fixed)  log_omega2 += longitudinal(fixed_idx++);
     if (biomarker_random) log_omega2 += bi(re_idx++);
     if (velocity_fixed)   log_2xi_omega += longitudinal(fixed_idx++);
@@ -127,13 +128,6 @@ Type joint_ode_nll(objective_function<Type>* obj) {
     int forcing_fixed_start = fixed_idx;
     int forcing_re_start = re_idx;
 
-    int cov0_idx = covariate_index_at(0.0, obs_t);
-    Type eta0(0);
-    for (int k = 0; k < n_fixed_covariates; k++)
-      eta0 += longitudinal(forcing_fixed_start + k) * Type(long_fixed_covariates_i(cov0_idx, k));
-    for (int k = 0; k < n_random_covariates; k++)
-      eta0 += bi(forcing_re_start + k) * Type(long_random_covariates_i(cov0_idx, k));
-    Type v = (eta0 - exp(log_omega2) * m) / exp(log_2xi_omega);
     Type cum_haz(0);
     vector<Type> sol_m(n_times), sol_v(n_times), sol_H(n_times);
     sol_m(0) = m;  sol_v(0) = v;  sol_H(0) = cum_haz;
